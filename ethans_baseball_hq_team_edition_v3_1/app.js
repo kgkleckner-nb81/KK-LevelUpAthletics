@@ -1,0 +1,321 @@
+const KEY='ethansBaseballHQ.logoParent.v1';
+const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9'};
+let state=load();
+function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const metricNames={pushups:'Push-ups',squats:'Squats',plank:'Plank seconds',crunches:'Sit Ups',broadJumps:'Broad jumps',shuffleTouches:'Lateral shuffle touches',skaterJumps:'Skater jumps',sprints:'Sprints'};
+const combineNames={maxPushups:'Max push-ups',squat60:'Squats in 60 sec',plankMax:'Longest plank',broadJumpIn:'Broad jump',sprintSec:'20-yard sprint'};
+
+const quests=[
+  {id:'daily-double',type:'Quest',icon:'⚾',title:'Daily Double',desc:'Complete two short workouts in one day.',xp:40},
+  {id:'gold-glove',type:'Quest',icon:'🧤',title:'Gold Glove Drill',desc:'Complete 50 lateral shuffle touches.',xp:35},
+  {id:'base-stealer',type:'Quest',icon:'🏃',title:'Base Stealer Bonus',desc:'Complete 10 total 20-yard sprints.',xp:40},
+  {id:'iron-core',type:'Quest',icon:'🧱',title:'Iron Core',desc:'Hold a plank for 60 seconds.',xp:45},
+  {id:'power-hitter',type:'Quest',icon:'💥',title:'Power Hitter',desc:'Complete 15 broad jumps with good form.',xp:45},
+  {id:'dad-challenge',type:'Quest',icon:'👨‍👦',title:'Dad Challenge',desc:'Beat Dad in one approved challenge.',xp:60},
+  {id:'fastball-monster',type:'Boss Battle',icon:'👹',title:'Fastball Monster',desc:'15 push-ups, 45-sec plank, and 40 squats.',xp:100},
+  {id:'base-dragon',type:'Boss Battle',icon:'🐉',title:'Base-Stealing Dragon',desc:'8 sprints and 40 shuffle touches.',xp:100},
+  {id:'spartan-trial',type:'Boss Battle',icon:'⚔️',title:'Spartan Trial',desc:'Reach 60+ overall and complete a verified combine.',xp:125},
+  {id:'brewers-callup',type:'Boss Battle',icon:'🔵',title:'Brewers Call-Up',desc:'Reach Brewers Prospect tier.',xp:175}
+];
+function questXP(){return (state.quests||[]).reduce((a,x)=>a+(+x.xp||0),0)}
+
+const rewardMilestones=[
+  {xp:250,title:'Ice Cream Single',icon:'🍦',desc:'Small surprise reward.'},
+  {xp:500,title:'New Baseball Bonus',icon:'⚾',desc:'New baseball, eye black, or small gear item.'},
+  {xp:750,title:'Batting Cage Trip',icon:'🥎',desc:'Parent-approved cage session or dad pitching session.'},
+  {xp:1000,title:'Baseball Store Visit',icon:'🧢',desc:'Trip to pick a small baseball item.'},
+  {xp:1500,title:'Brewers Bonus',icon:'🔵',desc:'Brewers-themed surprise.'},
+  {xp:2000,title:'All-Star Outing',icon:'🏟️',desc:'Special baseball outing idea.'},
+  {xp:3000,title:'MVP Surprise',icon:'🏆',desc:'Big end-of-season reward.'}
+];
+const bonusXPValues={
+  'Great Effort Bonus':25,
+  'Sportsmanship Bonus':50,
+  'Helping Teammate Bonus':50,
+  'Coach Compliment Bonus':100,
+  'Parent Wild Card':75
+};
+function bonusXP(){return (state.bonuses||[]).reduce((a,x)=>a+(+x.xp||0),0)}
+
+
+const tiers=[{name:'Rookie',min:0},{name:'Travel Ball',min:60},{name:'Single A',min:68},{name:'Double AA',min:76},{name:'Triple AAA',min:84},{name:'THE SHOW',min:92}];
+const benches={pushups:[5,10,15,20,30],squats:[15,25,40,60,80],plank:[20,30,45,60,90],shuffleTouches:[20,30,40,50,60],skaterJumps:[10,20,30,40,50],broadJumpIn:[40,50,60,70,80],sprintSec:[4.5,4.2,4.0,3.8,3.6]};
+
+$$('.tab').forEach(b=>b.onclick=()=>switchScreen(b.dataset.screen));
+function modeForScreen(id){
+  if(['clubhouse','daily','player','combine','quests','charts','library','rewards'].includes(id)) return 'athlete';
+  if(['team','league'].includes(id)) return 'team';
+  if(id==='arcade') return 'arcade';
+  if(id==='parent') return 'parent';
+  return 'home';
+}
+function showModeNav(mode){
+  $$('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  ['athlete','team','arcade','parent'].forEach(m=>{
+    const el=$('#'+m+'Subnav'); if(el) el.classList.toggle('hidden',m!==mode);
+  });
+}
+function switchScreen(id){
+  const mode=modeForScreen(id);
+  showModeNav(mode);
+  $$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.screen===id));
+  $$('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
+  window.scrollTo({top:0,behavior:'smooth'});
+  render();
+}
+function enterMode(mode){
+  if(mode==='home') switchScreen('home');
+  if(mode==='athlete') switchScreen('clubhouse');
+  if(mode==='team') switchScreen('team');
+  if(mode==='arcade') switchScreen('arcade');
+  if(mode==='parent') switchScreen('parent');
+}
+$$('.mode-btn').forEach(b=>b.onclick=()=>enterMode(b.dataset.mode));
+$$('[data-path]').forEach(b=>b.onclick=()=>enterMode(b.dataset.path));
+$$('[data-home-button]').forEach(b=>b.onclick=()=>enterMode('home'));
+if($('#dailyForm').date) $('#dailyForm').date.valueAsDate=new Date();
+$('#dailyForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());state.daily.push(d);state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));save();openPack();e.target.reset();$('#dailyForm').date.valueAsDate=new Date();render()};
+$('#combineForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());const ok=d.parentCode===state.parentCode;delete d.parentCode;d.verified=ok;d.status=ok?'Parent Verified':'Pending Parent Review';state.combine.push(d);state.combine.sort((a,b)=>(+a.week||0)-(+b.week||0));save();alert(ok?'Weekly combine saved and parent verified.':'Saved as pending. Parent can approve in Parent Zone.');e.target.reset();render()};
+$('#questForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());if(d.parentCode!==state.parentCode){alert('Incorrect parent code. Quest XP not awarded.');return}const q=quests.find(x=>x.id===d.questId);if(!q){alert('Select a quest.');return}state.quests=state.quests||[];state.quests.push({id:q.id,title:q.title,type:q.type,xp:q.xp,notes:d.notes||'',date:new Date().toISOString().slice(0,10)});save();alert(`${q.title} complete! +${q.xp} XP awarded.`);e.target.reset();render()};
+
+$('#saveParentCode').onclick=()=>{const c=$('#newParentCode').value.trim();if(c.length<4){$('#codeStatus').textContent='Use at least 4 characters.';return}state.parentCode=c;save();$('#newParentCode').value='';$('#codeStatus').textContent='Parent code updated.'};
+$('#approvePending').onclick=()=>{if($('#reviewCode').value!==state.parentCode){alert('Incorrect parent code.');return}state.combine.forEach(x=>{if(!x.verified){x.verified=true;x.status='Parent Verified'}});save();$('#reviewCode').value='';render()};
+$('#bonusForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());if(d.parentCode!==state.parentCode){alert('Incorrect parent code. Bonus XP not awarded.');return}const xpValue=bonusXPValues[d.bonusType]||0;state.bonuses=state.bonuses||[];state.bonuses.push({date:new Date().toISOString().slice(0,10),type:d.bonusType,xp:xpValue,reason:d.reason||''});save();alert(`${d.bonusType} awarded! +${xpValue} XP.`);e.target.reset();render()};
+
+$('#exerciseSelect').onchange=renderCharts;$('#combineMetricSelect').onchange=renderCharts;
+$('#exportData').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ethans-baseball-hq-backup.json';a.click()};
+$('#importData').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{state={...defaults,...JSON.parse(r.result)};save();render()}catch{alert('Could not import file')}};r.readAsText(f)};
+$('#resetData').onclick=()=>{if(confirm('Reset all saved data on this device?')){state={...defaults,daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[]};save();render()}};
+
+function max(arr){return Math.max(0,...arr.map(x=>+x||0))}
+function minPos(arr){const v=arr.map(Number).filter(x=>x>0);return v.length?Math.min(...v):0}
+function pr(){return{pushups:max([...state.daily.map(x=>x.pushups),...state.combine.filter(x=>x.verified).map(x=>x.maxPushups)]),squats:max([...state.daily.map(x=>x.squats),...state.combine.filter(x=>x.verified).map(x=>x.squat60)]),plank:max([...state.daily.map(x=>x.plank),...state.combine.filter(x=>x.verified).map(x=>x.plankMax)]),shuffleTouches:max(state.daily.map(x=>x.shuffleTouches)),skaterJumps:max(state.daily.map(x=>x.skaterJumps)),crunches:max(state.daily.map(x=>x.crunches)),broadJumpIn:max(state.combine.filter(x=>x.verified).map(x=>x.broadJumpIn)),sprintSec:minPos(state.combine.filter(x=>x.verified).map(x=>x.sprintSec)),sprints:max(state.daily.map(x=>x.sprints))}}
+function score(v,k){const b=benches[k]||[5,10,15,20,30];if(k==='sprintSec'){if(!v)return 50;if(v<=b[4])return 92;if(v<=b[3])return 84;if(v<=b[2])return 76;if(v<=b[1])return 68;return 60}let i=0;b.forEach((n,idx)=>{if(v>=n)i=idx});return [50,60,68,76,84][i]}
+function ratings(){const r=pr();const consistency=Math.min(99,50+state.daily.length*2+streak()*3);const speed=Math.round((score(r.sprints,'pushups')+(r.sprintSec?score(r.sprintSec,'sprintSec'):50))/2);const strength=Math.round((score(r.pushups,'pushups')+score(r.squats,'squats')+score(r.plank,'plank'))/3);const power=score(r.broadJumpIn,'broadJumpIn');const agility=Math.round((score(r.shuffleTouches,'shuffleTouches')+score(r.skaterJumps,'skaterJumps'))/2);const overall=Math.round((speed+strength+power+agility+consistency)/5);return{speed,strength,power,agility,consistency,overall}}
+function streak(){const dates=[...new Set(state.daily.map(x=>x.date).filter(Boolean))].sort().reverse();if(!dates.length)return 0;let s=0,d=new Date();for(let i=0;i<365;i++){const iso=d.toISOString().slice(0,10);if(dates.includes(iso)){s++;d.setDate(d.getDate()-1)}else if(i===0)d.setDate(d.getDate()-1);else break}return s}
+function xp(){return state.daily.length*25+state.combine.filter(x=>x.verified).length*75+questXP()+bonusXP()}
+function tier(){const o=ratings().overall;return [...tiers].reverse().find(t=>o>=t.min)||tiers[0]}
+function openPack(){$('#packReveal').classList.remove('hidden');$('#packCards').innerHTML='<div class="pack-card"><h3>⭐ +25 XP</h3><p>Workout completed.</p></div><div class="pack-card"><h3>⚾ Card Pack</h3><p>Keep the streak alive.</p></div><div class="pack-card"><h3>🎁 Mystery Chance</h3><p>Ask Dad if the Home Run Meter is full.</p></div>'}
+
+function renderPlatformStatus(){
+  const total=xp(), current=tier(), currentIndex=Math.max(0,tiers.findIndex(x=>x.name===current.name));
+  const next=tiers[Math.min(currentIndex+1,tiers.length-1)];
+  const packReady=(total%250)>=200;
+  if($('#statusTier')) $('#statusTier').textContent=current.name;
+  if($('#statusLevel')) $('#statusLevel').textContent=Math.max(1,Math.floor(total/150)+1);
+  if($('#statusXP')) $('#statusXP').textContent=total;
+  if($('#statusStreak')) $('#statusStreak').textContent=streak();
+  if($('#statusPack')) $('#statusPack').textContent=packReady?'READY':'LOCKED';
+  if($('#homeStreak')) $('#homeStreak').textContent=streak()+' Days';
+  if($('#homeNextCallup')) $('#homeNextCallup').textContent=currentIndex>=tiers.length-1?'THE SHOW':next.name;
+  if($('#homePackStatus')) $('#homePackStatus').textContent=packReady?'Ready to Open':'Locked';
+  if($('#homeMissionName')) $('#homeMissionName').textContent=typeof missionForToday==='function'?missionForToday().title:'Daily Mission';
+}
+function render(){renderPlatformStatus();const r=ratings(), rec=pr(), x=xp(), t=tier();$('#overall').textContent=r.overall;$('#overallBig').textContent=r.overall;$('#streak').textContent=streak();$('#workouts').textContent=state.daily.length;$('#xp').textContent=x;$('#levelName').textContent=t.name;$('#levelDesc').textContent=t.name==='THE SHOW'?'Major league energy. Keep building.':(t.name==='Triple AAA'?'One step from THE SHOW. Keep stacking wins.':'Keep training to get called up.');['speed','strength','power','agility','consistency'].forEach(k=>{$('#'+k).textContent=r[k];$('#'+k+'Bar').style.width=Math.min(100,r[k])+'%'});
+$$('.tier').forEach((el,i)=>el.classList.toggle('active',r.overall>=tiers[i].min));$('#records').innerHTML=`<li>${rec.pushups} max push-ups</li><li>${rec.squats} max squats</li><li>${rec.plank} sec plank</li><li>${rec.shuffleTouches} shuffle touches</li><li>${rec.broadJumpIn} in verified broad jump</li><li>${rec.sprintSec||'—'} sec verified sprint</li>`;
+const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#meterText').textContent=`${x%250} / 250 XP to next parent surprise`;$('#rewardNotice').textContent=x>=250&&x%250<75?'🎁 Parent surprise may be unlocked. Check Parent Zone.':'';
+$('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
+$('#combineLog').innerHTML=table(['Week','Push-ups','Squats','Plank','Broad','Sprint','Status'],state.combine.map(a=>[a.week,a.maxPushups,a.squat60,a.plankMax,a.broadJumpIn,a.sprintSec,`<span class="status ${a.verified?'verified':'pending'}">${a.status}</span>`]));
+$('#pendingList').innerHTML=table(['Week','Push-ups','Plank','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.maxPushups,a.plankMax,a.status]));
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderCoachReport();renderTeamEdition();renderCharts()}
+
+
+function xpEvents(){
+  const events=[];
+  (state.daily||[]).forEach(x=>events.push({date:x.date||'',label:'Daily Workout',xp:25,detail:x.notes||''}));
+  (state.combine||[]).filter(x=>x.verified).forEach(x=>events.push({date:'Week '+x.week,label:'Verified Weekly Combine',xp:75,detail:'Parent verified'}));
+  (state.quests||[]).forEach(x=>events.push({date:x.date||'',label:x.title,xp:+x.xp||0,detail:x.type||'Quest'}));
+  (state.bonuses||[]).forEach(x=>events.push({date:x.date||'',label:x.type,xp:+x.xp||0,detail:x.reason||'Parent bonus'}));
+  return events;
+}
+function renderRewards(){
+  const total=xp();
+  const unlocked=rewardMilestones.filter(r=>total>=r.xp);
+  const next=rewardMilestones.find(r=>total<r.xp);
+  if($('#seasonXPBig')) $('#seasonXPBig').textContent=total;
+  if($('#lifetimeXPBig')) $('#lifetimeXPBig').textContent=total;
+  if($('#nextRewardXP')) $('#nextRewardXP').textContent=next?next.xp-total:0;
+  if($('#rewardsUnlocked')) $('#rewardsUnlocked').textContent=unlocked.length;
+  const prev=[...rewardMilestones].reverse().find(r=>total>=r.xp);
+  const base=prev?prev.xp:0;
+  const top=next?next.xp:base+250;
+  const pct=Math.min(100,((total-base)/(top-base))*100);
+  if($('#vaultMeterFill')) $('#vaultMeterFill').style.width=pct+'%';
+  if($('#vaultMeterText')) $('#vaultMeterText').textContent=next?`${total} XP earned. ${next.xp-total} XP until ${next.title}.`:`${total} XP earned. All listed rewards unlocked.`;
+  if($('#rewardVault')) $('#rewardVault').innerHTML=rewardMilestones.map(r=>{
+    const stateClass=total>=r.xp?'unlocked':'';
+    return `<div class="reward-tile ${stateClass}">
+      <div class="quest-icon">${r.icon}</div>
+      <h3>${r.title}</h3>
+      <p><strong>${r.xp} XP</strong></p>
+      <p>${r.desc}</p>
+      <strong>${total>=r.xp?'Unlocked':'Locked'}</strong>
+    </div>`;
+  }).join('');
+  const events=xpEvents().slice().reverse();
+  if($('#xpLedger')) $('#xpLedger').innerHTML=events.length?events.map(e=>`<div class="ledger-item"><span>${e.date}</span><span>${e.label}<br><small class="muted">${e.detail||''}</small></span><strong>+${e.xp} XP</strong></div>`).join(''):'<p class="muted">No XP events yet.</p>';
+}
+
+function renderQuests(){
+  const completed=(state.quests||[]).map(x=>x.id);
+  if($('#questSelect')) $('#questSelect').innerHTML=quests.map(q=>`<option value="${q.id}">${q.type}: ${q.title} (+${q.xp} XP)</option>`).join('');
+  if($('#questList')) $('#questList').innerHTML=quests.map(q=>{
+    const count=completed.filter(id=>id===q.id).length;
+    return `<div class="quest-card ${q.type==='Boss Battle'?'battle':''} ${count?'complete':''}">
+      <div class="quest-icon">${q.icon}</div>
+      <h3>${q.title}</h3>
+      <p><strong>${q.type}</strong></p>
+      <p>${q.desc}</p>
+      <span class="xp-pill">+${q.xp} XP</span>
+      ${count?`<p class="verified">Completed ${count}x</p>`:''}
+    </div>`;
+  }).join('');
+  if($('#questHistory')) $('#questHistory').innerHTML=table(['Date','Challenge','Type','XP','Notes'],(state.quests||[]).slice().reverse().map(q=>[q.date,q.title,q.type,q.xp,q.notes]));
+}
+
+
+function workoutXPForEntry(entry){
+  let total=25;
+  const prs=entryPRs(entry);
+  total += prs.length*15;
+  const s=streak();
+  if(s>=3) total += 10;
+  return {total,prs,base:25,streakBonus:s>=3?10:0,prBonus:prs.length*15};
+}
+function previousDailyBest(beforeIndex,key){
+  const prior=state.daily.slice(0,beforeIndex).map(x=>+x[key]||0);
+  return Math.max(0,...prior);
+}
+function entryPRs(entry){
+  const idx=state.daily.indexOf(entry);
+  if(idx<0) return [];
+  const checks=[['pushups','Push-ups'],['squats','Squats'],['crunches','Sit Ups'],['plank','Plank'],['shuffleTouches','Shuffle'],['skaterJumps','Skater Jumps'],['sprints','Sprints']];
+  return checks.filter(([k])=>{const val=+entry[k]||0;return val>0 && val>previousDailyBest(idx,k);}).map(([k,label])=>({key:k,label,value:+entry[k]||0,previous:previousDailyBest(idx,k)}));
+}
+function formatPRCell(entry,key,prs){
+  const val=entry[key]||'';
+  if(!val) return '';
+  return prs.some(p=>p.key===key)?`${val} <span class="new-pr">▲ PR</span>`:val;
+}
+function workoutHistoryTable(rows){
+  if(!rows.length) return '<p class="muted">No entries yet.</p>';
+  return `<table class="table workout-history"><thead><tr>
+    <th>Date</th><th>✓</th><th>XP</th><th>Squats</th><th>Push-ups</th><th>Sit Ups</th><th>Plank</th><th>Shuffle</th><th>Skater Jumps</th><th>Sprints</th>
+  </tr></thead><tbody>${rows.map(entry=>{
+    const originalIndex=state.daily.indexOf(entry);
+    const xpInfo=workoutXPForEntry(entry);
+    const prs=xpInfo.prs;
+    return `<tr class="workout-row" data-workout-index="${originalIndex}">
+      <td>${entry.date||''}${prs.length?'<span class="pr-chip">PR</span>':''}</td>
+      <td>✅</td>
+      <td><strong>+${xpInfo.total}</strong></td>
+      <td>${entry.squats||''}</td>
+      <td>${formatPRCell(entry,'pushups',prs)}</td>
+      <td>${formatPRCell(entry,'crunches',prs)}</td>
+      <td>${formatPRCell(entry,'plank',prs)}</td>
+      <td>${formatPRCell(entry,'shuffleTouches',prs)}</td>
+      <td>${formatPRCell(entry,'skaterJumps',prs)}</td>
+      <td>${formatPRCell(entry,'sprints',prs)}</td>
+    </tr>`;
+  }).join('')}</tbody></table><p class="muted tap-note">Tap a row to view workout details.</p>`;
+}
+function showWorkoutDetail(index){
+  const entry=state.daily[index];
+  if(!entry) return;
+  const xpInfo=workoutXPForEntry(entry);
+  const prs=xpInfo.prs;
+  const prHtml=prs.length?prs.map(p=>`<li><strong>${p.label}</strong>: ${p.value} ${p.previous?`(+${p.value-p.previous})`:''}</li>`).join(''):'<li>No new PRs this workout.</li>';
+  $('#workoutDetailContent').innerHTML=`
+    <p class="eyebrow dark">Workout Detail</p>
+    <h2>${entry.date||'Workout'}</h2>
+    <div class="xp-breakdown">
+      <h3>XP Breakdown</h3>
+      <p>Daily Workout <strong>+${xpInfo.base}</strong></p>
+      <p>Streak Bonus <strong>+${xpInfo.streakBonus}</strong></p>
+      <p>New PR Bonus <strong>+${xpInfo.prBonus}</strong></p>
+      <p class="total-xp">Total <strong>+${xpInfo.total} XP</strong></p>
+    </div>
+    <div class="detail-grid">
+      <p><strong>Squats:</strong> ${entry.squats||0}</p>
+      <p><strong>Push-ups:</strong> ${entry.pushups||0}</p>
+      <p><strong>Sit Ups:</strong> ${entry.crunches||0}</p>
+      <p><strong>Plank:</strong> ${entry.plank||0}</p>
+      <p><strong>Shuffle:</strong> ${entry.shuffleTouches||0}</p>
+      <p><strong>Skater Jumps:</strong> ${entry.skaterJumps||0}</p>
+      <p><strong>Sprints:</strong> ${entry.sprints||0}</p>
+      <p><strong>Notes:</strong> ${entry.notes||''}</p>
+    </div>
+    <h3>Personal Records</h3><ul>${prHtml}</ul>`;
+  $('#workoutDetailModal').classList.remove('hidden');
+}
+function renderCoachReport(){
+  if(!$('#coachReport')) return;
+  if(!state.daily.length){$('#coachReport').innerHTML='<p class="muted">Complete a few workouts to unlock a weekly coach report.</p>';return;}
+  const last7=state.daily.slice(-7);
+  const workouts=last7.length;
+  const metrics=[['pushups','Push-ups'],['squats','Squats'],['crunches','Sit Ups'],['plank','Plank'],['shuffleTouches','Shuffle'],['skaterJumps','Skater Jumps'],['sprints','Sprints']];
+  const best=metrics.map(([k,label])=>{const vals=last7.map(x=>+x[k]||0);return{label,improvement:vals.length?Math.max(...vals)-Math.min(...vals):0};}).sort((a,b)=>b.improvement-a.improvement)[0];
+  const r=pr();
+  $('#coachReport').innerHTML=`<p><strong>Great work this week.</strong></p><p>You logged <strong>${workouts}</strong> recent workouts. Biggest improvement area: <strong>${best.label}</strong>.</p><p><strong>Next goals:</strong> ${(r.pushups||0)+2} push-ups, ${(r.crunches||0)+5} sit ups, ${(r.plank||0)+5}-second plank.</p><p class="muted">Keep stacking small wins and chasing the next call-up.</p>`;
+}
+document.addEventListener('click',e=>{
+  const row=e.target.closest('.workout-row');
+  if(row) showWorkoutDetail(+row.dataset.workoutIndex);
+  if(e.target.id==='closeWorkoutDetail' || e.target.id==='workoutDetailModal') $('#workoutDetailModal').classList.add('hidden');
+});
+
+function table(h,rows){if(!rows.length)return'<p class="muted">No entries yet.</p>';return`<table class="table"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
+
+function canvas(id,h=240){const c=$('#'+id);if(!c)return null;const w=c.clientWidth||800,dpr=devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);return{ctx,w,h}}
+function line(id,rows,title){const c=canvas(id);if(!c)return;const{ctx,w,h}=c;if(!rows.length){ctx.fillText('No data yet.',20,100);return}const vals=rows.map(r=>r.value).filter(Number.isFinite),maxV=Math.max(...vals,1)*1.1,minV=0,p={l:40,r:20,t:35,b:35};ctx.font='900 16px system-ui';ctx.fillStyle='#0c2340';ctx.fillText(title,p.l,20);ctx.strokeStyle='#d7e2ec';for(let i=0;i<=4;i++){let y=p.t+(h-p.t-p.b)*i/4;ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(w-p.r,y);ctx.stroke()}const pts=rows.map((r,i)=>({x:p.l+(w-p.l-p.r)*(rows.length===1?.5:i/(rows.length-1)),y:p.t+(h-p.t-p.b)*(1-(r.value-minV)/(maxV-minV||1)),...r}));ctx.beginPath();pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.strokeStyle='#0c6b3d';ctx.lineWidth=4;ctx.stroke();pts.forEach(pt=>{ctx.beginPath();ctx.arc(pt.x,pt.y,5,0,Math.PI*2);ctx.fillStyle='#ffc72c';ctx.fill();ctx.strokeStyle='#0c2340';ctx.stroke()})}
+function renderCharts(){let m=$('#exerciseSelect').value;line('exerciseChart',state.daily.filter(x=>x.date).map(x=>({label:x.date,value:+x[m]||0})),metricNames[m]+' over time');let cm=$('#combineMetricSelect').value;line('combineChart',best(cm),combineNames[cm]+' best-to-date')}
+function best(m){let rows=[],b=m==='sprintSec'?Infinity:0;state.combine.filter(x=>x.verified).sort((a,b)=>(+a.week||0)-(+b.week||0)).forEach(x=>{let v=+x[m]||0;if(m==='sprintSec'){if(v>0)b=Math.min(b,v);if(b!==Infinity)rows.push({label:'W'+x.week,value:b})}else{b=Math.max(b,v);rows.push({label:'W'+x.week,value:b})}});return rows}
+
+const demoAthletes=[{name:'Ethan',xp:2845,workouts:42,streak:12,improvement:21,sportsmanship:8,arcade:920},{name:'Jack',xp:2710,workouts:40,streak:9,improvement:16,sportsmanship:10,arcade:880},{name:'Mason',xp:2490,workouts:38,streak:7,improvement:24,sportsmanship:6,arcade:810},{name:'Luke',xp:2380,workouts:36,streak:11,improvement:19,sportsmanship:7,arcade:790},{name:'Noah',xp:2265,workouts:35,streak:6,improvement:14,sportsmanship:9,arcade:760},{name:'Charlie',xp:2140,workouts:33,streak:8,improvement:18,sportsmanship:7,arcade:730}];
+const exerciseRepository={Strength:['Push-ups','Wide Push-ups','Squats','Jump Squats','Wall Sit','Calf Raises','Glute Bridge'],Core:['Sit Ups','Dead Bugs','Bicycle Sit Ups','Plank','Side Plank','Superman','Hollow Hold'],Speed:['10-yard Sprint','20-yard Sprint','Flying Sprint','Shuttle Run','First-Step Reaction','Base-Stealing Starts'],Agility:['Skater Jumps','Lateral Shuffle','Carioca','Zig-Zag Cones','Crossover Runs','Box Drill','Mirror Drill'],Power:['Broad Jump','Vertical Jump','Lateral Hops','Single-Leg Hops'],Throwing:['Target Throws','One-Knee Throwing','Long Toss','Crow Hop','Quick Release','Pivot Throws'],Catching:['Tennis Ball Reaction','Barehand Catches','Blocking Drill','Transfer Drill'],Hitting:['Tee Work','Front Toss','Bat-Speed Swings','One-Hand Drills','Balance Drills','Launch Position'],Pitching:['Balance Drill','Arm Care','Hip Rotation','Towel Drill'],Recovery:['Shoulder Mobility','Band Work','Hip Mobility','Foam Rolling','Stretching'],Teamwork:['Sportsmanship Challenge','Encourage a Teammate','Equipment Cleanup','Coach Helper']};
+const avatarOptions=['⚾','🧢','🦸‍♂️','🐻','🦅','🔥','⭐','💪'];
+const lockerItems=['Blueprint Card Background','Gold Bat Grip','Fire Player Frame','Pinstripe Jersey','Stadium Lights Background','Lightning Eye Black','Captain Title','Diamond Card Border'];
+function todayISO(){return new Date().toISOString().slice(0,10)}
+function ensureGameXPDay(){if(!state.gameXP||state.gameXP.date!==todayISO())state.gameXP={date:todayISO(),xp:0}}
+function awardGameXP(amount){ensureGameXPDay();const avail=Math.max(0,25-state.gameXP.xp),earned=Math.min(avail,amount);state.gameXP.xp+=earned;save();renderTeamEdition();return earned}
+function missionForToday(){const m=[{title:'Speed Day',tasks:['6 Sprints','40 Shuffle Touches','20 Skater Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Power Day',tasks:['35 Squats','12 Push-ups','10 Broad Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Core Day',tasks:['30 Sit Ups','45-Second Plank','20 Dead Bugs'],reward:'+40 XP + Mystery Pack'},{title:'Baseball IQ Day',tasks:['Strike Zone Challenge','Target Throws','Coach Helper'],reward:'+35 XP + Card Unlock'},{title:'Recovery Day',tasks:['Shoulder Mobility','Hip Mobility','Easy Stretching'],reward:'+25 XP + Rain Token Chance'}];return m[new Date().getDay()%m.length]}
+function unlockRandomItem(){state.inventory=state.inventory||[];const item=lockerItems[Math.floor(Math.random()*lockerItems.length)];if(!state.inventory.includes(item))state.inventory.push(item);return item}
+function completeDailyMission(){const m=missionForToday();state.bonuses=state.bonuses||[];if(state.bonuses.some(x=>x.type==='Daily Mission'&&x.date===todayISO())){alert('Today’s mission is already complete.');return}state.bonuses.push({date:todayISO(),type:'Daily Mission',xp:40,reason:m.title});unlockRandomItem();save();alert('Mission complete! +40 XP and a mystery item unlocked.');render()}
+function useRainToken(){state.rainTokens=state.rainTokens??1;if(state.rainTokens<=0){alert('No Rain Delay Tokens available.');return}state.rainTokens-=1;state.bonuses=state.bonuses||[];state.bonuses.push({date:todayISO(),type:'Rain Delay Token',xp:0,reason:'Streak protected'});save();alert('Streak protected for one missed day.');renderTeamEdition()}
+function renderMission(){const m=missionForToday();if($('#missionTitle'))$('#missionTitle').textContent=m.title;if($('#missionTasks'))$('#missionTasks').innerHTML='<ul>'+m.tasks.map(t=>`<li>☐ ${t}</li>`).join('')+'</ul>';if($('#missionReward'))$('#missionReward').textContent=m.reward;if($('#streakLarge'))$('#streakLarge').textContent=streak();if($('#rainTokens'))$('#rainTokens').textContent=state.rainTokens??1}
+function renderLocker(){if(!$('#lockerInventory'))return;const inv=state.inventory||[];$('#lockerInventory').innerHTML=lockerItems.map(i=>`<div class="locker-item ${inv.includes(i)?'unlocked':''}"><div class="locker-icon">${inv.includes(i)?'🔓':'🔒'}</div><strong>${i}</strong></div>`).join('')}
+function renderLeaderboard(){if(!$('#teamLeaderboard'))return;const metric=$('#leaderboardMetric')?.value||'xp';const sorted=[...demoAthletes].sort((a,b)=>b[metric]-a[metric]);$('#teamLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>${metric}</th></tr></thead><tbody>${sorted.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a[metric]}</td></tr>`).join('')}</tbody></table>`}
+function renderTeamFeed(){if(!$('#teamFeed'))return;$('#teamFeed').innerHTML=['🏆 Ethan reached Single A','👏 Jack completed today’s mission','🔥 Mason extended a 7-day streak','⭐ Coach awarded Luke Great Hustle','⚾ Noah set a new sit-up PR'].map(x=>`<div class="feed-item">${x}</div>`).join('')}
+function renderShoutouts(){if(!$('#shoutouts'))return;const demo=[{type:'Great Hustle',from:'Coach',date:'Today'},{type:'Great Attitude',from:'Dad',date:'Yesterday'}];$('#shoutouts').innerHTML=[...demo,...(state.shoutouts||[])].slice(-6).reverse().map(x=>`<div class="shoutout"><span>🏅</span><div><strong>${x.type}</strong><br><small>${x.from} · ${x.date}</small></div></div>`).join('')}
+function addShoutout(){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO()});save();renderShoutouts()}
+function renderExerciseLibrary(){if(!$('#libraryCategory'))return;const cats=Object.keys(exerciseRepository);if(!$('#libraryCategory').options.length)$('#libraryCategory').innerHTML=cats.map(c=>`<option>${c}</option>`).join('');const cat=$('#libraryCategory').value||cats[0];$('#exerciseLibrary').innerHTML=exerciseRepository[cat].map(x=>`<div class="library-card"><span>⚾</span><strong>${x}</strong><button type="button" onclick="alert('${x} added to demo mission queue.')">Add</button></div>`).join('')}
+function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>Score</th></tr></thead><tbody>${[...demoAthletes].sort((a,b)=>b.arcade-a.arcade).map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.arcade}</td></tr>`).join('')}</tbody></table>`}
+function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=state.gameScores?.reaction??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=state.gameScores?.homer??0}
+let reactionStart=0,reactionTimer=null;function startReactionGame(){$('#reactionResult').textContent='Get ready...';$('#reactionBall').classList.add('hidden');clearTimeout(reactionTimer);reactionTimer=setTimeout(()=>{const b=$('#reactionBall');b.style.left=(10+Math.random()*70)+'%';b.style.top=(18+Math.random()*55)+'%';b.classList.remove('hidden');reactionStart=performance.now();$('#reactionResult').textContent='TAP!'},800+Math.random()*1800)}function hitReactionBall(){const ms=Math.round(performance.now()-reactionStart);$('#reactionBall').classList.add('hidden');state.gameScores=state.gameScores||{};if(!state.gameScores.reaction||ms<state.gameScores.reaction)state.gameScores.reaction=ms;const e=awardGameXP(5);$('#reactionResult').textContent=`${ms} ms · +${e} XP`;save()}
+let strikeTarget=0,strikeRound=0,strikeScore=0;function startStrikeGame(){strikeRound=1;strikeScore=0;nextStrike()}function nextStrike(){strikeTarget=1+Math.floor(Math.random()*9);const names={1:'High & Inside',2:'High Center',3:'High & Away',4:'Middle Inside',5:'Middle',6:'Middle Away',7:'Low & Inside',8:'Low Center',9:'Low & Away'};$('#strikePrompt').textContent=`Round ${strikeRound}/5: ${names[strikeTarget]}`}function chooseStrike(z){if(!strikeRound)return;if(z===strikeTarget){strikeScore+=100;$('#strikeResult').textContent='Correct! +100'}else $('#strikeResult').textContent='Missed. Keep learning the zone.';strikeRound++;if(strikeRound>5){state.gameScores=state.gameScores||{};state.gameScores.strike=Math.max(state.gameScores.strike||0,strikeScore);const e=awardGameXP(10);$('#strikePrompt').textContent=`Final Score: ${strikeScore} · +${e} XP`;strikeRound=0;save()}else nextStrike()}
+let homerAnimation=null,homerStart=0,homerActive=false;function startHomerGame(){const ball=$('#timingBall');cancelAnimationFrame(homerAnimation);homerStart=performance.now();homerActive=true;function move(t){const pct=Math.min(100,((t-homerStart)/1800)*100);ball.style.left=pct+'%';if(pct<100&&homerActive)homerAnimation=requestAnimationFrame(move);else if(homerActive){$('#homerResult').textContent='Strike! Try again.';homerActive=false}}homerAnimation=requestAnimationFrame(move)}function swingHomer(){if(!homerActive)return;homerActive=false;cancelAnimationFrame(homerAnimation);const left=parseFloat($('#timingBall').style.left)||0;let score=0,msg='';if(left>=70&&left<=82){score=500;msg='HOME RUN!'}else if(left>=60&&left<=90){score=250;msg='Solid Contact!'}else{score=50;msg=left<60?'Early!':'Late!'}state.gameScores=state.gameScores||{};state.gameScores.homer=Math.max(state.gameScores.homer||0,score);const e=awardGameXP(score>=500?10:5);$('#homerResult').textContent=`${msg} ${score} points · +${e} XP`;save()}
+function handlePhotoUpload(file){if(!file)return;const r=new FileReader();r.onload=()=>{localStorage.setItem('ethansBaseballHQ.profilePhoto',r.result);renderProfilePhoto()};r.readAsDataURL(file)}function renderProfilePhoto(){if(!$('#profilePhoto'))return;const saved=localStorage.getItem('ethansBaseballHQ.profilePhoto');if(saved){$('#profilePhoto').src=saved;$('#profilePhoto').classList.remove('hidden');$('#avatarFallback').classList.add('hidden')}else{$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden')}}function randomAvatar(){const icon=avatarOptions[Math.floor(Math.random()*avatarOptions.length)];$('#avatarFallback').textContent=icon;$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden');localStorage.removeItem('ethansBaseballHQ.profilePhoto')}
+
+window.addEventListener('resize',renderCharts);render();renderTeamEdition();renderProfilePhoto();
+
+
+if($('#completeMission'))$('#completeMission').onclick=completeDailyMission;
+if($('#useRainToken'))$('#useRainToken').onclick=useRainToken;
+if($('#leaderboardMetric'))$('#leaderboardMetric').onchange=renderLeaderboard;
+if($('#libraryCategory'))$('#libraryCategory').onchange=renderExerciseLibrary;
+if($('#addShoutout'))$('#addShoutout').onclick=addShoutout;
+$$('.reaction-btn').forEach(b=>b.onclick=()=>{$('#reactionStatus').textContent=`${b.textContent} sent to the team feed.`;});
+if($('#startReaction'))$('#startReaction').onclick=startReactionGame;
+if($('#reactionBall'))$('#reactionBall').onclick=hitReactionBall;
+if($('#startStrike'))$('#startStrike').onclick=startStrikeGame;
+$$('#strikeZone button').forEach(b=>b.onclick=()=>chooseStrike(+b.dataset.zone));
+if($('#startHomer'))$('#startHomer').onclick=startHomerGame;
+if($('#swingButton'))$('#swingButton').onclick=swingHomer;
+if($('#photoUpload'))$('#photoUpload').onchange=e=>handlePhotoUpload(e.target.files[0]);
+if($('#randomAvatar'))$('#randomAvatar').onclick=randomAvatar;
+
+// Version 3.1 initial route
+showModeNav('home');
+$$('.screen').forEach(s=>s.classList.toggle('active',s.id==='home'));
