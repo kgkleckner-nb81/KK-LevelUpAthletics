@@ -762,6 +762,14 @@ footer{
 .library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .library-card{display:grid;gap:10px;justify-items:center;padding:16px;border-radius:16px;background:var(--white);border:2px dashed var(--ink)}
 .library-card span{font-size:36px}
+.library-card.active{border-color:var(--neon-green);border-style:solid;background:#eafff0}
+.library-card button:disabled{opacity:.5;cursor:not-allowed}
+.slots-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+.slot-card{border-radius:14px;padding:14px;text-align:center;border:2px dashed var(--ink);background:var(--white);font-family:var(--accent);font-weight:600}
+.slot-card.filled{background:var(--cream);border-style:solid;border-color:var(--creamsicle-dark)}
+.slot-card.empty{color:var(--muted)}
+.slot-remove{margin-top:8px;font-size:11px;padding:6px 10px;background:var(--danger);color:#fff;border-color:var(--ink)}
+@media(max-width:700px){.slots-grid{grid-template-columns:repeat(2,1fr)}}
 .locker-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .locker-item{padding:14px;border-radius:14px;background:#efe9da;color:var(--muted);text-align:center;border:2px dashed rgba(22,22,22,.2)}
 .locker-item.unlocked{background:var(--cream);color:var(--ink);border-color:var(--creamsicle-dark)}
