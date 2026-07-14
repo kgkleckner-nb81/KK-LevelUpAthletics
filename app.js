@@ -1,5 +1,6 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},trainingSlots:[null,null,null,null]};
+const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},trainingSlots:[null,null,null,null],teamProgram:null,teamProgramOptIn:false};
+const TEAM_NAME='Northbrook Spartans';
 let state=load();
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -674,8 +675,80 @@ document.addEventListener('click',e=>{
   if(viewBtn) renderActivityDetail(viewBtn.dataset.exercise);
   if(e.target.id==='closeActivityDetail' || e.target.id==='activityDetailModal') $('#activityDetailModal').classList.add('hidden');
 });
+// ---- Team Program ----
+// Coach/parent-authored program of Skill Lab activities. Uses the existing
+// parentCode as a stand-in "admin" gate since real coach roles aren't built
+// yet. Completion is a simple once-daily checklist bonus (like Daily Mission),
+// not per-metric logging — the individual activities can still be logged
+// directly via the Skill Lab training slots if an athlete wants that detail.
+function teamProgramLabel(){return `TEAM ${TEAM_NAME.toUpperCase()} PROGRAM`}
+function renderTeamProgramBuilder(){
+  const sel=$('#teamProgramActivities');
+  if(!sel || sel.options.length) return;
+  sel.innerHTML=categoryOrder.map(cat=>`<optgroup label="${cat}">${activities.filter(a=>a.category===cat).map(a=>`<option value="${a.name}">${a.name}</option>`).join('')}</optgroup>`).join('');
+  if(state.teamProgram){
+    [...sel.options].forEach(o=>{o.selected=state.teamProgram.activities.includes(o.value)});
+    if($('#teamProgramTitle')) $('#teamProgramTitle').value=state.teamProgram.title;
+  }
+}
+function saveTeamProgram(){
+  const code=$('#coachCode').value;
+  if(code!==state.parentCode){alert('Incorrect coach/parent code. Team program not saved.');return}
+  const chosen=[...$('#teamProgramActivities').selectedOptions].map(o=>o.value);
+  if(!chosen.length){alert('Pick at least one activity for the program.');return}
+  const title=$('#teamProgramTitle').value.trim()||`${TEAM_NAME} Baseball Training Program`;
+  state.teamProgram={title,activities:chosen};
+  save();
+  $('#coachCode').value='';
+  if($('#teamProgramStatus')) $('#teamProgramStatus').textContent=`Saved "${title}" with ${chosen.length} activities.`;
+  renderTeamProgramSummary();
+  renderClubhouseTeamProgram();
+}
+function joinTeamProgram(){
+  if(!state.teamProgram) return;
+  state.teamProgramOptIn=!state.teamProgramOptIn;
+  save();
+  renderTeamProgramSummary();
+  renderClubhouseTeamProgram();
+}
+function renderTeamProgramSummary(){
+  if(!$('#teamProgramSummaryCard')) return;
+  const p=state.teamProgram;
+  if(!p){
+    $('#teamProgramSummaryTitle').textContent='No Team Program Yet';
+    $('#teamProgramActivityList').innerHTML='<p class="muted">Your coach hasn’t created a team program yet.</p>';
+    $('#joinTeamProgram').classList.add('hidden');
+    return;
+  }
+  $('#teamProgramSummaryTitle').textContent=p.title;
+  $('#teamProgramActivityList').innerHTML='<ul>'+p.activities.map(n=>`<li>${n}</li>`).join('')+'</ul>';
+  $('#joinTeamProgram').classList.remove('hidden');
+  $('#joinTeamProgram').textContent=state.teamProgramOptIn?'Leave Team Program':'Join Team Program';
+}
+function completeTeamProgram(){
+  if(!state.teamProgram) return;
+  state.bonuses=state.bonuses||[];
+  if(state.bonuses.some(x=>x.type==='Team Program'&&x.date===todayISO())){alert('Today’s team program is already complete.');return}
+  state.bonuses.push({date:todayISO(),type:'Team Program',xp:50,reason:state.teamProgram.title});
+  save();
+  alert('Team program complete! +50 XP.');
+  render();
+}
+function renderClubhouseTeamProgram(){
+  const card=$('#teamProgramCard'); if(!card) return;
+  const show=!!(state.teamProgramOptIn && state.teamProgram && state.teamProgram.activities.length);
+  card.classList.toggle('hidden',!show);
+  if(!show) return;
+  $('#teamProgramCardTitle').textContent=teamProgramLabel();
+  $('#teamProgramTasks').innerHTML='<ul>'+state.teamProgram.activities.map(n=>`<li>☐ ${n}</li>`).join('')+'</ul>';
+  const doneToday=(state.bonuses||[]).some(x=>x.type==='Team Program'&&x.date===todayISO());
+  if($('#completeTeamProgram')){
+    $('#completeTeamProgram').disabled=doneToday;
+    $('#completeTeamProgram').textContent=doneToday?'Completed Today':'Complete Team Program';
+  }
+}
 function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>Score</th></tr></thead><tbody>${[...demoAthletes].sort((a,b)=>b.arcade-a.arcade).map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.arcade}</td></tr>`).join('')}</tbody></table>`}
-function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderTrainingSlots();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=state.gameScores?.reaction??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=state.gameScores?.homer??0;renderArcadeExtras()}
+function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderTrainingSlots();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=state.gameScores?.reaction??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=state.gameScores?.homer??0;renderArcadeExtras()}
 let reactionStart=0,reactionTimer=null;function startReactionGame(){$('#reactionResult').textContent='Get ready...';$('#reactionBall').classList.add('hidden');clearTimeout(reactionTimer);reactionTimer=setTimeout(()=>{const b=$('#reactionBall');b.style.left=(10+Math.random()*70)+'%';b.style.top=(18+Math.random()*55)+'%';b.classList.remove('hidden');reactionStart=performance.now();$('#reactionResult').textContent='TAP!'},800+Math.random()*1800)}function hitReactionBall(){const ms=Math.round(performance.now()-reactionStart);$('#reactionBall').classList.add('hidden');state.gameScores=state.gameScores||{};if(!state.gameScores.reaction||ms<state.gameScores.reaction)state.gameScores.reaction=ms;const e=awardGameXP(5);$('#reactionResult').textContent=`${ms} ms · +${e} XP`;save()}
 let strikeTarget=0,strikeRound=0,strikeScore=0;function startStrikeGame(){strikeRound=1;strikeScore=0;nextStrike()}function nextStrike(){strikeTarget=1+Math.floor(Math.random()*9);const names={1:'High & Inside',2:'High Center',3:'High & Away',4:'Middle Inside',5:'Middle',6:'Middle Away',7:'Low & Inside',8:'Low Center',9:'Low & Away'};$('#strikePrompt').textContent=`Round ${strikeRound}/5: ${names[strikeTarget]}`}function chooseStrike(z){if(!strikeRound)return;if(z===strikeTarget){strikeScore+=100;$('#strikeResult').textContent='Correct! +100'}else $('#strikeResult').textContent='Missed. Keep learning the zone.';strikeRound++;if(strikeRound>5){state.gameScores=state.gameScores||{};state.gameScores.strike=Math.max(state.gameScores.strike||0,strikeScore);const e=awardGameXP(10);$('#strikePrompt').textContent=`Final Score: ${strikeScore} · +${e} XP`;strikeRound=0;save()}else nextStrike()}
 let homerAnimation=null,homerStart=0,homerActive=false;function startHomerGame(){const ball=$('#timingBall');cancelAnimationFrame(homerAnimation);homerStart=performance.now();homerActive=true;function move(t){const pct=Math.min(100,((t-homerStart)/1800)*100);ball.style.left=pct+'%';if(pct<100&&homerActive)homerAnimation=requestAnimationFrame(move);else if(homerActive){$('#homerResult').textContent='Strike! Try again.';homerActive=false}}homerAnimation=requestAnimationFrame(move)}function swingHomer(){if(!homerActive)return;homerActive=false;cancelAnimationFrame(homerAnimation);const left=parseFloat($('#timingBall').style.left)||0;let score=0,msg='';if(left>=70&&left<=82){score=500;msg='HOME RUN!'}else if(left>=60&&left<=90){score=250;msg='Solid Contact!'}else{score=50;msg=left<60?'Early!':'Late!'}state.gameScores=state.gameScores||{};state.gameScores.homer=Math.max(state.gameScores.homer||0,score);const e=awardGameXP(score>=500?10:5);$('#homerResult').textContent=`${msg} ${score} points · +${e} XP`;save()}
@@ -792,6 +865,9 @@ if($('#useRainToken'))$('#useRainToken').onclick=useRainToken;
 if($('#leaderboardMetric'))$('#leaderboardMetric').onchange=renderLeaderboard;
 if($('#libraryCategory'))$('#libraryCategory').onchange=renderExerciseLibrary;
 if($('#addShoutout'))$('#addShoutout').onclick=addShoutout;
+if($('#saveTeamProgram'))$('#saveTeamProgram').onclick=saveTeamProgram;
+if($('#joinTeamProgram'))$('#joinTeamProgram').onclick=joinTeamProgram;
+if($('#completeTeamProgram'))$('#completeTeamProgram').onclick=completeTeamProgram;
 $$('.reaction-btn').forEach(b=>b.onclick=()=>{$('#reactionStatus').textContent=`${b.textContent} sent to the team feed.`;});
 if($('#startReaction'))$('#startReaction').onclick=startReactionGame;
 if($('#reactionBall'))$('#reactionBall').onclick=hitReactionBall;
