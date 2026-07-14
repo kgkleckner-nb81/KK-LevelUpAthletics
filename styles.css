@@ -764,6 +764,26 @@ footer{
 .library-card span{font-size:36px}
 .library-card.active{border-color:var(--neon-green);border-style:solid;background:#eafff0}
 .library-card button:disabled{opacity:.5;cursor:not-allowed}
+.library-card-actions{display:flex;gap:8px}
+.placeholder-card{background:var(--cream);border:2px dashed var(--ink);border-radius:14px;padding:16px;text-align:center;color:var(--muted);font-family:var(--accent);font-weight:600}
+.video-placeholder{background:var(--ink);color:#fff;border-radius:16px;padding:36px 16px;text-align:center;border:2px solid var(--ink)}
+.video-placeholder p{margin:0;font-family:var(--accent);font-weight:600}
+.play-glyph{display:grid;place-items:center;width:56px;height:56px;border-radius:50%;background:var(--neon-blue);color:var(--ink);font-size:20px;margin:0 auto 12px}
+.metric-legend{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.metric-legend-item{background:var(--cream);border:2px solid var(--ink);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;font-family:var(--accent);font-weight:600;font-size:13px}
+.metric-legend-item span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.fault-list{color:var(--danger)}
+
+.metric-field{display:flex;flex-direction:column;gap:4px}
+.metric-field-label{font-family:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:.03em;font-size:12px;color:var(--ink)}
+.unit-input{position:relative;display:flex;align-items:center}
+.unit-input input{padding-right:56px}
+.unit-badge{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--ink);color:#fff;font-family:var(--accent);font-weight:600;font-size:11px;padding:4px 8px;border-radius:6px;pointer-events:none;white-space:nowrap}
+.rpe-scale{display:flex;flex-wrap:wrap;gap:6px}
+.rpe-btn{padding:8px 10px;min-width:34px;border-radius:8px}
+.rpe-btn.selected{background:var(--neon-blue);color:var(--ink)}
+.combine-skill-fields{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px}
+.combine-skill-fields .metric-field{min-width:150px}
 .slots-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
 .slot-card{border-radius:14px;padding:14px;text-align:center;border:2px dashed var(--ink);background:var(--white);font-family:var(--accent);font-weight:600}
 .slot-card.filled{background:var(--cream);border-style:solid;border-color:var(--creamsicle-dark)}

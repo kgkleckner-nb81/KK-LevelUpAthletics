@@ -76,15 +76,35 @@ $$('.mode-btn').forEach(b=>b.onclick=()=>enterMode(b.dataset.mode));
 $$('[data-path]').forEach(b=>b.onclick=()=>enterMode(b.dataset.path));
 $$('[data-home-button]').forEach(b=>b.onclick=()=>enterMode('home'));
 if($('#dailyForm').date) $('#dailyForm').date.valueAsDate=new Date();
+// Reads the raw field values for one activity's metrics out of a submitted
+// form-data object, returning null if nothing was touched (so an athlete can
+// leave a slot/dropdown blank for the day) or {error} if a required metric
+// was started but left incomplete.
+function collectMetricValues(a,rawGetter){
+  const raw={};
+  (a.metrics||[]).forEach(met=>{raw[met.key]=rawGetter(met.key)});
+  const touched=Object.values(raw).some(v=>v!==undefined&&v!=='');
+  if(!touched) return null;
+  const missing=(a.metrics||[]).find(met=>met.required&&(raw[met.key]===undefined||raw[met.key]===''));
+  if(missing) return {error:`${a.name} — ${missing.label}`};
+  const values={};
+  (a.metrics||[]).forEach(met=>{if(raw[met.key]!==undefined&&raw[met.key]!=='')values[met.key]=met.inputType==='decimal'?parseFloat(raw[met.key]):+raw[met.key]});
+  return {values};
+}
 $('#dailyForm').onsubmit=e=>{
   e.preventDefault();
   const d=Object.fromEntries(new FormData(e.target).entries());
   d.custom={};
+  let missingRequired=null;
   (state.trainingSlots||[]).forEach((name,i)=>{
-    const val=d['skill_'+i];
-    if(name && val!==undefined && val!=='') d.custom[name]=+val;
-    delete d['skill_'+i];
+    if(!name) return;
+    const a=findActivity(name);
+    if(!a) return;
+    const result=collectMetricValues(a,key=>{const v=d[`skill_${i}_${key}`];delete d[`skill_${i}_${key}`];return v});
+    if(result && result.error && !missingRequired) missingRequired=result.error;
+    else if(result && result.values) d.custom[name]=result.values;
   });
+  if(missingRequired){alert(`Please fill in ${missingRequired} before saving, or leave that exercise blank.`);return}
   state.daily.push(d);
   state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   save();openPack();e.target.reset();$('#dailyForm').date.valueAsDate=new Date();renderDailyCustomFields();render();
@@ -97,16 +117,24 @@ $('#combineForm').onsubmit=e=>{
   d.verified=ok;
   d.status=ok?'Parent Verified':'Pending Parent Review';
   d.customCombine=[];
+  let missingRequired=null;
   [0,1].forEach(i=>{
-    const name=d['combineSkillName_'+i], val=d['combineSkillValue_'+i];
-    if(name && val!==undefined && val!=='') d.customCombine.push({name,value:+val});
-    delete d['combineSkillName_'+i]; delete d['combineSkillValue_'+i];
+    const name=d[`combineSkillActivity_${i}`];
+    delete d[`combineSkillActivity_${i}`];
+    const a=name?findActivity(name):null;
+    if(!a) return;
+    const result=collectMetricValues(a,key=>{const v=d[`combineSkillMetric_${i}_${key}`];delete d[`combineSkillMetric_${i}_${key}`];return v});
+    if(result && result.error && !missingRequired) missingRequired=result.error;
+    else if(result && result.values) d.customCombine.push({name:a.name,values:result.values});
   });
+  if(missingRequired){alert(`Please fill in ${missingRequired} before saving, or leave that exercise blank.`);return}
   state.combine.push(d);
   state.combine.sort((a,b)=>(+a.week||0)-(+b.week||0));
   save();
   alert(ok?'Weekly combine saved and parent verified.':'Saved as pending. Parent can approve in Parent Zone.');
-  e.target.reset();render();
+  e.target.reset();
+  [0,1].forEach(i=>{const f=$('#combineSkillFields_'+i);if(f)f.innerHTML=''});
+  render();
 };
 $('#questForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());if(d.parentCode!==state.parentCode){alert('Incorrect parent code. Quest XP not awarded.');return}const q=quests.find(x=>x.id===d.questId);if(!q){alert('Select a quest.');return}state.quests=state.quests||[];state.quests.push({id:q.id,title:q.title,type:q.type,xp:q.xp,notes:d.notes||'',date:new Date().toISOString().slice(0,10)});save();alert(`${q.title} complete! +${q.xp} XP awarded.`);e.target.reset();render()};
 
@@ -158,7 +186,7 @@ function render(){renderPlatformStatus();const r=ratings(), rec=pr(), x=xp(), t=
 $$('.tier').forEach((el,i)=>el.classList.toggle('active',r.overall>=tiers[i].min));$('#records').innerHTML=`<li>${rec.pushups} max push-ups</li><li>${rec.squats} max squats</li><li>${rec.plank} sec plank</li><li>${rec.shuffleTouches} shuffle touches</li><li>${rec.broadJumpIn} in verified broad jump</li><li>${rec.sprintSec||'—'} sec verified sprint</li>`;
 const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#meterText').textContent=`${x%250} / 250 XP to next parent surprise`;$('#rewardNotice').textContent=x>=250&&x%250<75?'🎁 Parent surprise may be unlocked. Check Parent Zone.':'';
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
-$('#combineLog').innerHTML=table(['Week','Push-ups','Squats','Plank','Broad','Sprint','Extra Skills','Status'],state.combine.map(a=>[a.week,a.maxPushups,a.squat60,a.plankMax,a.broadJumpIn,a.sprintSec,(a.customCombine||[]).map(x=>`${x.name}: ${x.value}`).join(', ')||'—',`<span class="status ${a.verified?'verified':'pending'}">${a.status}</span>`]));
+$('#combineLog').innerHTML=table(['Week','Push-ups','Squats','Plank','Broad','Sprint','Extra Skills','Status'],state.combine.map(a=>[a.week,a.maxPushups,a.squat60,a.plankMax,a.broadJumpIn,a.sprintSec,(a.customCombine||[]).map(x=>`${x.name}: ${formatMetricValues(x.name,x.values!=null?x.values:x.value)}`).join(', ')||'—',`<span class="status ${a.verified?'verified':'pending'}">${a.status}</span>`]));
 $('#pendingList').innerHTML=table(['Week','Push-ups','Plank','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.maxPushups,a.plankMax,a.status]));
 $('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderCoachReport();renderTeamEdition();renderCharts()}
 
@@ -289,7 +317,7 @@ function showWorkoutDetail(index){
       <p><strong>Sprints:</strong> ${entry.sprints||0}</p>
       <p><strong>Notes:</strong> ${entry.notes||''}</p>
     </div>
-    ${entry.custom&&Object.keys(entry.custom).length?`<h3>Skill Lab Extras</h3><div class="detail-grid">${Object.entries(entry.custom).map(([k,v])=>`<p><strong>${k}:</strong> ${v}</p>`).join('')}</div>`:''}
+    ${entry.custom&&Object.keys(entry.custom).length?`<h3>Skill Lab Extras</h3><div class="detail-grid">${Object.entries(entry.custom).map(([k,v])=>`<p><strong>${k}:</strong> ${formatMetricValues(k,v)}</p>`).join('')}</div>`:''}
     <h3>Personal Records</h3><ul>${prHtml}</ul>`;
   $('#workoutDetailModal').classList.remove('hidden');
 }
@@ -338,25 +366,122 @@ function renderCharts(){
 function best(m){let rows=[],b=m==='sprintSec'?Infinity:0;state.combine.filter(x=>x.verified).sort((a,b)=>(+a.week||0)-(+b.week||0)).forEach(x=>{let v=combineValueFor(x,m);if(m==='sprintSec'){if(v>0)b=Math.min(b,v);if(b!==Infinity)rows.push({label:'W'+x.week,value:b})}else{b=Math.max(b,v);rows.push({label:'W'+x.week,value:b})}});return rows}
 
 const demoAthletes=[{name:'Ethan',xp:2845,workouts:42,streak:12,improvement:21,sportsmanship:8,arcade:920},{name:'Jack',xp:2710,workouts:40,streak:9,improvement:16,sportsmanship:10,arcade:880},{name:'Mason',xp:2490,workouts:38,streak:7,improvement:24,sportsmanship:6,arcade:810},{name:'Luke',xp:2380,workouts:36,streak:11,improvement:19,sportsmanship:7,arcade:790},{name:'Noah',xp:2265,workouts:35,streak:6,improvement:14,sportsmanship:9,arcade:760},{name:'Charlie',xp:2140,workouts:33,streak:8,improvement:18,sportsmanship:7,arcade:730}];
-const exerciseRepository={Strength:['Push-ups','Wide Push-ups','Squats','Jump Squats','Wall Sit','Calf Raises','Glute Bridge'],Core:['Sit Ups','Dead Bugs','Bicycle Sit Ups','Plank','Side Plank','Superman','Hollow Hold'],Speed:['10-yard Sprint','20-yard Sprint','Flying Sprint','Shuttle Run','First-Step Reaction','Base-Stealing Starts'],Agility:['Skater Jumps','Lateral Shuffle','Carioca','Zig-Zag Cones','Crossover Runs','Box Drill','Mirror Drill'],Power:['Broad Jump','Vertical Jump','Lateral Hops','Single-Leg Hops'],Throwing:['Target Throws','One-Knee Throwing','Long Toss','Crow Hop','Quick Release','Pivot Throws'],Catching:['Tennis Ball Reaction','Barehand Catches','Blocking Drill','Transfer Drill'],Hitting:['Tee Work','Front Toss','Bat-Speed Swings','One-Hand Drills','Balance Drills','Launch Position'],Pitching:['Balance Drill','Arm Care','Hip Rotation','Towel Drill'],Recovery:['Shoulder Mobility','Band Work','Hip Mobility','Foam Rolling','Stretching'],Teamwork:['Sportsmanship Challenge','Encourage a Teammate','Equipment Cleanup','Coach Helper']};
 const fixedExerciseAliases=new Set(['Push-ups','Squats','Sit Ups','Skater Jumps','Lateral Shuffle','Broad Jump','20-yard Sprint','Plank']);
 const categoryAxisMap={Strength:'strength',Core:'strength',Speed:'speed',Agility:'agility',Power:'power',Throwing:'consistency',Catching:'consistency',Hitting:'consistency',Pitching:'consistency',Recovery:'consistency',Teamwork:'consistency'};
-function exerciseCategory(name){for(const [cat,list] of Object.entries(exerciseRepository)) if(list.includes(name)) return cat; return null}
-function allExerciseNames(){return Object.values(exerciseRepository).flat().filter(x=>!fixedExerciseAliases.has(x))}
+
+// ---- Skills Lab activity catalog ----
+// Each activity: {id, name, category, sportTags, ageBand, media, metrics}
+// media.video.plannedUrl is reserved for a future pass — no component in this
+// build ever reads it. See renderActivityDetail(): the Demo Video section is
+// always the "coming soon" placeholder, regardless of this field's value.
+function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')}
+function emptyMedia(){return {instructionText:null,formCues:[],commonFaults:[],video:{plannedUrl:null}}}
+const MetricBuilders={
+  repsSets:()=>[{key:'reps',label:'Reps',unit:'reps',inputType:'integer',required:true,min:1,order:1},{key:'sets',label:'Sets',unit:'sets',inputType:'integer',required:true,min:1,order:2},{key:'rpe',label:'Effort',unit:'RPE 1–10',inputType:'scale_1_10',required:false,order:3}],
+  repsSetsPlain:()=>[{key:'reps',label:'Reps',unit:'reps',inputType:'integer',required:true,min:1,order:1},{key:'sets',label:'Sets',unit:'sets',inputType:'integer',required:true,min:1,order:2}],
+  repsOnly:(label)=>[{key:'reps',label:label||'Reps',unit:'reps',inputType:'integer',required:true,min:1,order:1}],
+  duration:()=>[{key:'duration_sec',label:'Duration',unit:'sec',inputType:'integer',required:true,min:0,step:5,order:1}],
+  time:()=>[{key:'duration_sec',label:'Time',unit:'sec',inputType:'decimal',required:true,min:0,step:0.01,order:1}],
+  distanceYd:()=>[{key:'distance_yd',label:'Distance',unit:'yd',inputType:'integer',required:true,min:0,order:1}],
+  distanceIn:()=>[{key:'distance_in',label:'Distance',unit:'in',inputType:'integer',required:true,min:0,order:1}],
+  weightSetsReps:()=>[{key:'weight_lb',label:'Weight',unit:'lb',inputType:'integer',required:true,min:0,step:5,order:1},{key:'sets',label:'Sets',unit:'sets',inputType:'integer',required:true,min:1,order:2},{key:'reps',label:'Reps',unit:'reps',inputType:'integer',required:true,min:1,order:3},{key:'rpe',label:'Effort',unit:'RPE 1–10',inputType:'scale_1_10',required:false,order:4}]
+};
+const M=MetricBuilders;
+const activityDefs={
+  Strength:[['Push-ups',M.repsSets],['Wide Push-ups',M.repsSets],['Squats',M.repsSets],['Jump Squats',M.repsSets],['Wall Sit',M.duration],['Calf Raises',M.repsSetsPlain],['Glute Bridge',M.repsSetsPlain]],
+  Core:[['Sit Ups',M.repsSetsPlain],['Dead Bugs',M.repsSetsPlain],['Bicycle Sit Ups',M.repsSetsPlain],['Plank',M.duration],['Side Plank',M.duration],['Superman',M.repsSetsPlain],['Hollow Hold',M.duration]],
+  Speed:[['10-yard Sprint',M.time],['20-yard Sprint',M.time],['Flying Sprint',M.time],['Shuttle Run',M.time],['First-Step Reaction',()=>M.repsOnly('Reps')],['Base-Stealing Starts',()=>M.repsOnly('Reps')]],
+  Agility:[['Skater Jumps',()=>M.repsOnly('Reps')],['Lateral Shuffle',()=>M.repsOnly('Touches')],['Carioca',M.duration],['Zig-Zag Cones',M.duration],['Crossover Runs',()=>M.repsOnly('Reps')],['Box Drill',M.duration],['Mirror Drill',M.duration]],
+  Power:[['Broad Jump',M.distanceIn],['Vertical Jump',M.distanceIn],['Lateral Hops',M.repsSetsPlain],['Single-Leg Hops',M.repsSetsPlain]],
+  Throwing:[['Target Throws',()=>M.repsOnly('Reps')],['One-Knee Throwing',()=>M.repsOnly('Reps')],['Long Toss',M.distanceYd],['Crow Hop',()=>M.repsOnly('Reps')],['Quick Release',()=>M.repsOnly('Reps')],['Pivot Throws',()=>M.repsOnly('Reps')]],
+  Catching:[['Tennis Ball Reaction',()=>M.repsOnly('Reps')],['Barehand Catches',()=>M.repsOnly('Reps')],['Blocking Drill',()=>M.repsOnly('Reps')],['Transfer Drill',()=>M.repsOnly('Reps')]],
+  Hitting:[['Tee Work',()=>M.repsOnly('Swings')],['Front Toss',()=>M.repsOnly('Swings')],['Bat-Speed Swings',()=>M.repsOnly('Swings')],['One-Hand Drills',()=>M.repsOnly('Swings')],['Balance Drills',M.duration],['Launch Position',()=>M.repsOnly('Reps')]],
+  Pitching:[['Balance Drill',M.duration],['Arm Care',M.repsSetsPlain],['Hip Rotation',()=>M.repsOnly('Reps')],['Towel Drill',()=>M.repsOnly('Reps')]],
+  Recovery:[['Shoulder Mobility',M.duration],['Band Work',M.repsSetsPlain],['Hip Mobility',M.duration],['Foam Rolling',M.duration],['Stretching',M.duration]],
+  Teamwork:[['Sportsmanship Challenge',()=>M.repsOnly('Times')],['Encourage a Teammate',()=>M.repsOnly('Times')],['Equipment Cleanup',()=>M.repsOnly('Times')],['Coach Helper',()=>M.repsOnly('Times')]]
+};
+const categoryOrder=Object.keys(activityDefs);
+const baseballCategories=new Set(['Throwing','Catching','Hitting','Pitching']);
+// A handful of activities ship with real content to prove the "present" and
+// "partially present" states render correctly. Everything else intentionally
+// ships with null/empty media — the "absent" state — until a content pass fills it in.
+const sampleMedia={
+  'Wall Sit':{instructionText:'Slide your back down a wall until your knees are bent to about 90 degrees, like sitting in an invisible chair. Hold the position with your core tight and weight even through both feet.',formCues:['Back flat against the wall','Knees stacked over ankles, not past toes','Squeeze your quads and glutes','Breathe steady, don’t hold your breath'],commonFaults:['Letting the knees drift past the toes','Sliding too low or too high on the wall']},
+  '10-yard Sprint':{instructionText:'A short, explosive sprint from a stopped start. Drive out low for the first few steps, then accelerate through the line without slowing down.',formCues:['Lean forward out of the start','Drive your arms front to back','Push the ground away, don’t reach with your feet','Run through the line, not to it'],commonFaults:['Standing up too tall too early','Taking choppy first steps instead of driving out low']},
+  'Box Drill':{instructionText:'Set up four cones in a square. Sprint, shuffle, backpedal, and shuffle again around the box, staying low and under control at every corner.',formCues:['Stay low through every direction change','Chop your feet at each corner','Keep your eyes up, not on your feet','Push off the outside foot on every turn'],commonFaults:['Standing up tall at the corners and losing speed','Crossing your feet during the shuffle sections']},
+  'Hip Mobility':{instructionText:'A continuous flow through 90/90 switches, world’s greatest stretch, and lateral lunges to open the hips before training.',formCues:['Keep both hips square to the front','Move slow and controlled, no bouncing','Breathe out on every stretch position'],commonFaults:['Rushing through positions','Letting the back knee collapse inward']},
+  'Tee Work':{instructionText:'Hit off the batting tee focusing on a consistent, repeatable swing path rather than power.'}
+};
+const activities=categoryOrder.flatMap(cat=>activityDefs[cat].map(([name,metricsFn])=>{
+  const m=sampleMedia[name];
+  return {
+    id:slug(name),
+    name,
+    category:cat,
+    sportTags:baseballCategories.has(cat)?['baseball']:['multi-sport'],
+    ageBand:'all',
+    media:m?{instructionText:m.instructionText,formCues:m.formCues||[],commonFaults:m.commonFaults||[],video:{plannedUrl:null}}:emptyMedia(),
+    metrics:metricsFn()
+  };
+}));
+function findActivity(name){return activities.find(a=>a.name===name)}
+function exerciseCategory(name){const a=findActivity(name);return a?a.category:null}
+function allExerciseNames(){return activities.map(a=>a.name).filter(x=>!fixedExerciseAliases.has(x))}
+function primaryMetricKey(activity){const sorted=(activity.metrics||[]).slice().sort((a,b)=>a.order-b.order);return sorted.length?sorted[0].key:null}
+// Custom logs are stored per-metric (e.g. {reps:8,sets:3}) as of the Skills
+// Lab metrics upgrade. hasLoggedAny() also accepts the older flat-number
+// shape ({"Wide Push-ups": 12}) shipped before that upgrade, so previously
+// saved data keeps working.
+function hasLoggedAny(raw){
+  if(raw==null) return false;
+  if(typeof raw==='number') return raw>0;
+  return Object.values(raw).some(v=>(+v||0)>0);
+}
 function customExerciseLogCount(axis){
   let count=0;
-  state.daily.forEach(d=>{if(d.custom)Object.keys(d.custom).forEach(name=>{const cat=exerciseCategory(name);if(cat&&categoryAxisMap[cat]===axis&&(+d.custom[name]||0)>0)count++})});
-  state.combine.filter(x=>x.verified).forEach(c=>{(c.customCombine||[]).forEach(x=>{const cat=exerciseCategory(x.name);if(cat&&categoryAxisMap[cat]===axis&&(+x.value||0)>0)count++})});
+  state.daily.forEach(d=>{if(d.custom)Object.keys(d.custom).forEach(name=>{const cat=exerciseCategory(name);if(cat&&categoryAxisMap[cat]===axis&&hasLoggedAny(d.custom[name]))count++})});
+  state.combine.filter(x=>x.verified).forEach(c=>{(c.customCombine||[]).forEach(x=>{const cat=exerciseCategory(x.name);if(cat&&categoryAxisMap[cat]===axis&&hasLoggedAny(x.values!=null?x.values:x.value))count++})});
   return count;
 }
 function loggedCustomExerciseNames(){
   const set=new Set();
-  state.daily.forEach(d=>{if(d.custom)Object.keys(d.custom).forEach(k=>{if((d.custom[k]||'')!=='')set.add(k)})});
-  state.combine.forEach(c=>{(c.customCombine||[]).forEach(x=>{if((x.value||'')!=='')set.add(x.name)})});
+  state.daily.forEach(d=>{if(d.custom)Object.keys(d.custom).forEach(k=>{if(hasLoggedAny(d.custom[k]))set.add(k)})});
+  state.combine.forEach(c=>{(c.customCombine||[]).forEach(x=>{if(hasLoggedAny(x.values!=null?x.values:x.value))set.add(x.name)})});
   return [...set].sort();
 }
-function dailyValueFor(entry,key){if(key.startsWith('c:')){const name=key.slice(2);return +(entry.custom&&entry.custom[name])||0}return +entry[key]||0}
-function combineValueFor(entry,key){if(key.startsWith('c:')){const name=key.slice(2);const f=(entry.customCombine||[]).find(x=>x.name===name);return f?+f.value||0:0}return +entry[key]||0}
+// Formats a logged custom value for display, e.g. "Weight 95lb, Sets 3, Reps 8".
+// Handles both the current per-metric shape and the legacy flat number shape.
+function formatMetricValues(name,raw){
+  if(raw==null) return '—';
+  if(typeof raw==='number') return String(raw);
+  const a=findActivity(name);
+  return Object.entries(raw).map(([mk,mv])=>{
+    const met=a&&(a.metrics||[]).find(m=>m.key===mk);
+    return `${met?met.label:mk} ${mv}${met&&met.unit?' '+met.unit:''}`;
+  }).join(', ');
+}
+function dailyValueFor(entry,key){
+  if(key.startsWith('c:')){
+    const name=key.slice(2);
+    const raw=entry.custom&&entry.custom[name];
+    if(raw==null) return 0;
+    if(typeof raw==='number') return raw;
+    const a=findActivity(name), pk=a?primaryMetricKey(a):null;
+    return pk&&raw[pk]!=null?+raw[pk]:0;
+  }
+  return +entry[key]||0;
+}
+function combineValueFor(entry,key){
+  if(key.startsWith('c:')){
+    const name=key.slice(2);
+    const f=(entry.customCombine||[]).find(x=>x.name===name);
+    if(!f) return 0;
+    if(f.value!=null) return +f.value||0;
+    const a=findActivity(name), pk=a?primaryMetricKey(a):null;
+    return pk&&f.values&&f.values[pk]!=null?+f.values[pk]:0;
+  }
+  return +entry[key]||0;
+}
 const avatarOptions=['⚾','🧢','🦸‍♂️','🐻','🦅','🔥','⭐','💪'];
 const lockerItems=['Blueprint Card Background','Gold Bat Grip','Fire Player Frame','Pinstripe Jersey','Stadium Lights Background','Lightning Eye Black','Captain Title','Diamond Card Border'];
 
@@ -430,15 +555,44 @@ function renderShoutouts(){if(!$('#shoutouts'))return;const demo=[{type:'Great H
 function addShoutout(){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO()});save();renderShoutouts()}
 function renderExerciseLibrary(){
   if(!$('#libraryCategory'))return;
-  const cats=Object.keys(exerciseRepository);
-  if(!$('#libraryCategory').options.length)$('#libraryCategory').innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
-  const cat=$('#libraryCategory').value||cats[0];
-  $('#exerciseLibrary').innerHTML=exerciseRepository[cat].map(x=>{
-    const isFixed=fixedExerciseAliases.has(x);
-    const active=(state.trainingSlots||[]).includes(x);
+  if(!$('#libraryCategory').options.length)$('#libraryCategory').innerHTML=categoryOrder.map(c=>`<option>${c}</option>`).join('');
+  const cat=$('#libraryCategory').value||categoryOrder[0];
+  $('#exerciseLibrary').innerHTML=activities.filter(a=>a.category===cat).map(a=>{
+    const isFixed=fixedExerciseAliases.has(a.name);
+    const active=(state.trainingSlots||[]).includes(a.name);
     const label=isFixed?'Tracked Daily':(active?'In Training':'Add');
-    return `<div class="library-card${active?' active':''}"><span>⚾</span><strong>${x}</strong><button type="button" class="add-exercise-btn" data-exercise="${x}" ${(isFixed||active)?'disabled':''}>${label}</button></div>`;
+    return `<div class="library-card${active?' active':''}"><span>⚾</span><strong>${a.name}</strong><div class="library-card-actions"><button type="button" class="view-activity-btn" data-exercise="${a.name}">View</button><button type="button" class="add-exercise-btn" data-exercise="${a.name}" ${(isFixed||active)?'disabled':''}>${label}</button></div></div>`;
   }).join('');
+}
+function whyTrackLine(category){
+  const axis=categoryAxisMap[category]||'consistency';
+  const axisLabel={speed:'Speed',strength:'Strength',power:'Power',agility:'Agility',consistency:'training consistency'}[axis];
+  return `We log this so we can chart your ${axisLabel} rating on the Player Card.`;
+}
+function renderActivityDetail(name){
+  const a=findActivity(name);
+  if(!a || !$('#activityDetailModal')) return;
+  const media=a.media||emptyMedia();
+  const perform=media.instructionText
+    ?`<p>${media.instructionText}</p>${media.formCues&&media.formCues.length?`<h4>Form Cues</h4><ul>${media.formCues.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}${media.commonFaults&&media.commonFaults.length?`<h4>Watch For</h4><ul class="fault-list">${media.commonFaults.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}`
+    :`<div class="placeholder-card">Written instructions coming soon</div>`;
+  const video=`<div class="video-placeholder"><span class="play-glyph">▶</span><p>Demo video coming soon</p></div>`;
+  const sortedMetrics=(a.metrics||[]).slice().sort((x,y)=>x.order-y.order);
+  const legend=sortedMetrics.map(met=>`<div class="metric-legend-item"><strong>${met.label}</strong><span>${met.unit||'—'}</span></div>`).join('');
+  const isFixed=fixedExerciseAliases.has(a.name);
+  const active=(state.trainingSlots||[]).includes(a.name);
+  const addLabel=isFixed?'Tracked Daily':(active?'In Training':'Add to Daily Training');
+  $('#activityDetailContent').innerHTML=`
+    <p class="eyebrow dark">${a.category}</p>
+    <h2>${a.name}</h2>
+    <h3>How to Perform</h3>${perform}
+    <h3>Demo Video</h3>${video}
+    <h3>How to Track</h3>
+    <div class="metric-legend">${legend}</div>
+    <p class="muted">${whyTrackLine(a.category)}</p>
+    <button type="button" class="primary add-exercise-btn" data-exercise="${a.name}" ${(isFixed||active)?'disabled':''}>${addLabel}</button>
+  `;
+  $('#activityDetailModal').classList.remove('hidden');
 }
 function renderTrainingSlots(){
   if(!$('#trainingSlots')) return;
@@ -458,6 +612,7 @@ function assignExercise(name){
   renderTrainingSlots();
   renderExerciseLibrary();
   renderDailyCustomFields();
+  if($('#activityDetailModal')) $('#activityDetailModal').classList.add('hidden');
   alert(`${name} added to slot ${idx+1}! It now shows up on your Daily Check-In.`);
 }
 function removeSlot(i){
@@ -467,21 +622,57 @@ function removeSlot(i){
   renderExerciseLibrary();
   renderDailyCustomFields();
 }
+// Renders one input per activity metric, in metric.order, with a persistent
+// unit badge (not placeholder text) so the unit stays visible while typing.
+// scale_1_10 metrics render as a 1-10 segmented control instead of a number field.
+function metricInputHTML(fieldName,activityName,metric){
+  if(metric.inputType==='scale_1_10'){
+    return `<div class="metric-field"><span class="metric-field-label">${activityName} · ${metric.label}</span><div class="rpe-scale" data-name="${fieldName}"><input type="hidden" name="${fieldName}">${Array.from({length:10},(_,i)=>i+1).map(n=>`<button type="button" class="rpe-btn" data-value="${n}">${n}</button>`).join('')}</div></div>`;
+  }
+  const step=metric.step!=null?metric.step:(metric.inputType==='decimal'?0.01:1);
+  const min=metric.min!=null?` min="${metric.min}"`:'';
+  const max=metric.max!=null?` max="${metric.max}"`:'';
+  return `<div class="metric-field"><span class="metric-field-label">${activityName} · ${metric.label}</span><div class="unit-input"><input type="number" name="${fieldName}" step="${step}"${min}${max} placeholder="0"><span class="unit-badge">${metric.unit||''}</span></div></div>`;
+}
 function renderDailyCustomFields(){
   const c=$('#dailyCustomFields'); if(!c) return;
   const slots=(state.trainingSlots||[]).filter(Boolean);
-  c.innerHTML=slots.map((name,i)=>`<label>${name}<input type="number" min="0" step="any" name="skill_${i}" data-exercise="${name}" placeholder="reps / score"></label>`).join('');
+  c.innerHTML=slots.map((name,i)=>{
+    const a=findActivity(name);
+    if(!a) return '';
+    return (a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`skill_${i}_${met.key}`,a.name,met)).join('');
+  }).join('');
+}
+function renderCombineSkillFields(slot,name){
+  const c=$('#combineSkillFields_'+slot); if(!c) return;
+  const a=name?findActivity(name):null;
+  c.innerHTML=a?(a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`combineSkillMetric_${slot}_${met.key}`,a.name,met)).join(''):'';
 }
 function renderCombineCustomFields(){
   const c=$('#combineCustomFields'); if(!c || c.children.length) return;
   const opts='<option value="">— Select exercise —</option>'+allExerciseNames().map(n=>`<option value="${n}">${n}</option>`).join('');
-  c.innerHTML=[0,1].map(i=>`<label>Extra Exercise ${i+1}<select name="combineSkillName_${i}">${opts}</select></label><label>Result<input type="number" min="0" step="any" name="combineSkillValue_${i}" placeholder="reps / score"></label>`).join('');
+  c.innerHTML=[0,1].map(i=>`<div class="combine-skill-block wide"><label>Extra Exercise ${i+1}<select name="combineSkillActivity_${i}" class="combine-skill-select" data-slot="${i}">${opts}</select></label><div id="combineSkillFields_${i}" class="combine-skill-fields"></div></div>`).join('');
 }
+document.addEventListener('click',e=>{
+  const rpeBtn=e.target.closest('.rpe-btn');
+  if(rpeBtn){
+    const scale=rpeBtn.closest('.rpe-scale');
+    scale.querySelector('input[type=hidden]').value=rpeBtn.dataset.value;
+    scale.querySelectorAll('.rpe-btn').forEach(b=>b.classList.toggle('selected',b===rpeBtn));
+  }
+});
+document.addEventListener('change',e=>{
+  const sel=e.target.closest('.combine-skill-select');
+  if(sel) renderCombineSkillFields(sel.dataset.slot,sel.value);
+});
 document.addEventListener('click',e=>{
   const addBtn=e.target.closest('.add-exercise-btn');
   if(addBtn && !addBtn.disabled) assignExercise(addBtn.dataset.exercise);
   const rmBtn=e.target.closest('.slot-remove');
   if(rmBtn) removeSlot(+rmBtn.dataset.slot);
+  const viewBtn=e.target.closest('.view-activity-btn');
+  if(viewBtn) renderActivityDetail(viewBtn.dataset.exercise);
+  if(e.target.id==='closeActivityDetail' || e.target.id==='activityDetailModal') $('#activityDetailModal').classList.add('hidden');
 });
 function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>Score</th></tr></thead><tbody>${[...demoAthletes].sort((a,b)=>b.arcade-a.arcade).map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.arcade}</td></tr>`).join('')}</tbody></table>`}
 function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderTrainingSlots();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=state.gameScores?.reaction??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=state.gameScores?.homer??0;renderArcadeExtras()}
