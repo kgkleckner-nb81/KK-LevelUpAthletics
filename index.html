@@ -92,6 +92,16 @@
     <div><span>NEXT CALL-UP</span><strong id="homeNextCallup">Travel Ball</strong></div>
     <div><span>PACK STATUS</span><strong id="homePackStatus">Locked</strong></div>
   </div>
+  <div class="card xp-explainer">
+    <p class="eyebrow dark">How XP Works</p>
+    <h2>What Is XP?</h2>
+    <div class="xp-explainer-grid">
+      <div><span>⚾</span><div><strong>Earn it by training</strong><p>Complete daily workouts and combine tests.</p></div></div>
+      <div><span>🎮</span><div><strong>Earn it by playing</strong><p>Play Arcade games and spin the daily bonus wheel.</p></div></div>
+      <div><span>🏅</span><div><strong>Earn it from your coach</strong><p>Coaches and parents can award bonus XP for good actions.</p></div></div>
+      <div><span>🎁</span><div><strong>Spend it on rewards</strong><p>Use your XP balance to claim rewards in the Reward Locker.</p></div></div>
+    </div>
+  </div>
 </section>
 
 <section id="clubhouse" class="screen">
@@ -288,27 +298,23 @@
 <div class="card team-hero"><div><p class="eyebrow dark">Team Edition Demo</p><h2>Northbrook Spartans 10U</h2><p>Summer Season · 12 Athletes · Coach Miller</p></div><img src="spartans-logo.png" class="team-logo" alt="Spartans logo"></div>
 <div class="grid stats"><div class="stat"><span>Team XP</span><strong>18,442</strong><small>points</small></div><div class="stat"><span>Weekly Completion</span><strong>83%</strong><small>team</small></div><div class="stat"><span>Current Challenge</span><strong>7/12</strong><small>athletes</small></div><div class="stat"><span>Team Rank</span><strong>3</strong><small>of 14</small></div></div>
 <div class="grid two"><div class="card"><h2>Team Leaderboards</h2><label>Sort by<select id="leaderboardMetric"><option value="xp">Total XP</option><option value="workouts">Workouts</option><option value="streak">Longest Streak</option><option value="improvement">Most Improved</option><option value="sportsmanship">Sportsmanship</option><option value="arcade">Arcade Score</option></select></label><div id="teamLeaderboard"></div></div><div class="card"><h2>Team Feed</h2><div id="teamFeed"></div></div></div>
-<div class="card"><h2>Positive Reactions</h2><p class="muted">No comments or direct messages—only positive team reactions.</p><div class="reaction-row"><button class="reaction-btn">👏 Nice Work</button><button class="reaction-btn">🔥 Awesome</button><button class="reaction-btn">⚾ Great Job</button><button class="reaction-btn">💪 Beast</button><button class="reaction-btn">⭐ Let’s Go</button></div><p id="reactionStatus" class="muted"></p></div>
-<div class="card"><h2>Coach + Parent Shout-Outs</h2><div id="shoutouts"></div><div class="form-grid"><label>Award<select id="shoutoutType"><option>Great Hustle</option><option>Best Teammate</option><option>Practice Leader</option><option>Sportsmanship</option><option>Never Quit</option></select></label><label>From<select id="shoutoutFrom"><option>Coach</option><option>Parent</option></select></label><button id="addShoutout" class="primary wide" type="button">Add Demo Shout-Out</button></div></div>
+<div class="card">
+  <h2>Team Shout-Outs</h2>
+  <p class="muted">No comments or direct messages — only positive reactions and shout-outs from teammates, coaches, and parents.</p>
+  <div id="shoutouts"></div>
+  <div class="reaction-row"><button class="reaction-btn">👏 Nice Work</button><button class="reaction-btn">🔥 Awesome</button><button class="reaction-btn">⚾ Great Job</button><button class="reaction-btn">💪 Beast</button><button class="reaction-btn">⭐ Let’s Go</button></div>
+  <div class="form-grid">
+    <label>Award<select id="shoutoutType"><option>Great Hustle</option><option>Best Teammate</option><option>Practice Leader</option><option>Sportsmanship</option><option>Never Quit</option></select></label>
+    <label>From<select id="shoutoutFrom"><option>Coach</option><option>Parent</option></select></label>
+    <button id="addShoutout" class="primary wide" type="button">Add Shout-Out</button>
+  </div>
+</div>
 
 <div class="card" id="teamProgramSummaryCard">
   <p class="eyebrow dark">Team Assignment</p>
   <h2 id="teamProgramSummaryTitle">No Team Program Yet</h2>
   <div id="teamProgramActivityList"></div>
   <button id="joinTeamProgram" class="primary hidden" type="button">Join Team Program</button>
-</div>
-
-<div class="card">
-  <p class="eyebrow dark">Coach Tools</p>
-  <h2>Build the Team Program</h2>
-  <p class="muted">Admin roles aren't fully built out yet, so this reuses the Coach/Parent Corner code to confirm it's a coach or parent making the change.</p>
-  <div class="form-grid">
-    <label class="wide">Coach / parent code<input id="coachCode" type="password" placeholder="Required"></label>
-    <label class="wide">Program title<input id="teamProgramTitle" type="text" placeholder="e.g. Northbrook Spartans Baseball Training Program"></label>
-    <label class="wide">Pick activities for the program<select id="teamProgramActivities" multiple size="10"></select></label>
-    <button id="saveTeamProgram" class="primary wide" type="button">Save Team Program</button>
-  </div>
-  <p id="teamProgramStatus" class="muted"></p>
 </div>
 </section>
 <section id="league" class="screen"><div class="card league-hero"><p class="eyebrow dark">League Home</p><h2>Northbrook Little League</h2><p>26 Teams · 312 Athletes · Week 7</p></div><div class="grid two"><div class="card"><h2>Current Seasonal Drop</h2><div class="drop-card"><div class="drop-badge">LIVE</div><h3>Summer Tournament Drop</h3><p>Limited jersey skin, championship badge, team banner, and Home Run Derby boss battle.</p><div class="meter large"><div style="width:68%"></div></div><p><strong>Community Goal:</strong> 68% complete</p></div></div><div class="card"><h2>League Leaderboard</h2><table class="table"><thead><tr><th>Team</th><th>Participation</th><th>Improvement</th><th>Team XP</th></tr></thead><tbody><tr><td>Glenview Cubs</td><td>91%</td><td>+18%</td><td>20,410</td></tr><tr><td>Winnetka Warriors</td><td>87%</td><td>+16%</td><td>19,602</td></tr><tr><td>Northbrook Spartans</td><td>83%</td><td>+21%</td><td>18,442</td></tr><tr><td>Deerfield Demons</td><td>80%</td><td>+14%</td><td>17,905</td></tr></tbody></table></div></div><div class="card"><h2>Upcoming Drops</h2><div class="drop-grid"><div class="drop-tile"><strong>All-Star Week</strong><span>Jul 20</span></div><div class="drop-tile"><strong>Home Run Derby</strong><span>Aug 2</span></div><div class="drop-tile"><strong>Fall Ball</strong><span>Sep 1</span></div><div class="drop-tile"><strong>Winter Work</strong><span>Nov 15</span></div></div></div></section>
@@ -344,11 +350,24 @@
     </div>
     <div class="card">
       <h2>Review Pending Combine Tests</h2>
-      <p class="muted">Use the parent code to approve any pending weekly tests.</p>
+      <p class="muted">Use the parent code to approve any pending combine tests.</p>
       <label>Parent code<input id="reviewCode" type="password"></label>
       <button class="primary" id="approvePending">Approve Pending Tests</button>
       <div id="pendingList"></div>
     </div>
+  </div>
+  <div class="card">
+    <p class="eyebrow dark">Coach Tools</p>
+    <h2>Build the Team Program</h2>
+    <p class="muted">Admin roles aren't fully built out yet, so this reuses the Coach/Parent Corner code to confirm it's a coach or parent making the change.</p>
+    <div class="form-grid">
+      <label class="wide">Coach / parent code<input id="coachCode" type="password" placeholder="Required"></label>
+      <label class="wide">Program title<input id="teamProgramTitle" type="text" placeholder="e.g. Northbrook Spartans Baseball Training Program"></label>
+      <label class="wide">Pick activities for the program<select id="teamProgramActivities" multiple size="10"></select></label>
+      <label class="wide">Instructions for the team (optional)<input id="teamProgramInstructions" type="text" placeholder="e.g. Please attempt to complete this program 2x per week"></label>
+      <button id="saveTeamProgram" class="primary wide" type="button">Save Team Program</button>
+    </div>
+    <p id="teamProgramStatus" class="muted"></p>
   </div>
   <div class="card">
     <h2>Backup / Reset</h2>

@@ -137,7 +137,19 @@ $('#combineForm').onsubmit=e=>{
   [0,1].forEach(i=>{const f=$('#combineSkillFields_'+i);if(f)f.innerHTML=''});
   render();
 };
-$('#questForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());if(d.parentCode!==state.parentCode){alert('Incorrect parent code. Quest XP not awarded.');return}const q=quests.find(x=>x.id===d.questId);if(!q){alert('Select a quest.');return}state.quests=state.quests||[];state.quests.push({id:q.id,title:q.title,type:q.type,xp:q.xp,notes:d.notes||'',date:new Date().toISOString().slice(0,10)});save();alert(`${q.title} complete! +${q.xp} XP awarded.`);e.target.reset();render()};
+// Quests/boss battles reset weekly (calendar week, Monday start) rather than
+// being repeatable indefinitely.
+function weekStartISO(dateStr){
+  const d=new Date((dateStr||todayISO())+'T00:00:00Z');
+  const day=d.getUTCDay();
+  d.setUTCDate(d.getUTCDate()+(day===0?-6:1-day));
+  return d.toISOString().slice(0,10);
+}
+function questCompletedThisWeek(id){
+  const wk=weekStartISO(todayISO());
+  return (state.quests||[]).some(x=>x.id===id&&weekStartISO(x.date)===wk);
+}
+$('#questForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());if(d.parentCode!==state.parentCode){alert('Incorrect parent code. Quest XP not awarded.');return}const q=quests.find(x=>x.id===d.questId);if(!q){alert('Select a quest.');return}if(questCompletedThisWeek(q.id)){alert(`${q.title} was already completed this week. It resets next Monday.`);return}state.quests=state.quests||[];state.quests.push({id:q.id,title:q.title,type:q.type,xp:q.xp,notes:d.notes||'',date:new Date().toISOString().slice(0,10)});save();alert(`${q.title} complete! +${q.xp} XP awarded.`);e.target.reset();render()};
 
 $('#saveParentCode').onclick=()=>{const c=$('#newParentCode').value.trim();if(c.length<4){$('#codeStatus').textContent='Use at least 4 characters.';return}state.parentCode=c;save();$('#newParentCode').value='';$('#codeStatus').textContent='Parent code updated.'};
 $('#approvePending').onclick=()=>{if($('#reviewCode').value!==state.parentCode){alert('Incorrect parent code.');return}state.combine.forEach(x=>{if(!x.verified){x.verified=true;x.status='Parent Verified'}});save();$('#reviewCode').value='';render()};
@@ -229,30 +241,41 @@ function renderRewards(){
 }
 
 function renderQuests(){
-  const completed=(state.quests||[]).map(x=>x.id);
-  if($('#questSelect')) $('#questSelect').innerHTML=quests.map(q=>`<option value="${q.id}">${q.type}: ${q.title} (+${q.xp} XP)</option>`).join('');
+  const wk=weekStartISO(todayISO());
+  const completedThisWeek=new Set((state.quests||[]).filter(x=>weekStartISO(x.date)===wk).map(x=>x.id));
+  if($('#questSelect')) $('#questSelect').innerHTML=quests.map(q=>`<option value="${q.id}" ${completedThisWeek.has(q.id)?'disabled':''}>${q.type}: ${q.title} (+${q.xp} XP)${completedThisWeek.has(q.id)?' — done this week':''}</option>`).join('');
   if($('#questList')) $('#questList').innerHTML=quests.map(q=>{
-    const count=completed.filter(id=>id===q.id).length;
-    return `<div class="quest-card ${q.type==='Boss Battle'?'battle':''} ${count?'complete':''}">
+    const doneThisWeek=completedThisWeek.has(q.id);
+    const lifetimeCount=(state.quests||[]).filter(x=>x.id===q.id).length;
+    return `<div class="quest-card ${q.type==='Boss Battle'?'battle':''} ${doneThisWeek?'complete':''}">
       <div class="quest-icon">${q.icon}</div>
       <h3>${q.title}</h3>
       <p><strong>${q.type}</strong></p>
       <p>${q.desc}</p>
       <span class="xp-pill">+${q.xp} XP</span>
-      ${count?`<p class="verified">Completed ${count}x</p>`:''}
+      ${doneThisWeek?`<p class="verified">Completed this week</p>`:''}
+      ${lifetimeCount?`<p class="muted">Lifetime: ${lifetimeCount}x</p>`:''}
     </div>`;
   }).join('');
   if($('#questHistory')) $('#questHistory').innerHTML=table(['Date','Challenge','Type','XP','Notes'],(state.quests||[]).slice().reverse().map(q=>[q.date,q.title,q.type,q.xp,q.notes]));
 }
 
 
+function streakBonusXP(s){
+  if(s>=30) return 50;
+  if(s>=14) return 35;
+  if(s>=7) return 20;
+  if(s>=3) return 10;
+  return 0;
+}
 function workoutXPForEntry(entry){
   let total=25;
   const prs=entryPRs(entry);
   total += prs.length*15;
   const s=streak();
-  if(s>=3) total += 10;
-  return {total,prs,base:25,streakBonus:s>=3?10:0,prBonus:prs.length*15};
+  const streakBonus=streakBonusXP(s);
+  total += streakBonus;
+  return {total,prs,base:25,streakBonus,prBonus:prs.length*15};
 }
 function previousDailyBest(beforeIndex,key){
   const prior=state.daily.slice(0,beforeIndex).map(x=>+x[key]||0);
@@ -485,7 +508,27 @@ function combineValueFor(entry,key){
 const avatarOptions=['⚾','🧢','🦸‍♂️','🐻','🦅','🔥','⭐','💪'];
 const lockerItems=['Blueprint Card Background','Gold Bat Grip','Fire Player Frame','Pinstripe Jersey','Stadium Lights Background','Lightning Eye Black','Captain Title','Diamond Card Border'];
 
-const wheelSegments=[10,10,15,20,20,25,25,50,50,100,250,1000];
+const wheelSegments=[5,10,10,15,20,20,25,25,50,50,100,250,1000];
+// Slice size (and therefore landing odds — the wedge angle IS the probability)
+// scales down as prize value climbs, so the wheel visually and mathematically
+// tells the truth about how rare a prize is: standard/-30%/-50%/-75% width.
+function wheelSliceWeight(val){
+  if(val>=1000) return 0.25;
+  if(val>=250) return 0.5;
+  if(val>=50) return 0.7;
+  return 1;
+}
+function wheelSliceAngles(){
+  const weights=wheelSegments.map(wheelSliceWeight);
+  const total=weights.reduce((a,b)=>a+b,0);
+  let acc=0;
+  return wheelSegments.map((val,i)=>{
+    const width=weights[i]/total*360;
+    const start=acc;
+    acc+=width;
+    return {value:val,width,start};
+  });
+}
 
 const triviaQuestions=[
   {cat:'History',q:'Which team ended a 108-year championship drought by winning the 2016 World Series?',choices:['Cleveland Indians','Chicago Cubs','Boston Red Sox','Chicago White Sox'],a:1},
@@ -551,8 +594,20 @@ function renderMission(){const m=missionForToday();if($('#missionTitle'))$('#mis
 function renderLocker(){if(!$('#lockerInventory'))return;const inv=state.inventory||[];$('#lockerInventory').innerHTML=lockerItems.map(i=>`<div class="locker-item ${inv.includes(i)?'unlocked':''}"><div class="locker-icon">${inv.includes(i)?'🔓':'🔒'}</div><strong>${i}</strong></div>`).join('')}
 function renderLeaderboard(){if(!$('#teamLeaderboard'))return;const metric=$('#leaderboardMetric')?.value||'xp';const sorted=[...demoAthletes].sort((a,b)=>b[metric]-a[metric]);$('#teamLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>${metric}</th></tr></thead><tbody>${sorted.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a[metric]}</td></tr>`).join('')}</tbody></table>`}
 function renderTeamFeed(){if(!$('#teamFeed'))return;$('#teamFeed').innerHTML=['🏆 Ethan reached Single A','👏 Jack completed today’s mission','🔥 Mason extended a 7-day streak','⭐ Coach awarded Luke Great Hustle','⚾ Noah set a new sit-up PR'].map(x=>`<div class="feed-item">${x}</div>`).join('')}
-function renderShoutouts(){if(!$('#shoutouts'))return;const demo=[{type:'Great Hustle',from:'Coach',date:'Today'},{type:'Great Attitude',from:'Dad',date:'Yesterday'}];$('#shoutouts').innerHTML=[...demo,...(state.shoutouts||[])].slice(-6).reverse().map(x=>`<div class="shoutout"><span>🏅</span><div><strong>${x.type}</strong><br><small>${x.from} · ${x.date}</small></div></div>`).join('')}
-function addShoutout(){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO()});save();renderShoutouts()}
+// Positive Reactions and Coach/Parent Shout-Outs are one unified feed —
+// both are positive-only entries in state.shoutouts, distinguished by
+// `source` only for icon rendering.
+function renderShoutouts(){
+  if(!$('#shoutouts'))return;
+  const demo=[{type:'Great Hustle',from:'Coach',date:'Today',source:'shoutout'},{type:'Great Attitude',from:'Dad',date:'Yesterday',source:'shoutout'}];
+  $('#shoutouts').innerHTML=[...demo,...(state.shoutouts||[])].slice(-8).reverse().map(x=>{
+    let icon='🏅',label=x.type;
+    if(x.source==='reaction'){const parts=x.type.split(' ');icon=parts[0];label=parts.slice(1).join(' ')}
+    return `<div class="shoutout"><span>${icon}</span><div><strong>${label}</strong><br><small>${x.from} · ${x.date}</small></div></div>`;
+  }).join('');
+}
+function addShoutout(){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO(),source:'shoutout'});save();renderShoutouts()}
+function addReaction(text){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:text,from:'You',date:todayISO(),source:'reaction'});save();renderShoutouts()}
 function renderExerciseLibrary(){
   if(!$('#libraryCategory'))return;
   if(!$('#libraryCategory').options.length)$('#libraryCategory').innerHTML=categoryOrder.map(c=>`<option>${c}</option>`).join('');
@@ -688,6 +743,7 @@ function renderTeamProgramBuilder(){
   if(state.teamProgram){
     [...sel.options].forEach(o=>{o.selected=state.teamProgram.activities.includes(o.value)});
     if($('#teamProgramTitle')) $('#teamProgramTitle').value=state.teamProgram.title;
+    if($('#teamProgramInstructions')) $('#teamProgramInstructions').value=state.teamProgram.instructions||'';
   }
 }
 function saveTeamProgram(){
@@ -696,16 +752,18 @@ function saveTeamProgram(){
   const chosen=[...$('#teamProgramActivities').selectedOptions].map(o=>o.value);
   if(!chosen.length){alert('Pick at least one activity for the program.');return}
   const title=$('#teamProgramTitle').value.trim()||`${TEAM_NAME} Baseball Training Program`;
-  state.teamProgram={title,activities:chosen};
+  const instructions=($('#teamProgramInstructions')?.value||'').trim();
+  state.teamProgram={title,activities:chosen,instructions};
   save();
   $('#coachCode').value='';
   if($('#teamProgramStatus')) $('#teamProgramStatus').textContent=`Saved "${title}" with ${chosen.length} activities.`;
   renderTeamProgramSummary();
   renderClubhouseTeamProgram();
 }
+// Joining is one-way — there's no leave action from the athlete's side.
 function joinTeamProgram(){
-  if(!state.teamProgram) return;
-  state.teamProgramOptIn=!state.teamProgramOptIn;
+  if(!state.teamProgram || state.teamProgramOptIn) return;
+  state.teamProgramOptIn=true;
   save();
   renderTeamProgramSummary();
   renderClubhouseTeamProgram();
@@ -720,9 +778,10 @@ function renderTeamProgramSummary(){
     return;
   }
   $('#teamProgramSummaryTitle').textContent=p.title;
-  $('#teamProgramActivityList').innerHTML='<ul>'+p.activities.map(n=>`<li>${n}</li>`).join('')+'</ul>';
+  $('#teamProgramActivityList').innerHTML='<ul>'+p.activities.map(n=>`<li>${n}</li>`).join('')+'</ul>'+(p.instructions?`<p class="muted team-program-notes"><strong>Coach note:</strong> ${p.instructions}</p>`:'');
   $('#joinTeamProgram').classList.remove('hidden');
-  $('#joinTeamProgram').textContent=state.teamProgramOptIn?'Leave Team Program':'Join Team Program';
+  $('#joinTeamProgram').disabled=!!state.teamProgramOptIn;
+  $('#joinTeamProgram').textContent=state.teamProgramOptIn?'Joined ✓':'Join Team Program';
 }
 function completeTeamProgram(){
   if(!state.teamProgram) return;
@@ -764,20 +823,34 @@ function todayTriviaIndex(){
   return ((days%triviaQuestions.length)+triviaQuestions.length)%triviaQuestions.length;
 }
 function buildWheelSVG(){
-  const seg=wheelSegments.length,cx=150,cy=150,r=145,anglePer=360/seg;
+  const cx=150,cy=150,r=145;
   const palette=['#00E5FF','#FF9A45','#FF2E9A','#39FF88','#1F7AE0','#FFC98B'];
+  const slices=wheelSliceAngles();
   let shapes='';
-  wheelSegments.forEach((val,i)=>{
-    const start=i*anglePer-90-anglePer/2, end=start+anglePer;
+  slices.forEach((s,i)=>{
+    const start=-90+s.start, end=start+s.width;
     const x1=cx+r*Math.cos(start*Math.PI/180), y1=cy+r*Math.sin(start*Math.PI/180);
     const x2=cx+r*Math.cos(end*Math.PI/180), y2=cy+r*Math.sin(end*Math.PI/180);
-    const color=val>=250?'#F9FF3D':palette[i%palette.length];
-    shapes+=`<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 0 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${color}" stroke="#161616" stroke-width="2"/>`;
-    const mid=start+anglePer/2;
+    const largeArc=s.width>180?1:0;
+    const color=s.value>=250?'#F9FF3D':palette[i%palette.length];
+    shapes+=`<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${largeArc} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${color}" stroke="#161616" stroke-width="2"/>`;
+    const mid=start+s.width/2;
     const lx=cx+(r*0.66)*Math.cos(mid*Math.PI/180), ly=cy+(r*0.66)*Math.sin(mid*Math.PI/180);
-    shapes+=`<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" transform="rotate(${(mid+90).toFixed(2)},${lx.toFixed(2)},${ly.toFixed(2)})" text-anchor="middle" dominant-baseline="middle" font-family="Fredoka,sans-serif" font-weight="700" font-size="${val>=250?22:15}" fill="#161616">${val}</text>`;
+    const fontSize=s.value>=1000?10:(s.value>=250?12:(s.value>=50?14:16));
+    shapes+=`<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" transform="rotate(${(mid+90).toFixed(2)},${lx.toFixed(2)},${ly.toFixed(2)})" text-anchor="middle" dominant-baseline="middle" font-family="Fredoka,sans-serif" font-weight="700" font-size="${fontSize}" fill="#161616">${s.value}</text>`;
   });
   return `<svg viewBox="0 0 300 300"><circle cx="150" cy="150" r="147" fill="#161616"/>${shapes}</svg>`;
+}
+// Picks a winning slice weighted by its angular width, so the odds of landing
+// on a prize always match how big its wedge looks on the wheel.
+function pickWeightedSlice(){
+  const slices=wheelSliceAngles();
+  let r=Math.random()*360;
+  for(let i=0;i<slices.length;i++){
+    if(r<slices[i].width) return i;
+    r-=slices[i].width;
+  }
+  return slices.length-1;
 }
 let wheelRotation=0,wheelSpinning=false;
 function spinWheel(){
@@ -792,10 +865,11 @@ function spinWheel(){
   wheelSpinning=true;
   if($('#spinButton')) $('#spinButton').disabled=true;
   if($('#spinResult')) $('#spinResult').textContent='';
-  const idx=Math.floor(Math.random()*wheelSegments.length);
+  const idx=pickWeightedSlice();
   const val=wheelSegments[idx];
-  const anglePer=360/wheelSegments.length;
-  const targetMod=(360-((idx*anglePer)%360))%360;
+  const chosen=wheelSliceAngles()[idx];
+  const centerAngle=-90+chosen.start+chosen.width/2;
+  const targetMod=(((-90-centerAngle)%360)+360)%360;
   const curMod=((wheelRotation%360)+360)%360;
   let delta=targetMod-curMod;
   if(delta<=0) delta+=360;
@@ -867,7 +941,7 @@ if($('#addShoutout'))$('#addShoutout').onclick=addShoutout;
 if($('#saveTeamProgram'))$('#saveTeamProgram').onclick=saveTeamProgram;
 if($('#joinTeamProgram'))$('#joinTeamProgram').onclick=joinTeamProgram;
 if($('#completeTeamProgram'))$('#completeTeamProgram').onclick=completeTeamProgram;
-$$('.reaction-btn').forEach(b=>b.onclick=()=>{$('#reactionStatus').textContent=`${b.textContent} sent to the team feed.`;});
+$$('.reaction-btn').forEach(b=>b.onclick=()=>addReaction(b.textContent));
 if($('#startReaction'))$('#startReaction').onclick=startReactionGame;
 if($('#reactionBall'))$('#reactionBall').onclick=hitReactionBall;
 if($('#startStrike'))$('#startStrike').onclick=startStrikeGame;

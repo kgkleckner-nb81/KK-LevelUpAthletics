@@ -25,7 +25,7 @@ Data is saved locally in the browser.
 - Each quest/battle can award bonus XP.
 - Parent code is required to approve and award quest/battle XP.
 - Quest history records date, challenge, type, XP, and notes.
-- Boss Battles can be completed more than once if the parent wants to award repeat bonuses.
+- Each quest/battle can be completed once per calendar week (Monday start), then resets.
 
 Default parent code remains: SPARTAN9
 
