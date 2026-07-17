@@ -242,33 +242,59 @@ function xpEvents(){
   (state.spinLog||[]).forEach(x=>events.push({date:x.date||'',label:'Prize Wheel Spin',xp:+x.xp||0,detail:`Landed on +${x.xp} XP`}));
   return events;
 }
+// Rewards are a spendable balance (earned minus claimed), not a lifetime
+// total — a milestone's "available/locked" state is purely a function of the
+// CURRENT balance vs its cost, so it can lock again after spending drops the
+// balance below it. Each claim requires parent-code approval.
+function totalXPSpent(){return (state.claimedRewards||[]).reduce((a,r)=>a+(+r.milestoneXP||0),0)}
+function availableBalance(){return xp()-totalXPSpent()}
+function claimReward(xpCost,title){
+  const balance=availableBalance();
+  if(balance<xpCost){alert(`Not enough balance to claim ${title}. You need ${xpCost} XP and have ${balance}.`);return}
+  const code=prompt(`Enter parent code to approve claiming "${title}" (-${xpCost} XP):`);
+  if(code===null) return;
+  if(code!==state.parentCode){alert('Incorrect parent code. Reward not claimed.');return}
+  state.claimedRewards=state.claimedRewards||[];
+  state.claimedRewards.push({milestoneXP:xpCost,title,dateClaimed:todayISO(),approvedBy:'Parent'});
+  save();
+  alert(`${title} claimed! -${xpCost} XP.`);
+  render();
+}
 function renderRewards(){
   const total=xp();
-  const unlocked=rewardMilestones.filter(r=>total>=r.xp);
-  const next=rewardMilestones.find(r=>total<r.xp);
-  if($('#seasonXPBig')) $('#seasonXPBig').textContent=total;
+  const spent=totalXPSpent();
+  const balance=availableBalance();
+  const next=rewardMilestones.find(r=>balance<r.xp);
+  if($('#balanceBig')) $('#balanceBig').textContent=balance;
   if($('#lifetimeXPBig')) $('#lifetimeXPBig').textContent=total;
-  if($('#nextRewardXP')) $('#nextRewardXP').textContent=next?next.xp-total:0;
-  if($('#rewardsUnlocked')) $('#rewardsUnlocked').textContent=unlocked.length;
-  const prev=[...rewardMilestones].reverse().find(r=>total>=r.xp);
-  const base=prev?prev.xp:0;
+  if($('#spentXPBig')) $('#spentXPBig').textContent=spent;
+  if($('#claimsCountBig')) $('#claimsCountBig').textContent=(state.claimedRewards||[]).length;
+  const prevAvailable=[...rewardMilestones].reverse().find(r=>balance>=r.xp);
+  const base=prevAvailable?prevAvailable.xp:0;
   const top=next?next.xp:base+250;
-  const pct=Math.min(100,((total-base)/(top-base))*100);
+  const pct=Math.min(100,((balance-base)/(top-base||1))*100);
   if($('#vaultMeterFill')) $('#vaultMeterFill').style.width=pct+'%';
-  if($('#vaultMeterText')) $('#vaultMeterText').textContent=next?`${total} XP earned. ${next.xp-total} XP until ${next.title}.`:`${total} XP earned. All listed rewards unlocked.`;
+  if($('#vaultMeterText')) $('#vaultMeterText').textContent=next?`${balance} XP available. ${next.xp-balance} XP until you can claim ${next.title}.`:`${balance} XP available. Every listed reward is claimable!`;
   if($('#rewardVault')) $('#rewardVault').innerHTML=rewardMilestones.map(r=>{
-    const stateClass=total>=r.xp?'unlocked':'';
-    return `<div class="reward-tile ${stateClass}">
+    const available=balance>=r.xp;
+    const claimCount=(state.claimedRewards||[]).filter(c=>c.title===r.title).length;
+    return `<div class="reward-tile ${available?'unlocked':''}">
       <div class="quest-icon">${r.icon}</div>
       <h3>${r.title}</h3>
       <p><strong>${r.xp} XP</strong></p>
       <p>${r.desc}</p>
-      <strong>${total>=r.xp?'Unlocked':'Locked'}</strong>
+      <strong>${available?'Available':'Locked'}</strong>
+      ${claimCount?`<p class="muted">Claimed ${claimCount}x</p>`:''}
+      ${available?`<button type="button" class="primary claim-reward-btn" data-xp="${r.xp}" data-title="${r.title}">Claim</button>`:''}
     </div>`;
   }).join('');
   const events=xpEvents().slice().reverse();
   if($('#xpLedger')) $('#xpLedger').innerHTML=events.length?events.map(e=>`<div class="ledger-item"><span>${e.date}</span><span>${e.label}<br><small class="muted">${e.detail||''}</small></span><strong>+${e.xp} XP</strong></div>`).join(''):'<p class="muted">No XP events yet.</p>';
 }
+document.addEventListener('click',e=>{
+  const claimBtn=e.target.closest('.claim-reward-btn');
+  if(claimBtn) claimReward(+claimBtn.dataset.xp,claimBtn.dataset.title);
+});
 
 function renderQuests(){
   const wk=weekStartISO(todayISO());

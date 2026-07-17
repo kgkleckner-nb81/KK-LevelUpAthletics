@@ -794,6 +794,7 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .program-picker{margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .program-picker label{margin:0}
 #newProgramBtn{margin-top:6px}
+.claim-reward-btn{margin-top:10px}
 .xp-explainer-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
 .xp-explainer-grid>div{display:flex;gap:12px;align-items:flex-start;padding:14px;background:var(--white);border:2px solid var(--ink);border-radius:14px}
 .xp-explainer-grid span{font-size:30px;line-height:1}
