@@ -22,14 +22,17 @@ const quests=[
 ];
 function questXP(){return (state.quests||[]).reduce((a,x)=>a+(+x.xp||0),0)}
 
+// Tier labels reuse the same common/uncommon/rare/legendary "prize-giveaway
+// hierarchy" language as the Arcade wheel's weighted tiers, just applied to
+// reward spacing instead of wheel wedge size.
 const rewardMilestones=[
-  {xp:250,title:'Ice Cream Single',icon:'🍦',desc:'Small surprise reward.'},
-  {xp:500,title:'New Baseball Bonus',icon:'⚾',desc:'New baseball, eye black, or small gear item.'},
-  {xp:750,title:'Batting Cage Trip',icon:'🥎',desc:'Parent-approved cage session or dad pitching session.'},
-  {xp:1000,title:'Baseball Store Visit',icon:'🧢',desc:'Trip to pick a small baseball item.'},
-  {xp:1500,title:'Brewers Bonus',icon:'🔵',desc:'Brewers-themed surprise.'},
-  {xp:2000,title:'All-Star Outing',icon:'🏟️',desc:'Special baseball outing idea.'},
-  {xp:3000,title:'MVP Surprise',icon:'🏆',desc:'Big end-of-season reward.'}
+  {xp:250,title:'Ice Cream Single',icon:'🍦',desc:'Small surprise reward.',tier:'Common'},
+  {xp:500,title:'New Baseball Bonus',icon:'⚾',desc:'New baseball, eye black, or small gear item.',tier:'Common'},
+  {xp:750,title:'Batting Cage Trip',icon:'🥎',desc:'Parent-approved cage session or dad pitching session.',tier:'Uncommon'},
+  {xp:1000,title:'Baseball Store Visit',icon:'🧢',desc:'Trip to pick a small baseball item.',tier:'Uncommon'},
+  {xp:1500,title:'Brewers Bonus',icon:'🔵',desc:'Brewers-themed surprise.',tier:'Rare'},
+  {xp:2000,title:'All-Star Outing',icon:'🏟️',desc:'Special baseball outing idea.',tier:'Rare'},
+  {xp:3000,title:'MVP Surprise',icon:'🏆',desc:'Big end-of-season reward.',tier:'Legendary'}
 ];
 const bonusXPValues={
   'Great Effort Bonus':25,
@@ -284,6 +287,7 @@ function renderRewards(){
     const available=balance>=r.xp;
     const claimCount=(state.claimedRewards||[]).filter(c=>c.title===r.title).length;
     return `<div class="reward-tile ${available?'unlocked':''}">
+      <span class="reward-tier-badge tier-${r.tier.toLowerCase()}">${r.tier}</span>
       <div class="quest-icon">${r.icon}</div>
       <h3>${r.title}</h3>
       <p><strong>${r.xp} XP</strong></p>
@@ -329,14 +333,20 @@ function streakBonusXP(s){
   if(s>=3) return 10;
   return 0;
 }
+// No single workout should read as meaningfully close to even the smallest
+// reward (250 XP) — base stays a flat 25 (so ~10 workouts = a small reward,
+// matching the target economy), and combined bonuses are capped well under
+// that so a big PR/streak day still can't rival multi-day + other-activity effort.
+const WORKOUT_XP_CAP=75;
 function workoutXPForEntry(entry){
-  let total=25;
+  const base=25;
   const prs=entryPRs(entry);
-  total += prs.length*15;
+  const prBonus=prs.length*15;
   const s=streak();
   const streakBonus=streakBonusXP(s);
-  total += streakBonus;
-  return {total,prs,base:25,streakBonus,prBonus:prs.length*15};
+  const rawTotal=base+prBonus+streakBonus;
+  const total=Math.min(rawTotal,WORKOUT_XP_CAP);
+  return {total,prs,base,streakBonus,prBonus,capped:rawTotal>WORKOUT_XP_CAP};
 }
 function previousDailyBest(beforeIndex,key){
   const prior=state.daily.slice(0,beforeIndex).map(x=>+x[key]||0);
@@ -390,6 +400,7 @@ function showWorkoutDetail(index){
       <p>Streak Bonus <strong>+${xpInfo.streakBonus}</strong></p>
       <p>New PR Bonus <strong>+${xpInfo.prBonus}</strong></p>
       <p class="total-xp">Total <strong>+${xpInfo.total} XP</strong></p>
+      ${xpInfo.capped?`<p class="muted">Daily workout XP is capped at ${WORKOUT_XP_CAP} so one big day can't rival steady training.</p>`:''}
     </div>
     <div class="detail-grid">
       <p><strong>Squats:</strong> ${entry.squats||0}</p>

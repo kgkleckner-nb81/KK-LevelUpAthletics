@@ -795,6 +795,11 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .program-picker label{margin:0}
 #newProgramBtn{margin-top:6px}
 .claim-reward-btn{margin-top:10px}
+.reward-tier-badge{position:absolute;left:12px;top:12px;font-family:var(--accent);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px;border-radius:999px;background:var(--ink);color:#fff}
+.reward-tier-badge.tier-common{background:#8a7f6a}
+.reward-tier-badge.tier-uncommon{background:var(--deep-blue)}
+.reward-tier-badge.tier-rare{background:var(--neon-pink)}
+.reward-tier-badge.tier-legendary{background:var(--neon-yellow);color:var(--ink)}
 .xp-explainer-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
 .xp-explainer-grid>div{display:flex;gap:12px;align-items:flex-start;padding:14px;background:var(--white);border:2px solid var(--ink);border-radius:14px}
 .xp-explainer-grid span{font-size:30px;line-height:1}
