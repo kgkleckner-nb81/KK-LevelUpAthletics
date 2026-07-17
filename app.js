@@ -130,6 +130,11 @@ $('#combineForm').onsubmit=e=>{
   d.status=ok?'Parent Verified':'Pending Parent Review';
   d.customCombine=[];
   let missingRequired=null;
+  combineProgramActivities().forEach(a=>{
+    const result=collectMetricValues(a,key=>{const v=d[`combineProgram_${a.id}_${key}`];delete d[`combineProgram_${a.id}_${key}`];return v});
+    if(result && result.error && !missingRequired) missingRequired=result.error;
+    else if(result && result.values) d.customCombine.push({name:a.name,values:result.values});
+  });
   [0,1].forEach(i=>{
     const name=d[`combineSkillActivity_${i}`];
     delete d[`combineSkillActivity_${i}`];
@@ -230,7 +235,7 @@ const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=table(['Week','Push-ups','Squats','Plank','Broad','Sprint','Extra Skills','Status'],state.combine.map(a=>[a.week,a.maxPushups,a.squat60,a.plankMax,a.broadJumpIn,a.sprintSec,(a.customCombine||[]).map(x=>`${x.name}: ${formatMetricValues(x.name,x.values!=null?x.values:x.value)}`).join(', ')||'—',`<span class="status ${a.verified?'verified':'pending'}">${a.status}</span>`]));
 $('#pendingList').innerHTML=table(['Week','Push-ups','Plank','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.maxPushups,a.plankMax,a.status]));
-$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderCoachReport();renderTeamEdition();renderCharts()}
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderCoachReport();renderTeamEdition();renderCombineProgramFields();renderCharts()}
 
 
 function xpEvents(){
@@ -840,6 +845,18 @@ function renderCombineCustomFields(){
   const c=$('#combineCustomFields'); if(!c || c.children.length) return;
   const opts='<option value="">— Select exercise —</option>'+allExerciseNames().map(n=>`<option value="${n}">${n}</option>`).join('');
   c.innerHTML=[0,1].map(i=>`<div class="combine-skill-block wide"><label>Extra Exercise ${i+1}<select name="combineSkillActivity_${i}" class="combine-skill-select" data-slot="${i}">${opts}</select></label><div id="combineSkillFields_${i}" class="combine-skill-fields"></div></div>`).join('');
+}
+// Combine Testing gets a dedicated field per activity across every program
+// the athlete has built, in addition to the fixed core benchmarks above and
+// the free-choice "Extra Exercise" dropdown slots.
+function combineProgramActivities(){
+  const ids=new Set();
+  (state.programs||[]).forEach(p=>(p.activityIds||[]).forEach(id=>ids.add(id)));
+  return [...ids].map(findActivityById).filter(Boolean);
+}
+function renderCombineProgramFields(){
+  const c=$('#combineProgramFields'); if(!c) return;
+  c.innerHTML=combineProgramActivities().map(a=>(a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`combineProgram_${a.id}_${met.key}`,a.name,met)).join('')).join('');
 }
 document.addEventListener('click',e=>{
   const rpeBtn=e.target.closest('.rpe-btn');
