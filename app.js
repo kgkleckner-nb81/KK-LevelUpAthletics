@@ -132,7 +132,7 @@ $('#combineForm').onsubmit=e=>{
   state.combine.push(d);
   state.combine.sort((a,b)=>(+a.week||0)-(+b.week||0));
   save();
-  alert(ok?'Weekly combine saved and parent verified.':'Saved as pending. Parent can approve in Parent Zone.');
+  alert(ok?'Combine test saved and parent verified.':'Saved as pending. Parent can approve in Coach/Parent Corner.');
   e.target.reset();
   [0,1].forEach(i=>{const f=$('#combineSkillFields_'+i);if(f)f.innerHTML=''});
   render();
@@ -174,7 +174,6 @@ function renderPlatformStatus(){
   const next=tiers[Math.min(currentIndex+1,tiers.length-1)];
   const packReady=(total%250)>=200;
   if($('#statusTier')) $('#statusTier').textContent=current.name;
-  if($('#statusLevel')) $('#statusLevel').textContent=Math.max(1,Math.floor(total/150)+1);
   if($('#statusXP')) $('#statusXP').textContent=total;
   if($('#statusStreak')) $('#statusStreak').textContent=streak();
   if($('#statusPack')) $('#statusPack').textContent=packReady?'READY':'LOCKED';
@@ -185,7 +184,7 @@ function renderPlatformStatus(){
 }
 function render(){renderPlatformStatus();const r=ratings(), rec=pr(), x=xp(), t=tier();$('#overall').textContent=r.overall;$('#overallBig').textContent=r.overall;$('#streak').textContent=streak();$('#workouts').textContent=state.daily.length;$('#xp').textContent=x;$('#levelName').textContent=t.name;$('#levelDesc').textContent=t.name==='THE SHOW'?'Major league energy. Keep building.':(t.name==='Triple AAA'?'One step from THE SHOW. Keep stacking wins.':'Keep training to get called up.');['speed','strength','power','agility','consistency'].forEach(k=>{$('#'+k).textContent=r[k];$('#'+k+'Bar').style.width=Math.min(100,r[k])+'%'});
 $$('.tier').forEach((el,i)=>el.classList.toggle('active',r.overall>=tiers[i].min));$('#records').innerHTML=`<li>${rec.pushups} max push-ups</li><li>${rec.squats} max squats</li><li>${rec.plank} sec plank</li><li>${rec.shuffleTouches} shuffle touches</li><li>${rec.broadJumpIn} in verified broad jump</li><li>${rec.sprintSec||'—'} sec verified sprint</li>`;
-const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#meterText').textContent=`${x%250} / 250 XP to next parent surprise`;$('#rewardNotice').textContent=x>=250&&x%250<75?'🎁 Parent surprise may be unlocked. Check Parent Zone.':'';
+const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#meterText').textContent=`${x%250} / 250 XP to next parent surprise`;$('#rewardNotice').textContent=x>=250&&x%250<75?'🎁 Parent surprise may be unlocked. Check Coach/Parent Corner.':'';
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=table(['Week','Push-ups','Squats','Plank','Broad','Sprint','Extra Skills','Status'],state.combine.map(a=>[a.week,a.maxPushups,a.squat60,a.plankMax,a.broadJumpIn,a.sprintSec,(a.customCombine||[]).map(x=>`${x.name}: ${formatMetricValues(x.name,x.values!=null?x.values:x.value)}`).join(', ')||'—',`<span class="status ${a.verified?'verified':'pending'}">${a.status}</span>`]));
 $('#pendingList').innerHTML=table(['Week','Push-ups','Plank','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.maxPushups,a.plankMax,a.status]));
@@ -195,7 +194,7 @@ $('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,pl
 function xpEvents(){
   const events=[];
   (state.daily||[]).forEach(x=>events.push({date:x.date||'',label:'Daily Workout',xp:25,detail:x.notes||''}));
-  (state.combine||[]).filter(x=>x.verified).forEach(x=>events.push({date:'Week '+x.week,label:'Verified Weekly Combine',xp:75,detail:'Parent verified'}));
+  (state.combine||[]).filter(x=>x.verified).forEach(x=>events.push({date:'Week '+x.week,label:'Verified Combine Testing',xp:75,detail:'Parent verified'}));
   (state.quests||[]).forEach(x=>events.push({date:x.date||'',label:x.title,xp:+x.xp||0,detail:x.type||'Quest'}));
   (state.bonuses||[]).forEach(x=>events.push({date:x.date||'',label:x.type,xp:+x.xp||0,detail:x.reason||'Parent bonus'}));
   (state.spinLog||[]).forEach(x=>events.push({date:x.date||'',label:'Prize Wheel Spin',xp:+x.xp||0,detail:`Landed on +${x.xp} XP`}));
