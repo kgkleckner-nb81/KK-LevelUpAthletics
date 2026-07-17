@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},trainingSlots:[null,null,null,null],teamProgram:null,teamProgramOptIn:false};
+const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,buildingProgramId:null,teamProgram:null,teamProgramOptIn:false};
 const TEAM_NAME='Northbrook Spartans';
 let state=load();
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
@@ -97,18 +97,29 @@ $('#dailyForm').onsubmit=e=>{
   const d=Object.fromEntries(new FormData(e.target).entries());
   d.custom={};
   let missingRequired=null;
-  (state.trainingSlots||[]).forEach((name,i)=>{
-    if(!name) return;
-    const a=findActivity(name);
+  const prog=findProgram(state.activeProgramId);
+  (prog?prog.activityIds:[]).forEach(actId=>{
+    const a=findActivityById(actId);
     if(!a) return;
-    const result=collectMetricValues(a,key=>{const v=d[`skill_${i}_${key}`];delete d[`skill_${i}_${key}`];return v});
+    const result=collectMetricValues(a,key=>{const v=d[`program_${actId}_${key}`];delete d[`program_${actId}_${key}`];return v});
     if(result && result.error && !missingRequired) missingRequired=result.error;
-    else if(result && result.values) d.custom[name]=result.values;
+    else if(result && result.values) d.custom[a.name]=result.values;
+  });
+  [0,1,2,3].forEach(i=>{
+    const name=d[`adhocActivity_${i}`];
+    delete d[`adhocActivity_${i}`];
+    const a=name?findActivity(name):null;
+    if(!a) return;
+    const result=collectMetricValues(a,key=>{const v=d[`adhocMetric_${i}_${key}`];delete d[`adhocMetric_${i}_${key}`];return v});
+    if(result && result.error && !missingRequired) missingRequired=result.error;
+    else if(result && result.values) d.custom[a.name]=result.values;
   });
   if(missingRequired){alert(`Please fill in ${missingRequired} before saving, or leave that exercise blank.`);return}
   state.daily.push(d);
   state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  save();openPack();e.target.reset();$('#dailyForm').date.valueAsDate=new Date();renderDailyCustomFields();render();
+  save();openPack();e.target.reset();$('#dailyForm').date.valueAsDate=new Date();
+  [0,1,2,3].forEach(i=>{const f=$('#adhocSkillFields_'+i);if(f)f.innerHTML=''});
+  renderDailyCustomFields();render();
 };
 $('#combineForm').onsubmit=e=>{
   e.preventDefault();
@@ -149,6 +160,25 @@ function questCompletedThisWeek(id){
   const wk=weekStartISO(todayISO());
   return (state.quests||[]).some(x=>x.id===id&&weekStartISO(x.date)===wk);
 }
+if($('#teamProgramLogForm')?.date) $('#teamProgramLogForm').date.valueAsDate=new Date();
+$('#teamProgramLogForm').onsubmit=e=>{
+  e.preventDefault();
+  const d=Object.fromEntries(new FormData(e.target).entries());
+  d.custom={};
+  d.programSource='team';
+  let missingRequired=null;
+  (state.teamProgram?.activities||[]).forEach((name,i)=>{
+    const a=findActivity(name);
+    if(!a) return;
+    const result=collectMetricValues(a,key=>{const v=d[`teamlog_${i}_${key}`];delete d[`teamlog_${i}_${key}`];return v});
+    if(result && result.error && !missingRequired) missingRequired=result.error;
+    else if(result && result.values) d.custom[a.name]=result.values;
+  });
+  if(missingRequired){alert(`Please fill in ${missingRequired} before saving, or leave that exercise blank.`);return}
+  state.daily.push(d);
+  state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  save();openPack();e.target.reset();$('#teamProgramLogForm').date.valueAsDate=new Date();render();
+};
 $('#questForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());if(d.parentCode!==state.parentCode){alert('Incorrect parent code. Quest XP not awarded.');return}const q=quests.find(x=>x.id===d.questId);if(!q){alert('Select a quest.');return}if(questCompletedThisWeek(q.id)){alert(`${q.title} was already completed this week. It resets next Monday.`);return}state.quests=state.quests||[];state.quests.push({id:q.id,title:q.title,type:q.type,xp:q.xp,notes:d.notes||'',date:new Date().toISOString().slice(0,10)});save();alert(`${q.title} complete! +${q.xp} XP awarded.`);e.target.reset();render()};
 
 $('#saveParentCode').onclick=()=>{const c=$('#newParentCode').value.trim();if(c.length<4){$('#codeStatus').textContent='Use at least 4 characters.';return}state.parentCode=c;save();$('#newParentCode').value='';$('#codeStatus').textContent='Parent code updated.'};
@@ -608,14 +638,90 @@ function renderShoutouts(){
 }
 function addShoutout(){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO(),source:'shoutout'});save();renderShoutouts()}
 function addReaction(text){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:text,from:'You',date:todayISO(),source:'reaction'});save();renderShoutouts()}
+// ---- Personal Programs ----
+// A Program is {id, name, activityIds[]}. Athletes can build multiple named
+// programs; Skill Lab's Add button always adds to whichever program is
+// currently being built/edited (state.buildingProgramId), not a fixed slot.
+function findProgram(id){return (state.programs||[]).find(p=>p.id===id)}
+function findActivityById(id){return activities.find(a=>a.id===id)}
+function createProgram(name){
+  const p={id:'prog_'+Date.now()+'_'+Math.floor(Math.random()*1000),name,activityIds:[]};
+  state.programs=state.programs||[];
+  state.programs.push(p);
+  state.buildingProgramId=p.id;
+  if(!state.activeProgramId) state.activeProgramId=p.id;
+  save();
+  return p;
+}
+function ensureBuildingProgram(){
+  state.programs=state.programs||[];
+  if(state.buildingProgramId && findProgram(state.buildingProgramId)) return findProgram(state.buildingProgramId);
+  if(state.programs.length){state.buildingProgramId=state.programs[0].id;return state.programs[0]}
+  return null;
+}
+function newProgramFlow(){
+  const name=prompt('Name your new program (e.g. "Baseball Exercise Program"):');
+  if(!name||!name.trim()) return;
+  createProgram(name.trim());
+  renderProgramBuilder();
+  renderExerciseLibrary();
+  renderDailyProgramPicker();
+  renderDailyCustomFields();
+}
+function addActivityToBuildingProgram(name){
+  const a=findActivity(name);
+  if(!a) return;
+  let prog=ensureBuildingProgram();
+  if(!prog){
+    const pname=prompt('Name your first program (e.g. "Baseball Exercise Program") to start adding activities:');
+    if(!pname||!pname.trim()) return;
+    prog=createProgram(pname.trim());
+  }
+  if(prog.activityIds.includes(a.id)){alert(`${a.name} is already in "${prog.name}".`);return}
+  prog.activityIds.push(a.id);
+  save();
+  renderProgramBuilder();
+  renderExerciseLibrary();
+  renderDailyProgramPicker();
+  renderDailyCustomFields();
+  if($('#activityDetailModal')) $('#activityDetailModal').classList.add('hidden');
+}
+function removeActivityFromProgram(programId,activityId){
+  const p=findProgram(programId);
+  if(!p) return;
+  p.activityIds=p.activityIds.filter(id=>id!==activityId);
+  save();
+  renderProgramBuilder();
+  renderExerciseLibrary();
+  renderDailyCustomFields();
+}
+function renderProgramBuilder(){
+  const card=$('#programBuilderCard'); if(!card) return;
+  const sel=$('#programBuilderSelect');
+  const progs=state.programs||[];
+  if(!progs.length){
+    $('#programBuilderTitle').textContent='Build Your First Program';
+    sel.innerHTML='<option value="">No programs yet</option>';
+    $('#programBuilderActivityList').innerHTML='<p class="muted">Click "+ New Program" to get started, then use Add on any activity below.</p>';
+    return;
+  }
+  const buildingId=ensureBuildingProgram()?.id;
+  sel.innerHTML=progs.map(p=>`<option value="${p.id}" ${p.id===buildingId?'selected':''}>${p.name}</option>`).join('');
+  const prog=findProgram(buildingId);
+  $('#programBuilderTitle').textContent=`Building: ${prog.name}`;
+  $('#programBuilderActivityList').innerHTML=prog.activityIds.length
+    ?'<ul class="program-activity-items">'+prog.activityIds.map(id=>{const a=findActivityById(id);return a?`<li>${a.name}<button type="button" class="remove-program-activity" data-program="${prog.id}" data-activity="${id}">Remove</button></li>`:''}).join('')+'</ul>'
+    :'<p class="muted">No activities yet — use Add on any Skill Lab exercise below.</p>';
+}
 function renderExerciseLibrary(){
   if(!$('#libraryCategory'))return;
   if(!$('#libraryCategory').options.length)$('#libraryCategory').innerHTML=categoryOrder.map(c=>`<option>${c}</option>`).join('');
   const cat=$('#libraryCategory').value||categoryOrder[0];
+  const buildingProg=findProgram(ensureBuildingProgram()?.id);
   $('#exerciseLibrary').innerHTML=activities.filter(a=>a.category===cat).map(a=>{
     const isFixed=fixedExerciseAliases.has(a.name);
-    const active=(state.trainingSlots||[]).includes(a.name);
-    const label=isFixed?'Tracked Daily':(active?'In Training':'Add');
+    const active=!!(buildingProg&&buildingProg.activityIds.includes(a.id));
+    const label=isFixed?'Tracked Daily':(active?'In Program':'Add');
     return `<div class="library-card${active?' active':''}"><span>⚾</span><strong>${a.name}</strong><div class="library-card-actions"><button type="button" class="view-activity-btn" data-exercise="${a.name}">View</button><button type="button" class="add-exercise-btn" data-exercise="${a.name}" ${(isFixed||active)?'disabled':''}>${label}</button></div></div>`;
   }).join('');
 }
@@ -635,8 +741,9 @@ function renderActivityDetail(name){
   const sortedMetrics=(a.metrics||[]).slice().sort((x,y)=>x.order-y.order);
   const legend=sortedMetrics.map(met=>`<div class="metric-legend-item"><strong>${met.label}</strong><span>${met.unit||'—'}</span></div>`).join('');
   const isFixed=fixedExerciseAliases.has(a.name);
-  const active=(state.trainingSlots||[]).includes(a.name);
-  const addLabel=isFixed?'Tracked Daily':(active?'In Training':'Add to Daily Training');
+  const buildingProg=findProgram(ensureBuildingProgram()?.id);
+  const active=!!(buildingProg&&buildingProg.activityIds.includes(a.id));
+  const addLabel=isFixed?'Tracked Daily':(active?'In Program':'Add to Program');
   $('#activityDetailContent').innerHTML=`
     <p class="eyebrow dark">${a.category}</p>
     <h2>${a.name}</h2>
@@ -648,34 +755,6 @@ function renderActivityDetail(name){
     <button type="button" class="primary add-exercise-btn" data-exercise="${a.name}" ${(isFixed||active)?'disabled':''}>${addLabel}</button>
   `;
   $('#activityDetailModal').classList.remove('hidden');
-}
-function renderTrainingSlots(){
-  if(!$('#trainingSlots')) return;
-  state.trainingSlots=state.trainingSlots||[null,null,null,null];
-  $('#trainingSlots').innerHTML=state.trainingSlots.map((ex,i)=>ex
-    ?`<div class="slot-card filled"><strong>${ex}</strong><button type="button" class="slot-remove" data-slot="${i}">Remove</button></div>`
-    :`<div class="slot-card empty"><span>Empty Slot ${i+1}</span></div>`
-  ).join('');
-}
-function assignExercise(name){
-  state.trainingSlots=state.trainingSlots||[null,null,null,null];
-  if(state.trainingSlots.includes(name)){alert(`${name} is already one of your 4 training slots.`);return}
-  const idx=state.trainingSlots.findIndex(x=>!x);
-  if(idx===-1){alert('All 4 training slots are full. Remove one first in the Skill Lab.');return}
-  state.trainingSlots[idx]=name;
-  save();
-  renderTrainingSlots();
-  renderExerciseLibrary();
-  renderDailyCustomFields();
-  if($('#activityDetailModal')) $('#activityDetailModal').classList.add('hidden');
-  alert(`${name} added to slot ${idx+1}! It now shows up on your Daily Check-In.`);
-}
-function removeSlot(i){
-  state.trainingSlots[i]=null;
-  save();
-  renderTrainingSlots();
-  renderExerciseLibrary();
-  renderDailyCustomFields();
 }
 // Renders one input per activity metric, in metric.order, with a persistent
 // unit badge (not placeholder text) so the unit stays visible while typing.
@@ -689,14 +768,42 @@ function metricInputHTML(fieldName,activityName,metric){
   const max=metric.max!=null?` max="${metric.max}"`:'';
   return `<div class="metric-field"><span class="metric-field-label">${activityName} · ${metric.label}</span><div class="unit-input"><input type="number" name="${fieldName}" step="${step}"${min}${max} placeholder="0"><span class="unit-badge">${metric.unit||''}</span></div></div>`;
 }
+// Daily Check-In: which personal program is being logged today.
+function renderDailyProgramPicker(){
+  const c=$('#dailyProgramPicker'); if(!c) return;
+  const progs=state.programs||[];
+  if(!progs.length){
+    c.innerHTML='<p class="muted">You haven\'t built a program yet.</p><button type="button" id="goToBuilderBtn">+ Build a Program</button>';
+    return;
+  }
+  if(!state.activeProgramId || !findProgram(state.activeProgramId)) state.activeProgramId=progs[0].id;
+  if(progs.length===1){
+    c.innerHTML=`<p class="muted">Logging for: <strong>${progs[0].name}</strong></p>`;
+  }else{
+    c.innerHTML=`<label>Logging for which program?<select id="dailyProgramSelect">${progs.map(p=>`<option value="${p.id}" ${p.id===state.activeProgramId?'selected':''}>${p.name}</option>`).join('')}</select></label><button type="button" id="goToBuilderBtn">+ Build Another Program</button>`;
+  }
+}
 function renderDailyCustomFields(){
   const c=$('#dailyCustomFields'); if(!c) return;
-  const slots=(state.trainingSlots||[]).filter(Boolean);
-  c.innerHTML=slots.map((name,i)=>{
-    const a=findActivity(name);
+  const prog=findProgram(state.activeProgramId);
+  if(!prog){c.innerHTML='';return}
+  c.innerHTML=prog.activityIds.map(id=>{
+    const a=findActivityById(id);
     if(!a) return '';
-    return (a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`skill_${i}_${met.key}`,a.name,met)).join('');
+    return (a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`program_${id}_${met.key}`,a.name,met)).join('');
   }).join('');
+}
+// Ad hoc slots on Daily Check-In for logging an exercise outside the active
+// program — same dynamic dropdown pattern as the Combine "Extra Exercise" slots.
+function renderDailyAdHocFields(){
+  const c=$('#dailyAdHocFields'); if(!c || c.children.length) return;
+  const opts='<option value="">— Select exercise —</option>'+allExerciseNames().map(n=>`<option value="${n}">${n}</option>`).join('');
+  c.innerHTML=[0,1,2,3].map(i=>`<div class="combine-skill-block wide"><label>Ad Hoc Exercise ${i+1}<select name="adhocActivity_${i}" class="adhoc-skill-select" data-slot="${i}">${opts}</select></label><div id="adhocSkillFields_${i}" class="combine-skill-fields"></div></div>`).join('');
+}
+function renderAdHocSkillFields(slot,name){
+  const c=$('#adhocSkillFields_'+slot); if(!c) return;
+  const a=name?findActivity(name):null;
+  c.innerHTML=a?(a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`adhocMetric_${slot}_${met.key}`,a.name,met)).join(''):'';
 }
 function renderCombineSkillFields(slot,name){
   const c=$('#combineSkillFields_'+slot); if(!c) return;
@@ -717,17 +824,23 @@ document.addEventListener('click',e=>{
   }
 });
 document.addEventListener('change',e=>{
-  const sel=e.target.closest('.combine-skill-select');
-  if(sel) renderCombineSkillFields(sel.dataset.slot,sel.value);
+  const cSel=e.target.closest('.combine-skill-select');
+  if(cSel) renderCombineSkillFields(cSel.dataset.slot,cSel.value);
+  const aSel=e.target.closest('.adhoc-skill-select');
+  if(aSel) renderAdHocSkillFields(aSel.dataset.slot,aSel.value);
+  if(e.target.id==='programBuilderSelect'){state.buildingProgramId=e.target.value;save();renderProgramBuilder();renderExerciseLibrary()}
+  if(e.target.id==='dailyProgramSelect'){state.activeProgramId=e.target.value;save();renderDailyCustomFields()}
 });
 document.addEventListener('click',e=>{
   const addBtn=e.target.closest('.add-exercise-btn');
-  if(addBtn && !addBtn.disabled) assignExercise(addBtn.dataset.exercise);
-  const rmBtn=e.target.closest('.slot-remove');
-  if(rmBtn) removeSlot(+rmBtn.dataset.slot);
+  if(addBtn && !addBtn.disabled) addActivityToBuildingProgram(addBtn.dataset.exercise);
+  const rmProgBtn=e.target.closest('.remove-program-activity');
+  if(rmProgBtn) removeActivityFromProgram(rmProgBtn.dataset.program,rmProgBtn.dataset.activity);
   const viewBtn=e.target.closest('.view-activity-btn');
   if(viewBtn) renderActivityDetail(viewBtn.dataset.exercise);
   if(e.target.id==='closeActivityDetail' || e.target.id==='activityDetailModal') $('#activityDetailModal').classList.add('hidden');
+  if(e.target.id==='newProgramBtn') newProgramFlow();
+  if(e.target.id==='goToBuilderBtn') switchScreen('library');
 });
 // ---- Team Program ----
 // Coach/parent-authored program of Skill Lab activities. Uses the existing
@@ -805,8 +918,24 @@ function renderClubhouseTeamProgram(){
     $('#completeTeamProgram').textContent=doneToday?'Completed Today':'Complete Team Program';
   }
 }
+// Daily Check-In: a parallel logging section sourced from the Team Program's
+// activities (by name, matching how teamProgram.activities is already
+// stored) rather than a personal Program's activityIds. Only shown once the
+// athlete has joined a team program.
+function renderTeamProgramLogFields(){
+  const card=$('#teamProgramLogCard'); if(!card) return;
+  const show=!!(state.teamProgramOptIn && state.teamProgram && state.teamProgram.activities.length);
+  card.classList.toggle('hidden',!show);
+  if(!show) return;
+  const c=$('#teamProgramLogFields'); if(!c) return;
+  c.innerHTML=state.teamProgram.activities.map((name,i)=>{
+    const a=findActivity(name);
+    if(!a) return '';
+    return (a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`teamlog_${i}_${met.key}`,a.name,met)).join('');
+  }).join('');
+}
 function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>Score</th></tr></thead><tbody>${[...demoAthletes].sort((a,b)=>b.arcade-a.arcade).map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.arcade}</td></tr>`).join('')}</tbody></table>`}
-function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderTrainingSlots();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=state.gameScores?.reaction??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=state.gameScores?.homer??0;renderArcadeExtras()}
+function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=state.gameScores?.reaction??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=state.gameScores?.homer??0;renderArcadeExtras()}
 let reactionStart=0,reactionTimer=null;function startReactionGame(){$('#reactionResult').textContent='Get ready...';$('#reactionBall').classList.add('hidden');clearTimeout(reactionTimer);reactionTimer=setTimeout(()=>{const b=$('#reactionBall');b.style.left=(10+Math.random()*70)+'%';b.style.top=(18+Math.random()*55)+'%';b.classList.remove('hidden');reactionStart=performance.now();$('#reactionResult').textContent='TAP!'},800+Math.random()*1800)}function hitReactionBall(){const ms=Math.round(performance.now()-reactionStart);$('#reactionBall').classList.add('hidden');state.gameScores=state.gameScores||{};if(!state.gameScores.reaction||ms<state.gameScores.reaction)state.gameScores.reaction=ms;const e=awardGameXP(5);$('#reactionResult').textContent=`${ms} ms · +${e} XP`;save()}
 let strikeTarget=0,strikeRound=0,strikeScore=0;function startStrikeGame(){strikeRound=1;strikeScore=0;nextStrike()}function nextStrike(){strikeTarget=1+Math.floor(Math.random()*9);const names={1:'High & Inside',2:'High Center',3:'High & Away',4:'Middle Inside',5:'Middle',6:'Middle Away',7:'Low & Inside',8:'Low Center',9:'Low & Away'};$('#strikePrompt').textContent=`Round ${strikeRound}/5: ${names[strikeTarget]}`}function chooseStrike(z){if(!strikeRound)return;if(z===strikeTarget){strikeScore+=100;$('#strikeResult').textContent='Correct! +100'}else $('#strikeResult').textContent='Missed. Keep learning the zone.';strikeRound++;if(strikeRound>5){state.gameScores=state.gameScores||{};state.gameScores.strike=Math.max(state.gameScores.strike||0,strikeScore);const e=awardGameXP(10);$('#strikePrompt').textContent=`Final Score: ${strikeScore} · +${e} XP`;strikeRound=0;save()}else nextStrike()}
 let homerAnimation=null,homerStart=0,homerActive=false;function startHomerGame(){const ball=$('#timingBall');cancelAnimationFrame(homerAnimation);homerStart=performance.now();homerActive=true;function move(t){const pct=Math.min(100,((t-homerStart)/1800)*100);ball.style.left=pct+'%';if(pct<100&&homerActive)homerAnimation=requestAnimationFrame(move);else if(homerActive){$('#homerResult').textContent='Strike! Try again.';homerActive=false}}homerAnimation=requestAnimationFrame(move)}function swingHomer(){if(!homerActive)return;homerActive=false;cancelAnimationFrame(homerAnimation);const left=parseFloat($('#timingBall').style.left)||0;let score=0,msg='';if(left>=70&&left<=82){score=500;msg='HOME RUN!'}else if(left>=60&&left<=90){score=250;msg='Solid Contact!'}else{score=50;msg=left<60?'Early!':'Late!'}state.gameScores=state.gameScores||{};state.gameScores.homer=Math.max(state.gameScores.homer||0,score);const e=awardGameXP(score>=500?10:5);$('#homerResult').textContent=`${msg} ${score} points · +${e} XP`;save()}
@@ -952,7 +1081,9 @@ if($('#wheelInner'))$('#wheelInner').innerHTML=buildWheelSVG();
 if($('#spinButton'))$('#spinButton').onclick=spinWheel;
 if($('#photoUpload'))$('#photoUpload').onchange=e=>handlePhotoUpload(e.target.files[0]);
 if($('#randomAvatar'))$('#randomAvatar').onclick=randomAvatar;
+renderDailyProgramPicker();
 renderDailyCustomFields();
+renderDailyAdHocFields();
 renderCombineCustomFields();
 
 // Version 3.1 initial route

@@ -785,14 +785,15 @@ footer{
 .rpe-btn.selected{background:var(--neon-blue);color:var(--ink)}
 .combine-skill-fields{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px}
 .combine-skill-fields .metric-field{min-width:150px}
-.slots-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
-.slot-card{border-radius:14px;padding:14px;text-align:center;border:2px dashed var(--ink);background:var(--white);font-family:var(--accent);font-weight:600}
-.slot-card.filled{background:var(--cream);border-style:solid;border-color:var(--creamsicle-dark)}
-.slot-card.empty{color:var(--muted)}
-.slot-remove{margin-top:8px;font-size:11px;padding:6px 10px;background:var(--danger);color:#fff;border-color:var(--ink)}
-@media(max-width:700px){.slots-grid{grid-template-columns:repeat(2,1fr)}}
 button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .team-program-notes{margin-top:12px;padding:10px 12px;background:var(--white);border:2px dashed var(--ink);border-radius:10px}
+.program-activity-list{margin:14px 0}
+.program-activity-items{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.program-activity-items li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--white);border:2px solid var(--ink);border-radius:10px;font-family:var(--accent);font-weight:600}
+.remove-program-activity{padding:6px 10px;font-size:11px;background:var(--danger);color:#fff;border-color:var(--ink)}
+.program-picker{margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.program-picker label{margin:0}
+#newProgramBtn{margin-top:6px}
 .xp-explainer-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
 .xp-explainer-grid>div{display:flex;gap:12px;align-items:flex-start;padding:14px;background:var(--white);border:2px solid var(--ink);border-radius:14px}
 .xp-explainer-grid span{font-size:30px;line-height:1}
