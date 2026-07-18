@@ -172,6 +172,15 @@ $('#teamProgramLogForm').onsubmit=e=>{
   });
   state.daily.push(d);
   state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  // Round 4: the 50 XP team-program bonus fires here — on an actual save with
+  // at least one logged exercise — not on the Clubhouse click that got the
+  // athlete here. Still only once per day, same gate as before.
+  state.bonuses=state.bonuses||[];
+  const loggedSomething=Object.keys(d.custom).length>0;
+  const alreadyAwardedToday=state.bonuses.some(x=>x.type==='Team Program'&&x.date===todayISO());
+  if(loggedSomething&&!alreadyAwardedToday){
+    state.bonuses.push({date:todayISO(),type:'Team Program',xp:50,reason:state.teamProgram.title});
+  }
   save();
   e.target.reset();
   $('#teamProgramLogForm').date.valueAsDate=new Date();
@@ -1109,14 +1118,17 @@ function renderTeamProgramSummary(){
   $('#joinTeamProgram').disabled=!!state.teamProgramOptIn;
   $('#joinTeamProgram').textContent=state.teamProgramOptIn?'Joined ✓':'Join Team Program';
 }
-function completeTeamProgram(){
-  if(!state.teamProgram) return;
-  state.bonuses=state.bonuses||[];
-  if(state.bonuses.some(x=>x.type==='Team Program'&&x.date===todayISO())){alert('Today’s team program is already complete.');return}
-  state.bonuses.push({date:todayISO(),type:'Team Program',xp:50,reason:state.teamProgram.title});
-  save();
-  alert('Team program complete! +50 XP.');
-  render();
+// Round 4: the Clubhouse button no longer awards XP itself — it's a jump-off
+// point to the real logging screen. The 50 XP only fires from an actual save
+// on the Team Program Check-In block (see the teamProgramLogForm submit
+// handler), gated the same once-per-day way completeTeamProgram used to gate it.
+function goToTeamProgramCheckIn(){
+  switchScreen('daily');
+  const card=$('#teamProgramLogCard');
+  if(!card) return;
+  card.scrollIntoView({behavior:'smooth',block:'start'});
+  card.classList.add('pulse-highlight');
+  setTimeout(()=>card.classList.remove('pulse-highlight'),1600);
 }
 function renderClubhouseTeamProgram(){
   const card=$('#teamProgramCard'); if(!card) return;
@@ -1128,7 +1140,7 @@ function renderClubhouseTeamProgram(){
   const doneToday=(state.bonuses||[]).some(x=>x.type==='Team Program'&&x.date===todayISO());
   if($('#completeTeamProgram')){
     $('#completeTeamProgram').disabled=doneToday;
-    $('#completeTeamProgram').textContent=doneToday?'Completed Today':'Complete Team Program';
+    $('#completeTeamProgram').textContent=doneToday?'Completed Today':'Log Team Program';
   }
 }
 // Daily Check-In: a parallel logging section sourced from the Team Program's
@@ -1283,7 +1295,7 @@ if($('#libraryCategory'))$('#libraryCategory').onchange=renderExerciseLibrary;
 if($('#addShoutout'))$('#addShoutout').onclick=addShoutout;
 if($('#saveTeamProgram'))$('#saveTeamProgram').onclick=saveTeamProgram;
 if($('#joinTeamProgram'))$('#joinTeamProgram').onclick=joinTeamProgram;
-if($('#completeTeamProgram'))$('#completeTeamProgram').onclick=completeTeamProgram;
+if($('#completeTeamProgram'))$('#completeTeamProgram').onclick=goToTeamProgramCheckIn;
 $$('.reaction-btn').forEach(b=>b.onclick=()=>addReaction(b.textContent));
 if($('#startReaction'))$('#startReaction').onclick=startReactionGame;
 if($('#reactionBall'))$('#reactionBall').onclick=hitReactionBall;
