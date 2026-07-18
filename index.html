@@ -39,8 +39,8 @@
   <button class="tab" data-screen="clubhouse">Clubhouse</button>
   <button class="tab" data-screen="library">Skill Lab</button>
   <button class="tab" data-screen="daily">Daily Check-In</button>
-  <button class="tab" data-screen="player">Player Card</button>
   <button class="tab" data-screen="combine">Combine Testing</button>
+  <button class="tab" data-screen="player">Player Card</button>
   <button class="tab" data-screen="quests">Quests & Battles</button>
   <button class="tab" data-screen="charts">Progress</button>
   <button class="tab" data-screen="rewards">Reward Locker</button>
@@ -151,18 +151,9 @@
     <div id="dailyProgramPicker" class="program-picker"></div>
     <form id="dailyForm" class="form-grid">
       <label>Date<input type="date" name="date" required></label>
-      <label>Squats<input type="number" name="squats" min="0"></label>
-      <label>Push-ups<input type="number" name="pushups" min="0"></label>
-      <label>Plank seconds<input type="number" name="plank" min="0"></label>
-      <label>Sit Ups<input type="number" name="crunches" min="0"></label>
-      <label>Broad jumps<input type="number" name="broadJumps" min="0"></label>
-      <label>Lateral shuffle touches<input type="number" name="shuffleTouches" min="0"></label>
-      <label>Skater jumps<input type="number" name="skaterJumps" min="0"></label>
-      <label>20-yard sprints<input type="number" name="sprints" min="0"></label>
       <div id="dailyCustomFields" style="display:contents"></div>
-      <div id="dailyAdHocFields" style="display:contents"></div>
       <label class="wide">Notes<input type="text" name="notes"></label>
-      <button class="primary wide" type="submit">Save Workout + Open Pack</button>
+      <button class="primary wide" type="submit">Save Workout</button>
     </form>
   </div>
   <div class="card hidden" id="teamProgramLogCard">
@@ -175,7 +166,6 @@
       <button class="primary wide" type="submit">Save Team Program Check-In</button>
     </form>
   </div>
-  <div class="card hidden" id="packReveal"><h2>⚾ Card Pack Opened!</h2><div id="packCards" class="pack-grid"></div></div>
   <div class="card"><h2>Recent Workouts</h2><div id="dailyLog"></div></div>
 </section>
 
@@ -204,13 +194,8 @@
     <p class="muted">Results are saved as pending until a parent enters the sign-off code.</p>
     <form id="combineForm" class="form-grid">
       <label>Week<input type="number" name="week" min="1" max="12" required></label>
-      <label>Max push-ups<input type="number" name="maxPushups" min="0"></label>
-      <label>Squats in 60 sec<input type="number" name="squat60" min="0"></label>
-      <label>Longest plank sec<input type="number" name="plankMax" min="0"></label>
-      <label>Broad jump inches<input type="number" name="broadJumpIn" min="0"></label>
-      <label>20-yard sprint sec<input type="number" name="sprintSec" min="0" step="0.01"></label>
+      <label class="wide">Testing which program?<select id="combineProgramSelect" name="combineProgram"></select></label>
       <div id="combineProgramFields" style="display:contents"></div>
-      <div id="combineCustomFields" style="display:contents"></div>
       <label class="wide">Parent code<input type="password" name="parentCode" placeholder="Required for verified result"></label>
       <button class="primary wide" type="submit">Save Combine Test</button>
     </form>
@@ -336,13 +321,9 @@
 <section id="library" class="screen">
 <div class="card" id="programBuilderCard">
   <p class="eyebrow dark">Workout Builder</p>
-  <h2 id="programBuilderTitle">Build a Program</h2>
-  <p class="muted">Activities you "Add" below go into whichever program you're building here. Create as many named programs as you want (e.g. "Baseball Exercise Program," "Strength Program").</p>
-  <div class="form-grid">
-    <label class="wide">Editing which program?<select id="programBuilderSelect"></select></label>
-  </div>
-  <div id="programBuilderActivityList" class="program-activity-list"></div>
-  <button id="newProgramBtn" type="button">+ New Program</button>
+  <h2>Build a Program</h2>
+  <p class="muted">Preset programs are ready-made and locked. Click "+ New Program" to start your own, then use Add on any activity below — don't forget to Save when you're done.</p>
+  <div id="programBuilderBody"></div>
 </div>
 <div class="card"><p class="eyebrow dark">Training Repository</p><h2>Choose a Skill Module</h2><label>Category<select id="libraryCategory"></select></label><div id="exerciseLibrary" class="library-grid"></div></div></section>
 

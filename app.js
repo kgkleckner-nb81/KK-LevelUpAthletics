@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,buildingProgramId:null,teamProgram:null,teamProgramOptIn:false};
+const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false};
 const TEAM_NAME='Northbrook Spartans';
 let state=load();
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
@@ -80,49 +80,46 @@ $$('.mode-btn').forEach(b=>b.onclick=()=>enterMode(b.dataset.mode));
 $$('[data-path]').forEach(b=>b.onclick=()=>enterMode(b.dataset.path));
 $$('[data-home-button]').forEach(b=>b.onclick=()=>enterMode('home'));
 if($('#dailyForm').date) $('#dailyForm').date.valueAsDate=new Date();
-// Reads the raw field values for one activity's metrics out of a submitted
-// form-data object, returning null if nothing was touched (so an athlete can
-// leave a slot/dropdown blank for the day) or {error} if a required metric
-// was started but left incomplete.
-function collectMetricValues(a,rawGetter){
-  const raw={};
-  (a.metrics||[]).forEach(met=>{raw[met.key]=rawGetter(met.key)});
-  const touched=Object.values(raw).some(v=>v!==undefined&&v!=='');
-  if(!touched) return null;
-  const missing=(a.metrics||[]).find(met=>met.required&&(raw[met.key]===undefined||raw[met.key]===''));
-  if(missing) return {error:`${a.name} — ${missing.label}`};
-  const values={};
-  (a.metrics||[]).forEach(met=>{if(raw[met.key]!==undefined&&raw[met.key]!=='')values[met.key]=met.inputType==='decimal'?parseFloat(raw[met.key]):+raw[met.key]});
-  return {values};
+// Round 3: every activity has exactly one metric, so a single field holds its
+// value (combine) or a list of per-set fields holds its values (daily/team —
+// see collectActivitySets). Returns null if the field was left blank.
+function collectMetricValue(fieldName,d,a){
+  const raw=d[fieldName];
+  delete d[fieldName];
+  if(raw===undefined||raw==='') return null;
+  const value=a.metric.inputType==='decimal'?parseFloat(raw):+raw;
+  return Number.isNaN(value)?null:value;
+}
+function collectActivitySets(prefix,d,a,setCount){
+  const sets=[];
+  for(let i=0;i<setCount;i++){
+    const value=collectMetricValue(`${prefix}_${a.id}_${i}`,d,a);
+    if(value!=null) sets.push({[a.metric.key]:value});
+  }
+  return sets;
 }
 $('#dailyForm').onsubmit=e=>{
   e.preventDefault();
   const d=Object.fromEntries(new FormData(e.target).entries());
   d.custom={};
-  let missingRequired=null;
   const prog=findProgram(state.activeProgramId);
+  d.programType='personal';
+  d.programId=prog?prog.id:null;
+  d.programName=prog?prog.name:null;
   (prog?prog.activityIds:[]).forEach(actId=>{
     const a=findActivityById(actId);
     if(!a) return;
-    const result=collectMetricValues(a,key=>{const v=d[`program_${actId}_${key}`];delete d[`program_${actId}_${key}`];return v});
-    if(result && result.error && !missingRequired) missingRequired=result.error;
-    else if(result && result.values) d.custom[a.name]=result.values;
+    const sets=collectActivitySets('set',d,a,dailySetCounts[actId]||1);
+    if(sets.length) d.custom[a.name]={sets};
   });
-  [0,1,2,3].forEach(i=>{
-    const name=d[`adhocActivity_${i}`];
-    delete d[`adhocActivity_${i}`];
-    const a=name?findActivity(name):null;
-    if(!a) return;
-    const result=collectMetricValues(a,key=>{const v=d[`adhocMetric_${i}_${key}`];delete d[`adhocMetric_${i}_${key}`];return v});
-    if(result && result.error && !missingRequired) missingRequired=result.error;
-    else if(result && result.values) d.custom[a.name]=result.values;
-  });
-  if(missingRequired){alert(`Please fill in ${missingRequired} before saving, or leave that exercise blank.`);return}
   state.daily.push(d);
   state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  save();openPack();e.target.reset();$('#dailyForm').date.valueAsDate=new Date();
-  [0,1,2,3].forEach(i=>{const f=$('#adhocSkillFields_'+i);if(f)f.innerHTML=''});
-  renderDailyCustomFields();render();
+  save();
+  e.target.reset();
+  $('#dailyForm').date.valueAsDate=new Date();
+  dailySetCounts={};
+  renderDailyCustomFields();
+  render();
 };
 $('#combineForm').onsubmit=e=>{
   e.preventDefault();
@@ -131,29 +128,20 @@ $('#combineForm').onsubmit=e=>{
   delete d.parentCode;
   d.verified=ok;
   d.status=ok?'Parent Verified':'Pending Parent Review';
+  const chosen=combineProgramOptions().find(o=>o.id===d.combineProgram);
+  delete d.combineProgram;
+  d.programId=chosen?chosen.id:null;
+  d.programName=chosen?chosen.name:null;
   d.customCombine=[];
-  let missingRequired=null;
-  combineProgramActivities().forEach(a=>{
-    const result=collectMetricValues(a,key=>{const v=d[`combineProgram_${a.id}_${key}`];delete d[`combineProgram_${a.id}_${key}`];return v});
-    if(result && result.error && !missingRequired) missingRequired=result.error;
-    else if(result && result.values) d.customCombine.push({name:a.name,values:result.values});
+  (chosen?chosen.activities:[]).forEach(a=>{
+    const value=collectMetricValue(`combineProgram_${a.id}_${a.metric.key}`,d,a);
+    if(value!=null) d.customCombine.push({name:a.name,values:{[a.metric.key]:value}});
   });
-  [0,1].forEach(i=>{
-    const name=d[`combineSkillActivity_${i}`];
-    delete d[`combineSkillActivity_${i}`];
-    const a=name?findActivity(name):null;
-    if(!a) return;
-    const result=collectMetricValues(a,key=>{const v=d[`combineSkillMetric_${i}_${key}`];delete d[`combineSkillMetric_${i}_${key}`];return v});
-    if(result && result.error && !missingRequired) missingRequired=result.error;
-    else if(result && result.values) d.customCombine.push({name:a.name,values:result.values});
-  });
-  if(missingRequired){alert(`Please fill in ${missingRequired} before saving, or leave that exercise blank.`);return}
   state.combine.push(d);
   state.combine.sort((a,b)=>(+a.week||0)-(+b.week||0));
   save();
   alert(ok?'Combine test saved and parent verified.':'Saved as pending. Parent can approve in Coach/Parent Corner.');
   e.target.reset();
-  [0,1].forEach(i=>{const f=$('#combineSkillFields_'+i);if(f)f.innerHTML=''});
   render();
 };
 // Quests/boss battles reset weekly (calendar week, Monday start) rather than
@@ -173,19 +161,23 @@ $('#teamProgramLogForm').onsubmit=e=>{
   e.preventDefault();
   const d=Object.fromEntries(new FormData(e.target).entries());
   d.custom={};
-  d.programSource='team';
-  let missingRequired=null;
-  (state.teamProgram?.activities||[]).forEach((name,i)=>{
+  d.programType='team';
+  d.programId='team';
+  d.programName=state.teamProgram?state.teamProgram.title:null;
+  (state.teamProgram?.activities||[]).forEach(name=>{
     const a=findActivity(name);
     if(!a) return;
-    const result=collectMetricValues(a,key=>{const v=d[`teamlog_${i}_${key}`];delete d[`teamlog_${i}_${key}`];return v});
-    if(result && result.error && !missingRequired) missingRequired=result.error;
-    else if(result && result.values) d.custom[a.name]=result.values;
+    const sets=collectActivitySets('teamset',d,a,teamSetCounts[a.id]||1);
+    if(sets.length) d.custom[a.name]={sets};
   });
-  if(missingRequired){alert(`Please fill in ${missingRequired} before saving, or leave that exercise blank.`);return}
   state.daily.push(d);
   state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  save();openPack();e.target.reset();$('#teamProgramLogForm').date.valueAsDate=new Date();render();
+  save();
+  e.target.reset();
+  $('#teamProgramLogForm').date.valueAsDate=new Date();
+  teamSetCounts={};
+  renderTeamProgramLogFields();
+  render();
 };
 $('#questForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());if(d.parentCode!==state.parentCode){alert('Incorrect parent code. Quest XP not awarded.');return}const q=quests.find(x=>x.id===d.questId);if(!q){alert('Select a quest.');return}if(questCompletedThisWeek(q.id)){alert(`${q.title} was already completed this week. It resets next Monday.`);return}state.quests=state.quests||[];state.quests.push({id:q.id,title:q.title,type:q.type,xp:q.xp,notes:d.notes||'',date:new Date().toISOString().slice(0,10)});save();alert(`${q.title} complete! +${q.xp} XP awarded.`);e.target.reset();render()};
 
@@ -200,13 +192,29 @@ $('#resetData').onclick=()=>{if(confirm('Reset all saved data on this device?'))
 
 function max(arr){return Math.max(0,...arr.map(x=>+x||0))}
 function minPos(arr){const v=arr.map(Number).filter(x=>x>0);return v.length?Math.min(...v):0}
-function pr(){return{pushups:max([...state.daily.map(x=>x.pushups),...state.combine.filter(x=>x.verified).map(x=>x.maxPushups)]),squats:max([...state.daily.map(x=>x.squats),...state.combine.filter(x=>x.verified).map(x=>x.squat60)]),plank:max([...state.daily.map(x=>x.plank),...state.combine.filter(x=>x.verified).map(x=>x.plankMax)]),shuffleTouches:max(state.daily.map(x=>x.shuffleTouches)),skaterJumps:max(state.daily.map(x=>x.skaterJumps)),crunches:max(state.daily.map(x=>x.crunches)),broadJumpIn:max(state.combine.filter(x=>x.verified).map(x=>x.broadJumpIn)),sprintSec:minPos(state.combine.filter(x=>x.verified).map(x=>x.sprintSec)),sprints:max(state.daily.map(x=>x.sprints))}}
+// Round 3: every core stat now comes from the unified activity catalog via
+// bestActivityValue(), which already merges daily + verified-combine logs
+// (both current-shape and legacy flat-field data). Key names are kept
+// identical to the pre-Round-3 shape so score()/ratings()/render()'s use of
+// pr() didn't need to change beyond this function.
+function pr(){
+  return {
+    pushups:bestActivityValue('Push-ups'),
+    squats:bestActivityValue('Squats'),
+    crunches:bestActivityValue('Sit Ups'),
+    plank:bestActivityValue('Plank'),
+    shuffleTouches:bestActivityValue('Lateral Shuffle'),
+    skaterJumps:bestActivityValue('Skater Jumps'),
+    broadJumpIn:bestActivityValue('Broad Jump'),
+    sprintSec:bestActivityValue('20-yard Sprint')
+  };
+}
 function score(v,k){const b=benches[k]||[5,10,15,20,30];if(k==='sprintSec'){if(!v)return 50;if(v<=b[4])return 92;if(v<=b[3])return 84;if(v<=b[2])return 76;if(v<=b[1])return 68;return 60}let i=0;b.forEach((n,idx)=>{if(v>=n)i=idx});return [50,60,68,76,84][i]}
 function ratings(){
   const r=pr();
   const bonus=axis=>Math.min(15,customExerciseLogCount(axis)*2);
   const consistency=Math.min(99,50+state.daily.length*2+streak()*3+bonus('consistency'));
-  const speed=Math.min(99,Math.round((score(r.sprints,'pushups')+(r.sprintSec?score(r.sprintSec,'sprintSec'):50))/2)+bonus('speed'));
+  const speed=Math.min(99,(r.sprintSec?score(r.sprintSec,'sprintSec'):50)+bonus('speed'));
   const strength=Math.min(99,Math.round((score(r.pushups,'pushups')+score(r.squats,'squats')+score(r.plank,'plank'))/3)+bonus('strength'));
   const power=Math.min(99,score(r.broadJumpIn,'broadJumpIn')+bonus('power'));
   const agility=Math.min(99,Math.round((score(r.shuffleTouches,'shuffleTouches')+score(r.skaterJumps,'skaterJumps'))/2)+bonus('agility'));
@@ -217,7 +225,6 @@ function streak(){const dates=[...new Set(state.daily.map(x=>x.date).filter(Bool
 function spinXP(){return (state.spinLog||[]).reduce((a,x)=>a+(+x.xp||0),0)}
 function xp(){return state.daily.length*25+state.combine.filter(x=>x.verified).length*75+questXP()+bonusXP()+spinXP()}
 function tier(){const o=ratings().overall;return [...tiers].reverse().find(t=>o>=t.min)||tiers[0]}
-function openPack(){$('#packReveal').classList.remove('hidden');$('#packCards').innerHTML='<div class="pack-card"><h3>⭐ +25 XP</h3><p>Workout completed.</p></div><div class="pack-card"><h3>⚾ Card Pack</h3><p>Keep the streak alive.</p></div><div class="pack-card"><h3>🎁 Mystery Chance</h3><p>Ask Dad if the Home Run Meter is full.</p></div>'}
 
 function renderPlatformStatus(){
   const total=xp(), current=tier(), currentIndex=Math.max(0,tiers.findIndex(x=>x.name===current.name));
@@ -236,9 +243,9 @@ function render(){renderPlatformStatus();const r=ratings(), rec=pr(), x=xp(), t=
 $$('.tier').forEach((el,i)=>el.classList.toggle('active',r.overall>=tiers[i].min));$('#records').innerHTML=`<li>${rec.pushups} max push-ups</li><li>${rec.squats} max squats</li><li>${rec.plank} sec plank</li><li>${rec.shuffleTouches} shuffle touches</li><li>${rec.broadJumpIn} in verified broad jump</li><li>${rec.sprintSec||'—'} sec verified sprint</li>`;
 const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#meterText').textContent=`${x%250} / 250 XP to next parent surprise`;$('#rewardNotice').textContent=x>=250&&x%250<75?'🎁 Parent surprise may be unlocked. Check Coach/Parent Corner.':'';
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
-$('#combineLog').innerHTML=table(['Week','Push-ups','Squats','Plank','Broad','Sprint','Extra Skills','Status'],state.combine.map(a=>[a.week,a.maxPushups,a.squat60,a.plankMax,a.broadJumpIn,a.sprintSec,(a.customCombine||[]).map(x=>`${x.name}: ${formatMetricValues(x.name,x.values!=null?x.values:x.value)}`).join(', ')||'—',`<span class="status ${a.verified?'verified':'pending'}">${a.status}</span>`]));
-$('#pendingList').innerHTML=table(['Week','Push-ups','Plank','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.maxPushups,a.plankMax,a.status]));
-$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderCoachReport();renderTeamEdition();renderCombineProgramFields();renderCharts()}
+$('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
+$('#pendingList').innerHTML=table(['Week','Program','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.programName||'—',a.status]));
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderCoachReport();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
 
 
 function xpEvents(){
@@ -348,40 +355,55 @@ function workoutXPForEntry(entry){
   const total=Math.min(rawTotal,WORKOUT_XP_CAP);
   return {total,prs,base,streakBonus,prBonus,capped:rawTotal>WORKOUT_XP_CAP};
 }
-function previousDailyBest(beforeIndex,key){
-  const prior=state.daily.slice(0,beforeIndex).map(x=>+x[key]||0);
-  return Math.max(0,...prior);
+// PRs are now detected per logged activity (not a fixed field list): an
+// entry's best set for an activity counts as a PR if it beats every prior
+// daily entry's best for that same activity (or if it's the athlete's first
+// time ever logging it, matching the old "first log always counts" behavior).
+function previousActivityBest(beforeIndex,name){
+  const a=findActivity(name);
+  if(!a) return 0;
+  const metricKey=a.metric.key;
+  const legacyKey=legacyDailyFieldMap[name];
+  const vals=[];
+  state.daily.slice(0,beforeIndex).forEach(entry=>{
+    vals.push(...valuesForActivityMetric(entry.custom&&entry.custom[name],metricKey));
+    if(legacyKey&&entry[legacyKey]!=null&&entry[legacyKey]!=='')vals.push(+entry[legacyKey]);
+  });
+  if(!vals.length) return 0;
+  return a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
 }
 function entryPRs(entry){
   const idx=state.daily.indexOf(entry);
-  if(idx<0) return [];
-  const checks=[['pushups','Push-ups'],['squats','Squats'],['crunches','Sit Ups'],['plank','Plank'],['shuffleTouches','Shuffle'],['skaterJumps','Skater Jumps'],['sprints','Sprints']];
-  return checks.filter(([k])=>{const val=+entry[k]||0;return val>0 && val>previousDailyBest(idx,k);}).map(([k,label])=>({key:k,label,value:+entry[k]||0,previous:previousDailyBest(idx,k)}));
-}
-function formatPRCell(entry,key,prs){
-  const val=entry[key]||'';
-  if(!val) return '';
-  return prs.some(p=>p.key===key)?`${val} <span class="new-pr">▲ PR</span>`:val;
+  if(idx<0||!entry.custom) return [];
+  const prs=[];
+  Object.keys(entry.custom).forEach(name=>{
+    const a=findActivity(name);
+    if(!a) return;
+    const vals=valuesForActivityMetric(entry.custom[name],a.metric.key);
+    if(!vals.length) return;
+    const best=a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
+    const previous=previousActivityBest(idx,name);
+    const beatsPrevious=previous===0?true:(a.metric.lowerIsBetter?best<previous:best>previous);
+    if(best>0&&beatsPrevious) prs.push({name,label:a.name,value:best,previous});
+  });
+  return prs;
 }
 function workoutHistoryTable(rows){
   if(!rows.length) return '<p class="muted">No entries yet.</p>';
   return `<table class="table workout-history"><thead><tr>
-    <th>Date</th><th>✓</th><th>XP</th><th>Squats</th><th>Push-ups</th><th>Sit Ups</th><th>Plank</th><th>Shuffle</th><th>Skater Jumps</th><th>Sprints</th>
+    <th>Date</th><th>✓</th><th>XP</th><th>Program</th><th>Activities Logged</th>
   </tr></thead><tbody>${rows.map(entry=>{
     const originalIndex=state.daily.indexOf(entry);
     const xpInfo=workoutXPForEntry(entry);
     const prs=xpInfo.prs;
+    const names=entry.custom?Object.keys(entry.custom).filter(n=>hasLoggedAny(entry.custom[n])):[];
+    const summary=names.length?names.map(n=>prs.some(p=>p.name===n)?`${n} <span class="new-pr">▲ PR</span>`:n).join(', '):'—';
     return `<tr class="workout-row" data-workout-index="${originalIndex}">
       <td>${entry.date||''}${prs.length?'<span class="pr-chip">PR</span>':''}</td>
       <td>✅</td>
       <td><strong>+${xpInfo.total}</strong></td>
-      <td>${entry.squats||''}</td>
-      <td>${formatPRCell(entry,'pushups',prs)}</td>
-      <td>${formatPRCell(entry,'crunches',prs)}</td>
-      <td>${formatPRCell(entry,'plank',prs)}</td>
-      <td>${formatPRCell(entry,'shuffleTouches',prs)}</td>
-      <td>${formatPRCell(entry,'skaterJumps',prs)}</td>
-      <td>${formatPRCell(entry,'sprints',prs)}</td>
+      <td>${entry.programName||'—'}</td>
+      <td>${summary}</td>
     </tr>`;
   }).join('')}</tbody></table><p class="muted tap-note">Tap a row to view workout details.</p>`;
 }
@@ -390,7 +412,9 @@ function showWorkoutDetail(index){
   if(!entry) return;
   const xpInfo=workoutXPForEntry(entry);
   const prs=xpInfo.prs;
-  const prHtml=prs.length?prs.map(p=>`<li><strong>${p.label}</strong>: ${p.value} ${p.previous?`(+${p.value-p.previous})`:''}</li>`).join(''):'<li>No new PRs this workout.</li>';
+  const prHtml=prs.length?prs.map(p=>`<li><strong>${p.label}</strong>: ${p.value}${p.previous?` (previous best ${p.previous})`:''}</li>`).join(''):'<li>No new PRs this workout.</li>';
+  const loggedNames=entry.custom?Object.keys(entry.custom).filter(n=>hasLoggedAny(entry.custom[n])):[];
+  const activityRows=loggedNames.length?loggedNames.map(name=>`<p><strong>${name}:</strong> ${formatMetricValues(name,entry.custom[name])}</p>`).join(''):'<p class="muted">No activities logged.</p>';
   $('#workoutDetailContent').innerHTML=`
     <p class="eyebrow dark">Workout Detail</p>
     <h2>${entry.date||'Workout'}</h2>
@@ -402,17 +426,9 @@ function showWorkoutDetail(index){
       <p class="total-xp">Total <strong>+${xpInfo.total} XP</strong></p>
       ${xpInfo.capped?`<p class="muted">Daily workout XP is capped at ${WORKOUT_XP_CAP} so one big day can't rival steady training.</p>`:''}
     </div>
-    <div class="detail-grid">
-      <p><strong>Squats:</strong> ${entry.squats||0}</p>
-      <p><strong>Push-ups:</strong> ${entry.pushups||0}</p>
-      <p><strong>Sit Ups:</strong> ${entry.crunches||0}</p>
-      <p><strong>Plank:</strong> ${entry.plank||0}</p>
-      <p><strong>Shuffle:</strong> ${entry.shuffleTouches||0}</p>
-      <p><strong>Skater Jumps:</strong> ${entry.skaterJumps||0}</p>
-      <p><strong>Sprints:</strong> ${entry.sprints||0}</p>
-      <p><strong>Notes:</strong> ${entry.notes||''}</p>
-    </div>
-    ${entry.custom&&Object.keys(entry.custom).length?`<h3>Skill Lab Extras</h3><div class="detail-grid">${Object.entries(entry.custom).map(([k,v])=>`<p><strong>${k}:</strong> ${formatMetricValues(k,v)}</p>`).join('')}</div>`:''}
+    <h3>${entry.programName?entry.programName:'Activities Logged'}</h3>
+    <div class="detail-grid">${activityRows}</div>
+    ${entry.notes?`<p><strong>Notes:</strong> ${entry.notes}</p>`:''}
     <h3>Personal Records</h3><ul>${prHtml}</ul>`;
   $('#workoutDetailModal').classList.remove('hidden');
 }
@@ -421,10 +437,22 @@ function renderCoachReport(){
   if(!state.daily.length){$('#coachReport').innerHTML='<p class="muted">Complete a few workouts to unlock a weekly coach report.</p>';return;}
   const last7=state.daily.slice(-7);
   const workouts=last7.length;
-  const metrics=[['pushups','Push-ups'],['squats','Squats'],['crunches','Sit Ups'],['plank','Plank'],['shuffleTouches','Shuffle'],['skaterJumps','Skater Jumps'],['sprints','Sprints']];
-  const best=metrics.map(([k,label])=>{const vals=last7.map(x=>+x[k]||0);return{label,improvement:vals.length?Math.max(...vals)-Math.min(...vals):0};}).sort((a,b)=>b.improvement-a.improvement)[0];
+  const names=new Set();
+  last7.forEach(entry=>{if(entry.custom)Object.keys(entry.custom).forEach(n=>{if(hasLoggedAny(entry.custom[n]))names.add(n)})});
+  let best=null;
+  names.forEach(name=>{
+    const a=findActivity(name);
+    if(!a) return;
+    const vals=last7.map(entry=>{
+      const v=valuesForActivityMetric(entry.custom&&entry.custom[name],a.metric.key);
+      return v.length?(a.metric.lowerIsBetter?Math.min(...v):Math.max(...v)):null;
+    }).filter(v=>v!=null);
+    if(vals.length<2) return;
+    const improvement=Math.max(...vals)-Math.min(...vals);
+    if(!best||improvement>best.improvement) best={label:name,improvement};
+  });
   const r=pr();
-  $('#coachReport').innerHTML=`<p><strong>Great work this week.</strong></p><p>You logged <strong>${workouts}</strong> recent workouts. Biggest improvement area: <strong>${best.label}</strong>.</p><p><strong>Next goals:</strong> ${(r.pushups||0)+2} push-ups, ${(r.crunches||0)+5} sit ups, ${(r.plank||0)+5}-second plank.</p><p class="muted">Keep stacking small wins and chasing the next call-up.</p>`;
+  $('#coachReport').innerHTML=`<p><strong>Great work this week.</strong></p><p>You logged <strong>${workouts}</strong> recent workouts.${best?` Biggest improvement area: <strong>${best.label}</strong>.`:''}</p><p><strong>Next goals:</strong> ${(r.pushups||0)+2} push-ups, ${(r.crunches||0)+5} sit ups, ${(r.plank||0)+5}-second plank.</p><p class="muted">Keep stacking small wins and chasing the next call-up.</p>`;
 }
 document.addEventListener('click',e=>{
   const row=e.target.closest('.workout-row');
@@ -433,6 +461,23 @@ document.addEventListener('click',e=>{
 });
 
 function table(h,rows){if(!rows.length)return'<p class="muted">No entries yet.</p>';return`<table class="table"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
+// Round 3: combine results are single-value-per-exercise (no sets) against
+// whichever program the parent picked at test time, so the history table
+// shows the program name + a results summary instead of fixed benchmark columns.
+function combineHistoryTable(rows){
+  if(!rows.length) return '<p class="muted">No entries yet.</p>';
+  return `<table class="table"><thead><tr><th>Week</th><th>Program</th><th>Results</th><th>Status</th></tr></thead><tbody>${rows.map(entry=>{
+    const legacyResults=[];
+    if(entry.maxPushups!=null&&entry.maxPushups!=='')legacyResults.push(`Push-ups: ${entry.maxPushups}`);
+    if(entry.squat60!=null&&entry.squat60!=='')legacyResults.push(`Squats: ${entry.squat60}`);
+    if(entry.plankMax!=null&&entry.plankMax!=='')legacyResults.push(`Plank: ${entry.plankMax}`);
+    if(entry.broadJumpIn!=null&&entry.broadJumpIn!=='')legacyResults.push(`Broad Jump: ${entry.broadJumpIn}`);
+    if(entry.sprintSec!=null&&entry.sprintSec!=='')legacyResults.push(`20-yard Sprint: ${entry.sprintSec}`);
+    const customResults=(entry.customCombine||[]).map(x=>`${x.name}: ${formatMetricValues(x.name,x.values!=null?x.values:x.value)}`);
+    const results=[...legacyResults,...customResults].join(', ')||'—';
+    return `<tr><td>${entry.week}</td><td>${entry.programName||'—'}</td><td>${results}</td><td><span class="status ${entry.verified?'verified':'pending'}">${entry.status}</span></td></tr>`;
+  }).join('')}</tbody></table>`;
+}
 
 function canvas(id,h=240){const c=$('#'+id);if(!c)return null;const w=c.clientWidth||800,dpr=devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);return{ctx,w,h}}
 function line(id,rows,title){const c=canvas(id);if(!c)return;const{ctx,w,h}=c;if(!rows.length){ctx.fillText('No data yet.',20,100);return}const vals=rows.map(r=>r.value).filter(Number.isFinite),maxV=Math.max(...vals,1)*1.1,minV=0,p={l:40,r:20,t:35,b:35};ctx.font='700 16px "Fredoka",sans-serif';ctx.fillStyle='#161616';ctx.fillText(title,p.l,20);ctx.strokeStyle='#f0e4c8';for(let i=0;i<=4;i++){let y=p.t+(h-p.t-p.b)*i/4;ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(w-p.r,y);ctx.stroke()}const pts=rows.map((r,i)=>({x:p.l+(w-p.l-p.r)*(rows.length===1?.5:i/(rows.length-1)),y:p.t+(h-p.t-p.b)*(1-(r.value-minV)/(maxV-minV||1)),...r}));ctx.beginPath();pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.strokeStyle='#1F7AE0';ctx.lineWidth=4;ctx.stroke();pts.forEach(pt=>{ctx.beginPath();ctx.arc(pt.x,pt.y,5,0,Math.PI*2);ctx.fillStyle='#FF2E9A';ctx.fill();ctx.strokeStyle='#161616';ctx.stroke()})}
@@ -461,39 +506,50 @@ function renderCharts(){
 function best(m){let rows=[],b=m==='sprintSec'?Infinity:0;state.combine.filter(x=>x.verified).sort((a,b)=>(+a.week||0)-(+b.week||0)).forEach(x=>{let v=combineValueFor(x,m);if(m==='sprintSec'){if(v>0)b=Math.min(b,v);if(b!==Infinity)rows.push({label:'W'+x.week,value:b})}else{b=Math.max(b,v);rows.push({label:'W'+x.week,value:b})}});return rows}
 
 const demoAthletes=[{name:'Ethan',xp:2845,workouts:42,streak:12,improvement:21,sportsmanship:8,arcade:920},{name:'Jack',xp:2710,workouts:40,streak:9,improvement:16,sportsmanship:10,arcade:880},{name:'Mason',xp:2490,workouts:38,streak:7,improvement:24,sportsmanship:6,arcade:810},{name:'Luke',xp:2380,workouts:36,streak:11,improvement:19,sportsmanship:7,arcade:790},{name:'Noah',xp:2265,workouts:35,streak:6,improvement:14,sportsmanship:9,arcade:760},{name:'Charlie',xp:2140,workouts:33,streak:8,improvement:18,sportsmanship:7,arcade:730}];
-const fixedExerciseAliases=new Set(['Push-ups','Squats','Sit Ups','Skater Jumps','Lateral Shuffle','Broad Jump','20-yard Sprint','Plank']);
+// Round 3: the 8 "Tracked Daily" activities are no longer excluded from the
+// Skill Lab Add button (that gating is retired per round-3 item 6 — Add
+// visibility is now governed purely by builder mode, see renderExerciseLibrary).
+// This set survives only as an internal rating-engine detail: these 8 already
+// feed the Player Card's core score()/benches calculation directly via pr(),
+// so customExerciseLogCount() skips them to avoid double-counting the same
+// log toward both the core score AND the generic category bonus.
+const coreScoredActivityNames=new Set(['Push-ups','Squats','Sit Ups','Skater Jumps','Lateral Shuffle','Broad Jump','20-yard Sprint','Plank']);
 const categoryAxisMap={Strength:'strength',Core:'strength',Speed:'speed',Agility:'agility',Power:'power',Throwing:'consistency',Catching:'consistency',Hitting:'consistency',Pitching:'consistency',Recovery:'consistency',Teamwork:'consistency'};
 
 // ---- Skills Lab activity catalog ----
-// Each activity: {id, name, category, sportTags, ageBand, media, metrics}
+// Each activity: {id, name, category, sportTags, ageBand, media, metric}
 // media.video.plannedUrl is reserved for a future pass — no component in this
 // build ever reads it. See renderActivityDetail(): the Demo Video section is
 // always the "coming soon" placeholder, regardless of this field's value.
+//
+// Round 3: every activity tracks exactly one metric — reps, time, or distance
+// (no RPE/effort, no weight) — because Daily Check-In now logs a list of sets
+// of that single measurement (see the Add Set flow) rather than a compound
+// reps+sets+effort object. `lowerIsBetter` marks timed-course metrics (sprints)
+// where a smaller number is the improvement, as opposed to held/duration work
+// (planks, mobility) where more time is the improvement.
 function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')}
 function emptyMedia(){return {instructionText:null,formCues:[],commonFaults:[],video:{plannedUrl:null}}}
 const MetricBuilders={
-  repsSets:()=>[{key:'reps',label:'Reps',unit:'reps',inputType:'integer',required:true,min:1,order:1},{key:'sets',label:'Sets',unit:'sets',inputType:'integer',required:true,min:1,order:2},{key:'rpe',label:'Effort',unit:'RPE 1–10',inputType:'scale_1_10',required:false,order:3}],
-  repsSetsPlain:()=>[{key:'reps',label:'Reps',unit:'reps',inputType:'integer',required:true,min:1,order:1},{key:'sets',label:'Sets',unit:'sets',inputType:'integer',required:true,min:1,order:2}],
-  repsOnly:(label)=>[{key:'reps',label:label||'Reps',unit:'reps',inputType:'integer',required:true,min:1,order:1}],
-  duration:()=>[{key:'duration_sec',label:'Duration',unit:'sec',inputType:'integer',required:true,min:0,step:5,order:1}],
-  time:()=>[{key:'duration_sec',label:'Time',unit:'sec',inputType:'decimal',required:true,min:0,step:0.01,order:1}],
-  distanceYd:()=>[{key:'distance_yd',label:'Distance',unit:'yd',inputType:'integer',required:true,min:0,order:1}],
-  distanceIn:()=>[{key:'distance_in',label:'Distance',unit:'in',inputType:'integer',required:true,min:0,order:1}],
-  weightSetsReps:()=>[{key:'weight_lb',label:'Weight',unit:'lb',inputType:'integer',required:true,min:0,step:5,order:1},{key:'sets',label:'Sets',unit:'sets',inputType:'integer',required:true,min:1,order:2},{key:'reps',label:'Reps',unit:'reps',inputType:'integer',required:true,min:1,order:3},{key:'rpe',label:'Effort',unit:'RPE 1–10',inputType:'scale_1_10',required:false,order:4}]
+  reps:(label)=>({key:'reps',label:label||'Reps',unit:'reps',inputType:'integer',min:1}),
+  duration:()=>({key:'duration_sec',label:'Duration',unit:'sec',inputType:'integer',min:0,step:5}),
+  time:()=>({key:'duration_sec',label:'Time',unit:'sec',inputType:'decimal',min:0,step:0.01,lowerIsBetter:true}),
+  distanceYd:()=>({key:'distance_yd',label:'Distance',unit:'yd',inputType:'integer',min:0}),
+  distanceIn:()=>({key:'distance_in',label:'Distance',unit:'in',inputType:'integer',min:0})
 };
 const M=MetricBuilders;
 const activityDefs={
-  Strength:[['Push-ups',M.repsSets],['Wide Push-ups',M.repsSets],['Squats',M.repsSets],['Jump Squats',M.repsSets],['Wall Sit',M.duration],['Calf Raises',M.repsSetsPlain],['Glute Bridge',M.repsSetsPlain]],
-  Core:[['Sit Ups',M.repsSetsPlain],['Dead Bugs',M.repsSetsPlain],['Bicycle Sit Ups',M.repsSetsPlain],['Plank',M.duration],['Side Plank',M.duration],['Superman',M.repsSetsPlain],['Hollow Hold',M.duration]],
-  Speed:[['10-yard Sprint',M.time],['20-yard Sprint',M.time],['Flying Sprint',M.time],['Shuttle Run',M.time],['First-Step Reaction',()=>M.repsOnly('Reps')],['Base-Stealing Starts',()=>M.repsOnly('Reps')]],
-  Agility:[['Skater Jumps',()=>M.repsOnly('Reps')],['Lateral Shuffle',()=>M.repsOnly('Touches')],['Carioca',M.duration],['Zig-Zag Cones',M.duration],['Crossover Runs',()=>M.repsOnly('Reps')],['Box Drill',M.duration],['Mirror Drill',M.duration]],
-  Power:[['Broad Jump',M.distanceIn],['Vertical Jump',M.distanceIn],['Lateral Hops',M.repsSetsPlain],['Single-Leg Hops',M.repsSetsPlain]],
-  Throwing:[['Target Throws',()=>M.repsOnly('Reps')],['One-Knee Throwing',()=>M.repsOnly('Reps')],['Long Toss',M.distanceYd],['Crow Hop',()=>M.repsOnly('Reps')],['Quick Release',()=>M.repsOnly('Reps')],['Pivot Throws',()=>M.repsOnly('Reps')]],
-  Catching:[['Tennis Ball Reaction',()=>M.repsOnly('Reps')],['Barehand Catches',()=>M.repsOnly('Reps')],['Blocking Drill',()=>M.repsOnly('Reps')],['Transfer Drill',()=>M.repsOnly('Reps')]],
-  Hitting:[['Tee Work',()=>M.repsOnly('Swings')],['Front Toss',()=>M.repsOnly('Swings')],['Bat-Speed Swings',()=>M.repsOnly('Swings')],['One-Hand Drills',()=>M.repsOnly('Swings')],['Balance Drills',M.duration],['Launch Position',()=>M.repsOnly('Reps')]],
-  Pitching:[['Balance Drill',M.duration],['Arm Care',M.repsSetsPlain],['Hip Rotation',()=>M.repsOnly('Reps')],['Towel Drill',()=>M.repsOnly('Reps')]],
-  Recovery:[['Shoulder Mobility',M.duration],['Band Work',M.repsSetsPlain],['Hip Mobility',M.duration],['Foam Rolling',M.duration],['Stretching',M.duration]],
-  Teamwork:[['Sportsmanship Challenge',()=>M.repsOnly('Times')],['Encourage a Teammate',()=>M.repsOnly('Times')],['Equipment Cleanup',()=>M.repsOnly('Times')],['Coach Helper',()=>M.repsOnly('Times')]]
+  Strength:[['Push-ups',()=>M.reps()],['Wide Push-ups',()=>M.reps()],['Squats',()=>M.reps()],['Jump Squats',()=>M.reps()],['Wall Sit',M.duration],['Calf Raises',()=>M.reps()],['Glute Bridge',()=>M.reps()],['Drop Lunges',()=>M.reps('Reps (each leg)')]],
+  Core:[['Sit Ups',()=>M.reps()],['Dead Bugs',()=>M.reps()],['Bicycle Sit Ups',()=>M.reps()],['Plank',M.duration],['Side Plank',M.duration],['Superman',()=>M.reps()],['Hollow Hold',M.duration]],
+  Speed:[['10-yard Sprint',M.time],['20-yard Sprint',M.time],['Flying Sprint',M.time],['Shuttle Run',M.time],['First-Step Reaction',()=>M.reps()],['Base-Stealing Starts',()=>M.reps()]],
+  Agility:[['Skater Jumps',()=>M.reps()],['Lateral Shuffle',()=>M.reps('Touches')],['Carioca',M.duration],['Zig-Zag Cones',M.duration],['Crossover Runs',()=>M.reps()],['Box Drill',M.duration],['Mirror Drill',M.duration]],
+  Power:[['Broad Jump',M.distanceIn],['Vertical Jump',M.distanceIn],['Lateral Hops',()=>M.reps()],['Single-Leg Hops',()=>M.reps()]],
+  Throwing:[['Target Throws',()=>M.reps()],['One-Knee Throwing',()=>M.reps()],['Long Toss',M.distanceYd],['Crow Hop',()=>M.reps()],['Quick Release',()=>M.reps()],['Pivot Throws',()=>M.reps()]],
+  Catching:[['Tennis Ball Reaction',()=>M.reps()],['Barehand Catches',()=>M.reps()],['Blocking Drill',()=>M.reps()],['Transfer Drill',()=>M.reps()]],
+  Hitting:[['Tee Work',()=>M.reps('Swings')],['Front Toss',()=>M.reps('Swings')],['Bat-Speed Swings',()=>M.reps('Swings')],['One-Hand Drills',()=>M.reps('Swings')],['Balance Drills',M.duration],['Launch Position',()=>M.reps()]],
+  Pitching:[['Balance Drill',M.duration],['Arm Care',()=>M.reps()],['Hip Rotation',()=>M.reps()],['Towel Drill',()=>M.reps()]],
+  Recovery:[['Shoulder Mobility',M.duration],['Band Work',()=>M.reps()],['Hip Mobility',M.duration],['Foam Rolling',M.duration],['Stretching',M.duration]],
+  Teamwork:[['Sportsmanship Challenge',()=>M.reps('Times')],['Encourage a Teammate',()=>M.reps('Times')],['Equipment Cleanup',()=>M.reps('Times')],['Coach Helper',()=>M.reps('Times')]]
 };
 const categoryOrder=Object.keys(activityDefs);
 const baseballCategories=new Set(['Throwing','Catching','Hitting','Pitching']);
@@ -507,7 +563,7 @@ const sampleMedia={
   'Hip Mobility':{instructionText:'A continuous flow through 90/90 switches, world’s greatest stretch, and lateral lunges to open the hips before training.',formCues:['Keep both hips square to the front','Move slow and controlled, no bouncing','Breathe out on every stretch position'],commonFaults:['Rushing through positions','Letting the back knee collapse inward']},
   'Tee Work':{instructionText:'Hit off the batting tee focusing on a consistent, repeatable swing path rather than power.'}
 };
-const activities=categoryOrder.flatMap(cat=>activityDefs[cat].map(([name,metricsFn])=>{
+const activities=categoryOrder.flatMap(cat=>activityDefs[cat].map(([name,metricFn])=>{
   const m=sampleMedia[name];
   return {
     id:slug(name),
@@ -516,26 +572,65 @@ const activities=categoryOrder.flatMap(cat=>activityDefs[cat].map(([name,metrics
     sportTags:baseballCategories.has(cat)?['baseball']:['multi-sport'],
     ageBand:'all',
     media:m?{instructionText:m.instructionText,formCues:m.formCues||[],commonFaults:m.commonFaults||[],video:{plannedUrl:null}}:emptyMedia(),
-    metrics:metricsFn()
+    metric:metricFn()
   };
 }));
 function findActivity(name){return activities.find(a=>a.name===name)}
+function findActivityById(id){return activities.find(a=>a.id===id)}
 function exerciseCategory(name){const a=findActivity(name);return a?a.category:null}
-function allExerciseNames(){return activities.map(a=>a.name).filter(x=>!fixedExerciseAliases.has(x))}
-function primaryMetricKey(activity){const sorted=(activity.metrics||[]).slice().sort((a,b)=>a.order-b.order);return sorted.length?sorted[0].key:null}
-// Custom logs are stored per-metric (e.g. {reps:8,sets:3}) as of the Skills
-// Lab metrics upgrade. hasLoggedAny() also accepts the older flat-number
-// shape ({"Wide Push-ups": 12}) shipped before that upgrade, so previously
-// saved data keeps working.
+// Three ready-made, locked programs so an athlete can start logging on day
+// one without building anything. Seeded once (state.presetsSeeded) so they
+// never duplicate on reload, and never re-seeded after an athlete deletes
+// their own programs — presets are a starting point, not a permanent fixture.
+const presetDefs=[
+  {name:'Level 1: Base Camp',activities:['Push-ups','Squats','Skater Jumps','Lateral Shuffle','Plank','Broad Jump','20-yard Sprint']},
+  {name:'Level 2: The Grind',activities:['Push-ups','Jump Squats','Skater Jumps','Sit Ups','Plank','Drop Lunges']},
+  {name:'Level 3: Boss Level',activities:['Push-ups','Jump Squats','Skater Jumps','Sit Ups','Plank','Drop Lunges','Wall Sit','Single-Leg Hops']}
+];
+function seedPresetPrograms(){
+  if(state.presetsSeeded) return;
+  state.programs=state.programs||[];
+  presetDefs.forEach((def,i)=>{
+    const activityIds=def.activities.map(n=>findActivity(n)).filter(Boolean).map(a=>a.id);
+    state.programs.push({id:'preset_'+i,name:def.name,activityIds,preset:true});
+  });
+  state.presetsSeeded=true;
+  save();
+}
+// ---- Logged-value extraction (handles 3 historical data generations) ----
+// A logged custom entry (`entry.custom[name]` or a customCombine `.values`)
+// may be shaped as:
+//   1. a legacy flat number (pre-Skills-Lab, e.g. {"Wide Push-ups": 12})
+//   2. a Round-2 single-object {metricKey: value} (one set, no Add Set yet)
+//   3. a Round-3 {sets:[{metricKey:value}, ...]} list (this build)
+// valuesForActivityMetric() reads any of the three and always returns a flat
+// array of numbers for the activity's one metric key.
+function valuesForActivityMetric(raw,metricKey){
+  if(raw==null) return [];
+  if(typeof raw==='number') return [raw];
+  if(Array.isArray(raw.sets)) return raw.sets.map(s=>s[metricKey]).filter(v=>v!=null).map(Number);
+  if(raw[metricKey]!=null) return [Number(raw[metricKey])];
+  return [];
+}
 function hasLoggedAny(raw){
   if(raw==null) return false;
   if(typeof raw==='number') return raw>0;
+  if(Array.isArray(raw.sets)) return raw.sets.some(s=>Object.values(s).some(v=>(+v||0)>0));
   return Object.values(raw).some(v=>(+v||0)>0);
 }
+// The very first app (before any Skills Lab catalog existed) wrote these 8
+// activities straight onto the daily/combine entry as flat named fields.
+// Folding them in here keeps that history contributing to PRs/ratings
+// instead of silently vanishing. Two of the original daily fields (broadJumps,
+// sprints) were rep-counts, not the distance/time the current Broad Jump and
+// 20-yard Sprint activities measure, so those two aren't unit-compatible and
+// are intentionally left out of the daily map.
+const legacyDailyFieldMap={'Push-ups':'pushups','Squats':'squats','Plank':'plank','Lateral Shuffle':'shuffleTouches','Skater Jumps':'skaterJumps','Sit Ups':'crunches'};
+const legacyCombineFieldMap={'Push-ups':'maxPushups','Squats':'squat60','Plank':'plankMax','Broad Jump':'broadJumpIn','20-yard Sprint':'sprintSec'};
 function customExerciseLogCount(axis){
   let count=0;
-  state.daily.forEach(d=>{if(d.custom)Object.keys(d.custom).forEach(name=>{const cat=exerciseCategory(name);if(cat&&categoryAxisMap[cat]===axis&&hasLoggedAny(d.custom[name]))count++})});
-  state.combine.filter(x=>x.verified).forEach(c=>{(c.customCombine||[]).forEach(x=>{const cat=exerciseCategory(x.name);if(cat&&categoryAxisMap[cat]===axis&&hasLoggedAny(x.values!=null?x.values:x.value))count++})});
+  state.daily.forEach(d=>{if(d.custom)Object.keys(d.custom).forEach(name=>{if(coreScoredActivityNames.has(name))return;const cat=exerciseCategory(name);if(cat&&categoryAxisMap[cat]===axis&&hasLoggedAny(d.custom[name]))count++})});
+  state.combine.filter(x=>x.verified).forEach(c=>{(c.customCombine||[]).forEach(x=>{if(coreScoredActivityNames.has(x.name))return;const cat=exerciseCategory(x.name);if(cat&&categoryAxisMap[cat]===axis&&hasLoggedAny(x.values!=null?x.values:x.value))count++})});
   return count;
 }
 function loggedCustomExerciseNames(){
@@ -544,36 +639,68 @@ function loggedCustomExerciseNames(){
   state.combine.forEach(c=>{(c.customCombine||[]).forEach(x=>{if(hasLoggedAny(x.values!=null?x.values:x.value))set.add(x.name)})});
   return [...set].sort();
 }
-// Formats a logged custom value for display, e.g. "Weight 95lb, Sets 3, Reps 8".
-// Handles both the current per-metric shape and the legacy flat number shape.
+// Formats a logged value for display, e.g. "8, 10, 12 reps (3 sets)".
 function formatMetricValues(name,raw){
   if(raw==null) return '—';
-  if(typeof raw==='number') return String(raw);
   const a=findActivity(name);
-  return Object.entries(raw).map(([mk,mv])=>{
-    const met=a&&(a.metrics||[]).find(m=>m.key===mk);
-    return `${met?met.label:mk} ${mv}${met&&met.unit?' '+met.unit:''}`;
-  }).join(', ');
+  const met=a?a.metric:null;
+  if(typeof raw==='number') return met?`${raw} ${met.unit}`:String(raw);
+  if(Array.isArray(raw.sets)){
+    const key=met?met.key:Object.keys(raw.sets[0]||{})[0];
+    const vals=raw.sets.map(s=>s[key]).filter(v=>v!=null);
+    if(!vals.length) return '—';
+    return vals.join(', ')+(met&&met.unit?' '+met.unit:'')+(vals.length>1?` (${vals.length} sets)`:'');
+  }
+  return Object.entries(raw).map(([mk,mv])=>met&&met.key===mk?`${mv}${met.unit?' '+met.unit:''}`:`${mk} ${mv}`).join(', ');
+}
+// Best-ever value for one activity's single metric, across every daily set
+// (any Program) and every verified combine result, folding in whichever of
+// the 3 historical shapes (plus the pre-Skills-Lab flat fields) applies.
+// "Best" respects the metric's direction: max for reps/distance/held-duration,
+// min for timed-course metrics (sprints) where faster is the improvement.
+function bestActivityValue(name){
+  const a=findActivity(name);
+  if(!a) return 0;
+  const metricKey=a.metric.key;
+  const legacyDailyKey=legacyDailyFieldMap[name];
+  const legacyCombineKey=legacyCombineFieldMap[name];
+  const vals=[];
+  state.daily.forEach(entry=>{
+    vals.push(...valuesForActivityMetric(entry.custom&&entry.custom[name],metricKey));
+    if(legacyDailyKey&&entry[legacyDailyKey]!=null&&entry[legacyDailyKey]!=='')vals.push(+entry[legacyDailyKey]);
+  });
+  state.combine.filter(x=>x.verified).forEach(entry=>{
+    const f=(entry.customCombine||[]).find(x=>x.name===name);
+    if(f)vals.push(...valuesForActivityMetric(f.values!=null?f.values:f.value,metricKey));
+    if(legacyCombineKey&&entry[legacyCombineKey]!=null&&entry[legacyCombineKey]!=='')vals.push(+entry[legacyCombineKey]);
+  });
+  if(!vals.length) return 0;
+  return a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
 }
 function dailyValueFor(entry,key){
   if(key.startsWith('c:')){
     const name=key.slice(2);
-    const raw=entry.custom&&entry.custom[name];
-    if(raw==null) return 0;
-    if(typeof raw==='number') return raw;
-    const a=findActivity(name), pk=a?primaryMetricKey(a):null;
-    return pk&&raw[pk]!=null?+raw[pk]:0;
+    const a=findActivity(name);
+    if(!a) return 0;
+    const vals=valuesForActivityMetric(entry.custom&&entry.custom[name],a.metric.key);
+    const legacyKey=legacyDailyFieldMap[name];
+    if(legacyKey&&entry[legacyKey]!=null&&entry[legacyKey]!=='')vals.push(+entry[legacyKey]);
+    if(!vals.length) return 0;
+    return a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
   }
   return +entry[key]||0;
 }
 function combineValueFor(entry,key){
   if(key.startsWith('c:')){
     const name=key.slice(2);
+    const a=findActivity(name);
+    if(!a) return 0;
     const f=(entry.customCombine||[]).find(x=>x.name===name);
-    if(!f) return 0;
-    if(f.value!=null) return +f.value||0;
-    const a=findActivity(name), pk=a?primaryMetricKey(a):null;
-    return pk&&f.values&&f.values[pk]!=null?+f.values[pk]:0;
+    const vals=f?valuesForActivityMetric(f.values!=null?f.values:f.value,a.metric.key):[];
+    const legacyKey=legacyCombineFieldMap[name];
+    if(legacyKey&&entry[legacyKey]!=null&&entry[legacyKey]!=='')vals.push(+entry[legacyKey]);
+    if(!vals.length) return 0;
+    return a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
   }
   return +entry[key]||0;
 }
@@ -681,90 +808,110 @@ function renderShoutouts(){
 function addShoutout(){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO(),source:'shoutout'});save();renderShoutouts()}
 function addReaction(text){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:text,from:'You',date:todayISO(),source:'reaction'});save();renderShoutouts()}
 // ---- Personal Programs ----
-// A Program is {id, name, activityIds[]}. Athletes can build multiple named
-// programs; Skill Lab's Add button always adds to whichever program is
-// currently being built/edited (state.buildingProgramId), not a fixed slot.
+// A Program is {id, name, activityIds[], preset?:true}. Preset programs ship
+// locked/read-only (seeded once by seedPresetPrograms) and can be used for
+// logging but never edited or deleted. Personal programs go through an
+// explicit draft/save workflow: state.draftProgram holds in-progress edits
+// (new or existing) and is only committed to state.programs on Save; the
+// Skill Lab Add button is only enabled while a draft is active.
 function findProgram(id){return (state.programs||[]).find(p=>p.id===id)}
-function findActivityById(id){return activities.find(a=>a.id===id)}
-function createProgram(name){
-  const p={id:'prog_'+Date.now()+'_'+Math.floor(Math.random()*1000),name,activityIds:[]};
-  state.programs=state.programs||[];
-  state.programs.push(p);
-  state.buildingProgramId=p.id;
-  if(!state.activeProgramId) state.activeProgramId=p.id;
-  save();
-  return p;
-}
-function ensureBuildingProgram(){
-  state.programs=state.programs||[];
-  if(state.buildingProgramId && findProgram(state.buildingProgramId)) return findProgram(state.buildingProgramId);
-  if(state.programs.length){state.buildingProgramId=state.programs[0].id;return state.programs[0]}
-  return null;
-}
-function newProgramFlow(){
-  const name=prompt('Name your new program (e.g. "Baseball Exercise Program"):');
-  if(!name||!name.trim()) return;
-  createProgram(name.trim());
+function personalPrograms(){return (state.programs||[]).filter(p=>!p.preset)}
+function presetPrograms(){return (state.programs||[]).filter(p=>p.preset)}
+function startNewProgramDraft(){
+  state.draftProgram={id:null,name:'',activityIds:[]};
   renderProgramBuilder();
   renderExerciseLibrary();
-  renderDailyProgramPicker();
-  renderDailyCustomFields();
 }
-function addActivityToBuildingProgram(name){
-  const a=findActivity(name);
-  if(!a) return;
-  let prog=ensureBuildingProgram();
-  if(!prog){
-    const pname=prompt('Name your first program (e.g. "Baseball Exercise Program") to start adding activities:');
-    if(!pname||!pname.trim()) return;
-    prog=createProgram(pname.trim());
+function startEditProgramDraft(id){
+  const p=findProgram(id);
+  if(!p||p.preset) return;
+  state.draftProgram={id:p.id,name:p.name,activityIds:[...p.activityIds]};
+  renderProgramBuilder();
+  renderExerciseLibrary();
+}
+function discardProgramDraft(){
+  state.draftProgram=null;
+  renderProgramBuilder();
+  renderExerciseLibrary();
+}
+function saveProgramDraft(name){
+  const draft=state.draftProgram;
+  if(!draft) return;
+  const finalName=(name||draft.name||'').trim();
+  if(!finalName){alert('Give your program a name before saving.');return}
+  if(!draft.activityIds.length){alert('Add at least one activity before saving.');return}
+  state.programs=state.programs||[];
+  if(draft.id){
+    const p=findProgram(draft.id);
+    if(p){p.name=finalName;p.activityIds=draft.activityIds}
+  }else{
+    const p={id:'prog_'+Date.now()+'_'+Math.floor(Math.random()*1000),name:finalName,activityIds:draft.activityIds};
+    state.programs.push(p);
+    if(!state.activeProgramId) state.activeProgramId=p.id;
   }
-  if(prog.activityIds.includes(a.id)){alert(`${a.name} is already in "${prog.name}".`);return}
-  prog.activityIds.push(a.id);
+  state.draftProgram=null;
   save();
   renderProgramBuilder();
   renderExerciseLibrary();
   renderDailyProgramPicker();
   renderDailyCustomFields();
+  renderCombineProgramPicker();
+}
+function addActivityToDraft(name){
+  const a=findActivity(name);
+  if(!a||!state.draftProgram) return;
+  if(state.draftProgram.activityIds.includes(a.id)){alert(`${a.name} is already in this program.`);return}
+  state.draftProgram.activityIds.push(a.id);
+  renderProgramBuilder();
+  renderExerciseLibrary();
   if($('#activityDetailModal')) $('#activityDetailModal').classList.add('hidden');
 }
-function removeActivityFromProgram(programId,activityId){
-  const p=findProgram(programId);
-  if(!p) return;
-  p.activityIds=p.activityIds.filter(id=>id!==activityId);
+function removeActivityFromDraft(activityId){
+  if(!state.draftProgram) return;
+  state.draftProgram.activityIds=state.draftProgram.activityIds.filter(id=>id!==activityId);
+  renderProgramBuilder();
+  renderExerciseLibrary();
+}
+function deleteProgram(id){
+  const p=findProgram(id);
+  if(!p||p.preset) return;
+  if(!confirm(`Delete "${p.name}"? This can't be undone.`)) return;
+  state.programs=state.programs.filter(x=>x.id!==id);
+  if(state.activeProgramId===id) state.activeProgramId=null;
+  if(state.draftProgram&&state.draftProgram.id===id) state.draftProgram=null;
   save();
   renderProgramBuilder();
   renderExerciseLibrary();
+  renderDailyProgramPicker();
   renderDailyCustomFields();
+  renderCombineProgramPicker();
 }
 function renderProgramBuilder(){
-  const card=$('#programBuilderCard'); if(!card) return;
-  const sel=$('#programBuilderSelect');
-  const progs=state.programs||[];
-  if(!progs.length){
-    $('#programBuilderTitle').textContent='Build Your First Program';
-    sel.innerHTML='<option value="">No programs yet</option>';
-    $('#programBuilderActivityList').innerHTML='<p class="muted">Click "+ New Program" to get started, then use Add on any activity below.</p>';
-    return;
-  }
-  const buildingId=ensureBuildingProgram()?.id;
-  sel.innerHTML=progs.map(p=>`<option value="${p.id}" ${p.id===buildingId?'selected':''}>${p.name}</option>`).join('');
-  const prog=findProgram(buildingId);
-  $('#programBuilderTitle').textContent=`Building: ${prog.name}`;
-  $('#programBuilderActivityList').innerHTML=prog.activityIds.length
-    ?'<ul class="program-activity-items">'+prog.activityIds.map(id=>{const a=findActivityById(id);return a?`<li>${a.name}<button type="button" class="remove-program-activity" data-program="${prog.id}" data-activity="${id}">Remove</button></li>`:''}).join('')+'</ul>'
-    :'<p class="muted">No activities yet — use Add on any Skill Lab exercise below.</p>';
+  const body=$('#programBuilderBody'); if(!body) return;
+  const draft=state.draftProgram;
+  const presets=presetPrograms();
+  const personal=personalPrograms();
+  const programTile=(p,editable)=>`<div class="program-tile${p.preset?' preset':''}">${p.preset?'<span class="lock-badge">🔒 Preset</span>':''}<h3>${p.name}</h3><ul>${p.activityIds.map(id=>{const a=findActivityById(id);return a?`<li>${a.name}</li>`:''}).join('')}</ul>${editable?`<div class="program-tile-actions"><button type="button" class="edit-program-btn" data-program="${p.id}">Edit</button><button type="button" class="delete-program-btn" data-program="${p.id}">Delete</button></div>`:''}</div>`;
+  const presetHTML=presets.length?`<p class="eyebrow dark">Preset Programs</p><div class="program-list">${presets.map(p=>programTile(p,false)).join('')}</div>`:'';
+  const personalHTML=`<p class="eyebrow dark">Your Programs</p>${personal.length?`<div class="program-list">${personal.map(p=>programTile(p,true)).join('')}</div>`:'<p class="muted">No programs yet — click "+ New Program" to build one.</p>'}`;
+  const draftHTML=draft?`
+    <div class="program-draft-editor">
+      <p class="eyebrow dark">${draft.id?'Editing Program':'New Program'}</p>
+      <label class="wide">Program name<input type="text" id="draftProgramName" value="${draft.name||''}" placeholder="e.g. Baseball Exercise Program"></label>
+      <div id="draftActivityList" class="program-activity-list">${draft.activityIds.length?'<ul class="program-activity-items">'+draft.activityIds.map(id=>{const a=findActivityById(id);return a?`<li>${a.name}<button type="button" class="remove-draft-activity" data-activity="${id}">Remove</button></li>`:''}).join('')+'</ul>':'<p class="muted">No activities yet — use Add on any Skill Lab exercise below.</p>'}</div>
+      <div class="program-draft-actions"><button type="button" id="saveProgramDraftBtn" class="primary">Save Program</button><button type="button" id="discardProgramDraftBtn">Discard</button></div>
+    </div>`:'<button id="newProgramBtn" type="button">+ New Program</button>';
+  body.innerHTML=presetHTML+personalHTML+draftHTML;
 }
 function renderExerciseLibrary(){
   if(!$('#libraryCategory'))return;
   if(!$('#libraryCategory').options.length)$('#libraryCategory').innerHTML=categoryOrder.map(c=>`<option>${c}</option>`).join('');
   const cat=$('#libraryCategory').value||categoryOrder[0];
-  const buildingProg=findProgram(ensureBuildingProgram()?.id);
+  const draft=state.draftProgram;
   $('#exerciseLibrary').innerHTML=activities.filter(a=>a.category===cat).map(a=>{
-    const isFixed=fixedExerciseAliases.has(a.name);
-    const active=!!(buildingProg&&buildingProg.activityIds.includes(a.id));
-    const label=isFixed?'Tracked Daily':(active?'In Program':'Add');
-    return `<div class="library-card${active?' active':''}"><span>⚾</span><strong>${a.name}</strong><div class="library-card-actions"><button type="button" class="view-activity-btn" data-exercise="${a.name}">View</button><button type="button" class="add-exercise-btn" data-exercise="${a.name}" ${(isFixed||active)?'disabled':''}>${label}</button></div></div>`;
+    const inDraft=!!(draft&&draft.activityIds.includes(a.id));
+    const label=!draft?'Start a Program':(inDraft?'In Program':'Add');
+    return `<div class="library-card${inDraft?' active':''}"><span>⚾</span><strong>${a.name}</strong><div class="library-card-actions"><button type="button" class="view-activity-btn" data-exercise="${a.name}">View</button><button type="button" class="add-exercise-btn" data-exercise="${a.name}" ${(!draft||inDraft)?'disabled':''}>${label}</button></div></div>`;
   }).join('');
 }
 function whyTrackLine(category){
@@ -780,12 +927,10 @@ function renderActivityDetail(name){
     ?`<p>${media.instructionText}</p>${media.formCues&&media.formCues.length?`<h4>Form Cues</h4><ul>${media.formCues.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}${media.commonFaults&&media.commonFaults.length?`<h4>Watch For</h4><ul class="fault-list">${media.commonFaults.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}`
     :`<div class="placeholder-card">Written instructions coming soon</div>`;
   const video=`<div class="video-placeholder"><span class="play-glyph">▶</span><p>Demo video coming soon</p></div>`;
-  const sortedMetrics=(a.metrics||[]).slice().sort((x,y)=>x.order-y.order);
-  const legend=sortedMetrics.map(met=>`<div class="metric-legend-item"><strong>${met.label}</strong><span>${met.unit||'—'}</span></div>`).join('');
-  const isFixed=fixedExerciseAliases.has(a.name);
-  const buildingProg=findProgram(ensureBuildingProgram()?.id);
-  const active=!!(buildingProg&&buildingProg.activityIds.includes(a.id));
-  const addLabel=isFixed?'Tracked Daily':(active?'In Program':'Add to Program');
+  const legend=`<div class="metric-legend-item"><strong>${a.metric.label}</strong><span>${a.metric.unit||'—'}</span></div>`;
+  const draft=state.draftProgram;
+  const inDraft=!!(draft&&draft.activityIds.includes(a.id));
+  const addLabel=!draft?'Start a Program':(inDraft?'In Program':'Add to Program');
   $('#activityDetailContent').innerHTML=`
     <p class="eyebrow dark">${a.category}</p>
     <h2>${a.name}</h2>
@@ -794,23 +939,33 @@ function renderActivityDetail(name){
     <h3>How to Track</h3>
     <div class="metric-legend">${legend}</div>
     <p class="muted">${whyTrackLine(a.category)}</p>
-    <button type="button" class="primary add-exercise-btn" data-exercise="${a.name}" ${(isFixed||active)?'disabled':''}>${addLabel}</button>
+    <button type="button" class="primary add-exercise-btn" data-exercise="${a.name}" ${(!draft||inDraft)?'disabled':''}>${addLabel}</button>
   `;
   $('#activityDetailModal').classList.remove('hidden');
 }
-// Renders one input per activity metric, in metric.order, with a persistent
-// unit badge (not placeholder text) so the unit stays visible while typing.
-// scale_1_10 metrics render as a 1-10 segmented control instead of a number field.
+// Single-value field (Combine Testing — one snapshot per activity) with a
+// persistent unit badge so the unit stays visible while typing.
 function metricInputHTML(fieldName,activityName,metric){
-  if(metric.inputType==='scale_1_10'){
-    return `<div class="metric-field"><span class="metric-field-label">${activityName} · ${metric.label}</span><div class="rpe-scale" data-name="${fieldName}"><input type="hidden" name="${fieldName}">${Array.from({length:10},(_,i)=>i+1).map(n=>`<button type="button" class="rpe-btn" data-value="${n}">${n}</button>`).join('')}</div></div>`;
-  }
   const step=metric.step!=null?metric.step:(metric.inputType==='decimal'?0.01:1);
   const min=metric.min!=null?` min="${metric.min}"`:'';
-  const max=metric.max!=null?` max="${metric.max}"`:'';
-  return `<div class="metric-field"><span class="metric-field-label">${activityName} · ${metric.label}</span><div class="unit-input"><input type="number" name="${fieldName}" step="${step}"${min}${max} placeholder="0"><span class="unit-badge">${metric.unit||''}</span></div></div>`;
+  return `<div class="metric-field"><span class="metric-field-label">${activityName} · ${metric.label}</span><div class="unit-input"><input type="number" name="${fieldName}" step="${step}"${min} placeholder="0"><span class="unit-badge">${metric.unit||''}</span></div></div>`;
 }
-// Daily Check-In: which personal program is being logged today.
+// Daily/Team Check-In: repeatable per-set field for one activity, e.g. three
+// sets of push-ups logged as three separate values. Counts are transient UI
+// state (not persisted) so "+ Add Set" can grow a block without a full re-render.
+let dailySetCounts={};
+let teamSetCounts={};
+function setInputHTML(prefix,activityId,activityName,metric,index){
+  const step=metric.step!=null?metric.step:(metric.inputType==='decimal'?0.01:1);
+  const min=metric.min!=null?` min="${metric.min}"`:'';
+  return `<div class="metric-field"><span class="metric-field-label">${activityName} · Set ${index+1}</span><div class="unit-input"><input type="number" name="${prefix}_${activityId}_${index}" step="${step}"${min} placeholder="0"><span class="unit-badge">${metric.unit||''}</span></div></div>`;
+}
+function activitySetBlockHTML(prefix,a,counts){
+  const n=counts[a.id]||1;
+  const rows=Array.from({length:n},(_,i)=>setInputHTML(prefix,a.id,a.name,a.metric,i)).join('');
+  return `<div class="activity-set-block" data-activity="${a.id}"><h4>${a.name}</h4>${rows}<button type="button" class="add-set-btn" data-prefix="${prefix}" data-activity="${a.id}">+ Add Set</button></div>`;
+}
+// Daily Check-In: which personal (or preset) program is being logged today.
 function renderDailyProgramPicker(){
   const c=$('#dailyProgramPicker'); if(!c) return;
   const progs=state.programs||[];
@@ -821,79 +976,83 @@ function renderDailyProgramPicker(){
   if(!state.activeProgramId || !findProgram(state.activeProgramId)) state.activeProgramId=progs[0].id;
   if(progs.length===1){
     c.innerHTML=`<p class="muted">Logging for: <strong>${progs[0].name}</strong></p>`;
-  }else{
-    c.innerHTML=`<label>Logging for which program?<select id="dailyProgramSelect">${progs.map(p=>`<option value="${p.id}" ${p.id===state.activeProgramId?'selected':''}>${p.name}</option>`).join('')}</select></label><button type="button" id="goToBuilderBtn">+ Build Another Program</button>`;
+    return;
   }
+  c.innerHTML=`<label>Logging for which program?<select id="dailyProgramSelect">${progs.map(p=>`<option value="${p.id}" ${p.id===state.activeProgramId?'selected':''}>${p.name}${p.preset?' (Preset)':''}</option>`).join('')}</select></label><button type="button" id="goToBuilderBtn">+ Build Another Program</button>`;
 }
 function renderDailyCustomFields(){
   const c=$('#dailyCustomFields'); if(!c) return;
   const prog=findProgram(state.activeProgramId);
-  if(!prog){c.innerHTML='';return}
+  dailySetCounts={};
+  if(!prog||!prog.activityIds.length){c.innerHTML='<p class="muted">Build a program in Skill Lab to see activities here.</p>';return}
   c.innerHTML=prog.activityIds.map(id=>{
     const a=findActivityById(id);
-    if(!a) return '';
-    return (a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`program_${id}_${met.key}`,a.name,met)).join('');
+    return a?activitySetBlockHTML('set',a,dailySetCounts):'';
   }).join('');
 }
-// Ad hoc slots on Daily Check-In for logging an exercise outside the active
-// program — same dynamic dropdown pattern as the Combine "Extra Exercise" slots.
-function renderDailyAdHocFields(){
-  const c=$('#dailyAdHocFields'); if(!c || c.children.length) return;
-  const opts='<option value="">— Select exercise —</option>'+allExerciseNames().map(n=>`<option value="${n}">${n}</option>`).join('');
-  c.innerHTML=[0,1,2,3].map(i=>`<div class="combine-skill-block wide"><label>Ad Hoc Exercise ${i+1}<select name="adhocActivity_${i}" class="adhoc-skill-select" data-slot="${i}">${opts}</select></label><div id="adhocSkillFields_${i}" class="combine-skill-fields"></div></div>`).join('');
+// Combine Testing: a parent/coach picks which program is being tested, then
+// gets one single-value field per activity in it — a benchmark snapshot, not
+// a workout log, so no "Add Set" here (unlike Daily/Team Check-In).
+function combineProgramOptions(){
+  const opts=(state.programs||[]).map(p=>({id:p.id,name:p.name,activities:p.activityIds.map(findActivityById).filter(Boolean)}));
+  if(state.teamProgram&&state.teamProgramOptIn){
+    opts.push({id:'team',name:state.teamProgram.title,activities:state.teamProgram.activities.map(findActivity).filter(Boolean)});
+  }
+  return opts;
 }
-function renderAdHocSkillFields(slot,name){
-  const c=$('#adhocSkillFields_'+slot); if(!c) return;
-  const a=name?findActivity(name):null;
-  c.innerHTML=a?(a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`adhocMetric_${slot}_${met.key}`,a.name,met)).join(''):'';
-}
-function renderCombineSkillFields(slot,name){
-  const c=$('#combineSkillFields_'+slot); if(!c) return;
-  const a=name?findActivity(name):null;
-  c.innerHTML=a?(a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`combineSkillMetric_${slot}_${met.key}`,a.name,met)).join(''):'';
-}
-function renderCombineCustomFields(){
-  const c=$('#combineCustomFields'); if(!c || c.children.length) return;
-  const opts='<option value="">— Select exercise —</option>'+allExerciseNames().map(n=>`<option value="${n}">${n}</option>`).join('');
-  c.innerHTML=[0,1].map(i=>`<div class="combine-skill-block wide"><label>Extra Exercise ${i+1}<select name="combineSkillActivity_${i}" class="combine-skill-select" data-slot="${i}">${opts}</select></label><div id="combineSkillFields_${i}" class="combine-skill-fields"></div></div>`).join('');
-}
-// Combine Testing gets a dedicated field per activity across every program
-// the athlete has built, in addition to the fixed core benchmarks above and
-// the free-choice "Extra Exercise" dropdown slots.
-function combineProgramActivities(){
-  const ids=new Set();
-  (state.programs||[]).forEach(p=>(p.activityIds||[]).forEach(id=>ids.add(id)));
-  return [...ids].map(findActivityById).filter(Boolean);
+function renderCombineProgramPicker(){
+  const sel=$('#combineProgramSelect'); if(!sel) return;
+  const opts=combineProgramOptions();
+  if(!opts.length){
+    sel.innerHTML='<option value="">Build a program first</option>';
+    renderCombineProgramFields();
+    return;
+  }
+  const current=sel.value;
+  sel.innerHTML=opts.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
+  sel.value=opts.some(o=>o.id===current)?current:opts[0].id;
+  renderCombineProgramFields();
 }
 function renderCombineProgramFields(){
   const c=$('#combineProgramFields'); if(!c) return;
-  c.innerHTML=combineProgramActivities().map(a=>(a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`combineProgram_${a.id}_${met.key}`,a.name,met)).join('')).join('');
+  const sel=$('#combineProgramSelect');
+  const chosen=combineProgramOptions().find(o=>o.id===(sel?sel.value:''));
+  c.innerHTML=chosen&&chosen.activities.length
+    ?chosen.activities.map(a=>metricInputHTML(`combineProgram_${a.id}_${a.metric.key}`,a.name,a.metric)).join('')
+    :'<p class="muted">No activities in this program yet.</p>';
 }
 document.addEventListener('click',e=>{
-  const rpeBtn=e.target.closest('.rpe-btn');
-  if(rpeBtn){
-    const scale=rpeBtn.closest('.rpe-scale');
-    scale.querySelector('input[type=hidden]').value=rpeBtn.dataset.value;
-    scale.querySelectorAll('.rpe-btn').forEach(b=>b.classList.toggle('selected',b===rpeBtn));
+  const addSetBtn=e.target.closest('.add-set-btn');
+  if(addSetBtn){
+    const prefix=addSetBtn.dataset.prefix, actId=addSetBtn.dataset.activity;
+    const counts=prefix==='set'?dailySetCounts:(prefix==='teamset'?teamSetCounts:null);
+    const a=findActivityById(actId);
+    if(counts&&a){
+      const index=counts[actId]||1;
+      counts[actId]=index+1;
+      addSetBtn.insertAdjacentHTML('beforebegin',setInputHTML(prefix,actId,a.name,a.metric,index));
+    }
   }
 });
 document.addEventListener('change',e=>{
-  const cSel=e.target.closest('.combine-skill-select');
-  if(cSel) renderCombineSkillFields(cSel.dataset.slot,cSel.value);
-  const aSel=e.target.closest('.adhoc-skill-select');
-  if(aSel) renderAdHocSkillFields(aSel.dataset.slot,aSel.value);
-  if(e.target.id==='programBuilderSelect'){state.buildingProgramId=e.target.value;save();renderProgramBuilder();renderExerciseLibrary()}
   if(e.target.id==='dailyProgramSelect'){state.activeProgramId=e.target.value;save();renderDailyCustomFields()}
+  if(e.target.id==='combineProgramSelect') renderCombineProgramFields();
 });
 document.addEventListener('click',e=>{
   const addBtn=e.target.closest('.add-exercise-btn');
-  if(addBtn && !addBtn.disabled) addActivityToBuildingProgram(addBtn.dataset.exercise);
-  const rmProgBtn=e.target.closest('.remove-program-activity');
-  if(rmProgBtn) removeActivityFromProgram(rmProgBtn.dataset.program,rmProgBtn.dataset.activity);
+  if(addBtn && !addBtn.disabled) addActivityToDraft(addBtn.dataset.exercise);
   const viewBtn=e.target.closest('.view-activity-btn');
   if(viewBtn) renderActivityDetail(viewBtn.dataset.exercise);
   if(e.target.id==='closeActivityDetail' || e.target.id==='activityDetailModal') $('#activityDetailModal').classList.add('hidden');
-  if(e.target.id==='newProgramBtn') newProgramFlow();
+  if(e.target.id==='newProgramBtn') startNewProgramDraft();
+  if(e.target.id==='saveProgramDraftBtn'){const nameInput=$('#draftProgramName');saveProgramDraft(nameInput?nameInput.value:'')}
+  if(e.target.id==='discardProgramDraftBtn'){if(confirm('Discard this program without saving?')) discardProgramDraft()}
+  const editBtn=e.target.closest('.edit-program-btn');
+  if(editBtn) startEditProgramDraft(editBtn.dataset.program);
+  const delBtn=e.target.closest('.delete-program-btn');
+  if(delBtn) deleteProgram(delBtn.dataset.program);
+  const rmDraftBtn=e.target.closest('.remove-draft-activity');
+  if(rmDraftBtn) removeActivityFromDraft(rmDraftBtn.dataset.activity);
   if(e.target.id==='goToBuilderBtn') switchScreen('library');
 });
 // ---- Team Program ----
@@ -982,10 +1141,10 @@ function renderTeamProgramLogFields(){
   card.classList.toggle('hidden',!show);
   if(!show) return;
   const c=$('#teamProgramLogFields'); if(!c) return;
-  c.innerHTML=state.teamProgram.activities.map((name,i)=>{
+  teamSetCounts={};
+  c.innerHTML=state.teamProgram.activities.map(name=>{
     const a=findActivity(name);
-    if(!a) return '';
-    return (a.metrics||[]).slice().sort((x,y)=>x.order-y.order).map(met=>metricInputHTML(`teamlog_${i}_${met.key}`,a.name,met)).join('');
+    return a?activitySetBlockHTML('teamset',a,teamSetCounts):'';
   }).join('');
 }
 function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>Score</th></tr></thead><tbody>${[...demoAthletes].sort((a,b)=>b.arcade-a.arcade).map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.arcade}</td></tr>`).join('')}</tbody></table>`}
@@ -1113,6 +1272,7 @@ document.addEventListener('click',e=>{
 
 function handlePhotoUpload(file){if(!file)return;const r=new FileReader();r.onload=()=>{localStorage.setItem('ethansBaseballHQ.profilePhoto',r.result);renderProfilePhoto()};r.readAsDataURL(file)}function renderProfilePhoto(){if(!$('#profilePhoto'))return;const saved=localStorage.getItem('ethansBaseballHQ.profilePhoto');if(saved){$('#profilePhoto').src=saved;$('#profilePhoto').classList.remove('hidden');$('#avatarFallback').classList.add('hidden')}else{$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden')}}function randomAvatar(){const icon=avatarOptions[Math.floor(Math.random()*avatarOptions.length)];$('#avatarFallback').textContent=icon;$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden');localStorage.removeItem('ethansBaseballHQ.profilePhoto')}
 
+seedPresetPrograms();
 window.addEventListener('resize',renderCharts);render();renderTeamEdition();renderProfilePhoto();
 
 
@@ -1137,8 +1297,7 @@ if($('#photoUpload'))$('#photoUpload').onchange=e=>handlePhotoUpload(e.target.fi
 if($('#randomAvatar'))$('#randomAvatar').onclick=randomAvatar;
 renderDailyProgramPicker();
 renderDailyCustomFields();
-renderDailyAdHocFields();
-renderCombineCustomFields();
+renderCombineProgramPicker();
 
 // Version 3.1 initial route
 showModeNav('home');
