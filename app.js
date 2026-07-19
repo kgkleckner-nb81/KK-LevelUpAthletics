@@ -1,6 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false};
-const TEAM_NAME='Northbrook Spartans';
+const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false};
 let state=load();
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -44,7 +43,15 @@ const bonusXPValues={
 function bonusXP(){return (state.bonuses||[]).reduce((a,x)=>a+(+x.xp||0),0)}
 
 
-const tiers=[{name:'Rookie',min:0},{name:'Travel Ball',min:60},{name:'Single A',min:68},{name:'Double AA',min:76},{name:'Triple AAA',min:84},{name:'THE SHOW',min:92}];
+// Round 5: sport-agnostic, non-trademarked six-tier ladder. Actual promotion
+// between tiers is gated (see evaluatePromotion()) rather than being a pure
+// function of `min` — `min` here is only the rating component of that gate,
+// kept alongside the name for renderPathToNextTier()'s "next tier" lookup.
+const tiers=[{name:'Rookie',min:0},{name:'Grinder',min:55},{name:'Baller',min:65},{name:'All-Star',min:75},{name:'Elite',min:85},{name:'Legend',min:93}];
+// Real artwork is being sourced separately per tier — this is a swappable
+// slot lookup, not placeholder art. Missing files fall back to a plain
+// colored badge (see tierBadgeHTML) with zero code changes once files land.
+const tierBadges={Rookie:'assets/tier-rookie.png',Grinder:'assets/tier-grinder.png',Baller:'assets/tier-baller.png','All-Star':'assets/tier-allstar.png',Elite:'assets/tier-elite.png',Legend:'assets/tier-legend.png'};
 const benches={pushups:[5,10,15,20,30],squats:[15,25,40,60,80],plank:[20,30,45,60,90],shuffleTouches:[20,30,40,50,60],skaterJumps:[10,20,30,40,50],broadJumpIn:[40,50,60,70,80],sprintSec:[4.5,4.2,4.0,3.8,3.6]};
 
 $$('.tab').forEach(b=>b.onclick=()=>switchScreen(b.dataset.screen));
@@ -139,6 +146,13 @@ $('#combineForm').onsubmit=e=>{
   });
   state.combine.push(d);
   state.combine.sort((a,b)=>(+a.week||0)-(+b.week||0));
+  // Item 9: promotion is only re-evaluated when a VERIFIED Combine is saved
+  // (not on every render), and only verified results ever become checkpoints
+  // — a pending/unverified test can't confirm a tier.
+  if(ok){
+    recordCombineCheckpoint();
+    evaluatePromotion();
+  }
   save();
   alert(ok?'Combine test saved and parent verified.':'Saved as pending. Parent can approve in Coach/Parent Corner.');
   e.target.reset();
@@ -218,25 +232,207 @@ function pr(){
     sprintSec:bestActivityValue('20-yard Sprint')
   };
 }
-function score(v,k){const b=benches[k]||[5,10,15,20,30];if(k==='sprintSec'){if(!v)return 50;if(v<=b[4])return 92;if(v<=b[3])return 84;if(v<=b[2])return 76;if(v<=b[1])return 68;return 60}let i=0;b.forEach((n,idx)=>{if(v>=n)i=idx});return [50,60,68,76,84][i]}
+// Round 5: continuous replacement for the old discrete 5-tier snap (which
+// jumped in chunks of 8+ and left benches[0] functionally unreachable — see
+// git history). Every bench point is now a real, distinct breakpoint:
+// v=0 anchors at 30 (floor), each benches[k][i] anchors at scorePoints[i+1],
+// and values between/beyond breakpoints interpolate or extrapolate linearly
+// off the nearest segment's slope, capped at 92. sprintSec (lower=better) is
+// handled by negating both the value and its benchmarks rather than a
+// hardcoded special case, which also fixes the old top-score inconsistency
+// (sprint alone topped out at 92 while everything else capped at 84).
+const lowerIsBetterBenchKeys=new Set(['sprintSec']);
+const scorePoints=[50,60,68,76,84];
+function score(v,k){
+  const raw=benches[k]||[5,10,15,20,30];
+  const lower=lowerIsBetterBenchKeys.has(k);
+  const val=+v||0;
+  const thresholds=lower?raw.map(n=>-n):raw;
+  const x=lower?-val:val;
+  if(x<=thresholds[0]){
+    const slope=(scorePoints[1]-scorePoints[0])/(thresholds[1]-thresholds[0]);
+    return Math.round(Math.max(30,scorePoints[0]+slope*(x-thresholds[0])));
+  }
+  for(let i=0;i<thresholds.length-1;i++){
+    if(x<=thresholds[i+1]){
+      const t=(x-thresholds[i])/(thresholds[i+1]-thresholds[i]);
+      return Math.round(scorePoints[i]+(scorePoints[i+1]-scorePoints[i])*t);
+    }
+  }
+  const slope=(scorePoints[4]-scorePoints[3])/(thresholds[4]-thresholds[3]);
+  return Math.round(Math.min(92,scorePoints[4]+slope*(x-thresholds[4])));
+}
+// "No data logged at all" is handled here (neutral 50), not inside score()
+// itself, so a genuinely low-but-real value still scores below a never-tried
+// one instead of the two colliding at the same floor.
+function scoreOrBaseline(v,k){return v>0?score(v,k):50}
+// Which activity(ies) feed each performance axis's benches-keyed stat.
+const axisStatNames={strength:[['Push-ups','pushups'],['Squats','squats'],['Plank','plank']],speed:[['20-yard Sprint','sprintSec']],power:[['Broad Jump','broadJumpIn']],agility:[['Skater Jumps','skaterJumps'],['Lateral Shuffle','shuffleTouches']]};
+// Round 5 item 2: each stat blends the latest verified Combine result (heavy
+// weight) with the best self-reported Daily Check-In value (light, capped
+// weight) — Combine stays the primary driver of real rating movement while
+// daily training still visibly nudges the number.
+const COMBINE_WEIGHT=0.82, DAILY_WEIGHT=0.18;
+function blendedStatScore(name,benchKey){
+  const combineVal=latestVerifiedCombineValue(name);
+  const dailyVal=bestDailyActivityValue(name);
+  return Math.round(scoreOrBaseline(combineVal,benchKey)*COMBINE_WEIGHT+scoreOrBaseline(dailyVal,benchKey)*DAILY_WEIGHT);
+}
+function axisScore(axis){
+  const stats=axisStatNames[axis];
+  const total=stats.reduce((sum,[name,benchKey])=>sum+blendedStatScore(name,benchKey),0);
+  return Math.round(total/stats.length);
+}
 function ratings(){
-  const r=pr();
-  const bonus=axis=>Math.min(15,customExerciseLogCount(axis)*2);
-  const consistency=Math.min(99,50+state.daily.length*2+streak()*3+bonus('consistency'));
-  const speed=Math.min(99,(r.sprintSec?score(r.sprintSec,'sprintSec'):50)+bonus('speed'));
-  const strength=Math.min(99,Math.round((score(r.pushups,'pushups')+score(r.squats,'squats')+score(r.plank,'plank'))/3)+bonus('strength'));
-  const power=Math.min(99,score(r.broadJumpIn,'broadJumpIn')+bonus('power'));
-  const agility=Math.min(99,Math.round((score(r.shuffleTouches,'shuffleTouches')+score(r.skaterJumps,'skaterJumps'))/2)+bonus('agility'));
+  // Item 1: Consistency is purely engagement (workout count + streak) — no
+  // XP input, and no longer any exercise-variety bonus either (that bonus
+  // moved to the performance axes as verified-improvement credit, item 5).
+  const consistency=Math.min(99,50+state.daily.length*2+streak()*3);
+  const speed=Math.min(99,axisScore('speed')+combineImprovementBonus('speed'));
+  const strength=Math.min(99,axisScore('strength')+combineImprovementBonus('strength'));
+  const power=Math.min(99,axisScore('power')+combineImprovementBonus('power'));
+  const agility=Math.min(99,axisScore('agility')+combineImprovementBonus('agility'));
   const overall=Math.round((speed+strength+power+agility+consistency)/5);
   return{speed,strength,power,agility,consistency,overall}
 }
 function streak(){const dates=[...new Set(state.daily.map(x=>x.date).filter(Boolean))].sort().reverse();if(!dates.length)return 0;let s=0,d=new Date();for(let i=0;i<365;i++){const iso=d.toISOString().slice(0,10);if(dates.includes(iso)){s++;d.setDate(d.getDate()-1)}else if(i===0)d.setDate(d.getDate()-1);else break}return s}
 function spinXP(){return (state.spinLog||[]).reduce((a,x)=>a+(+x.xp||0),0)}
 function xp(){return state.daily.length*25+state.combine.filter(x=>x.verified).length*75+questXP()+bonusXP()+spinXP()}
-function tier(){const o=ratings().overall;return [...tiers].reverse().find(t=>o>=t.min)||tiers[0]}
+// Round 5 item 9: tier is now stateful (state.currentTierIndex), advanced
+// only by evaluatePromotion() at a verified-Combine save — not a pure
+// function of the current rating, so it doesn't flicker as raw numbers
+// shift day to day.
+function tier(){return tiers[state.currentTierIndex||0]}
+// Item 8's promotion table, keyed by the tier being promoted INTO (index 1
+// is Rookie->Grinder, etc; index 0/Rookie has no incoming gate). combine
+// checkpoint requirements are expressed in terms of ordinal verified-Combine
+// position (1st/2nd/3rd+) rather than calendar weeks, since the app has no
+// season-start-date concept — see Round 5 open question 2.
+const promotionGates=[
+  null,
+  {rating:55,workouts:5,combineCheckpoint:'first'},
+  {rating:65,workouts:10,combineCheckpoint:'mid'},
+  {rating:75,workouts:15,combineCheckpoint:'mid_or_end'},
+  {rating:85,workouts:20,combineCheckpoint:'end'},
+  {rating:93,workouts:25,combineCheckpoint:'both_mid_and_end'}
+];
+function questCompletionCount(){return (state.quests||[]).length}
+function teamProgramLoggedAtLeastOnce(){return state.daily.some(d=>d.programType==='team')}
+// Engagement gate: "any one of a few paths" per tier (item 8's table).
+function engagementSatisfied(tierIndex){
+  const s=streak(), q=questCompletionCount(), team=teamProgramLoggedAtLeastOnce();
+  switch(tierIndex){
+    case 1:return s>=3||q>=1;
+    case 2:return s>=5||q>=2;
+    case 3:return s>=7||q>=3||team;
+    case 4:return s>=10||(q>=4&&team);
+    case 5:return s>=14||(q>=5&&team);
+    default:return false;
+  }
+}
+function checkpointMeetsThreshold(idx,threshold){
+  const cp=(state.combineCheckpoints||[])[idx];
+  return !!(cp&&cp.overall>=threshold);
+}
+// "first" = the athlete's 1st-ever verified Combine (or early baseline
+// check); "mid"/"end" = the 2nd / any 3rd-or-later verified Combine,
+// standing in for the Mid-Season / End-of-Season checkpoints described in
+// Part 2's season model. "both_mid_and_end" is Legend's exception — proof
+// across the whole season, not one good test.
+function combineConfirmed(gateType,threshold){
+  const cps=state.combineCheckpoints||[];
+  const endMet=()=>cps.slice(2).some((_,i)=>checkpointMeetsThreshold(i+2,threshold));
+  switch(gateType){
+    case 'first':return checkpointMeetsThreshold(0,threshold);
+    case 'mid':return checkpointMeetsThreshold(1,threshold);
+    case 'end':return endMet();
+    case 'mid_or_end':return checkpointMeetsThreshold(1,threshold)||endMet();
+    case 'both_mid_and_end':return checkpointMeetsThreshold(1,threshold)&&endMet();
+    default:return false;
+  }
+}
+// Snapshots the CURRENT overall rating against this verified Combine so
+// later gate checks (especially Legend's "both mid and end") can look back
+// at what the rating actually was at that specific checkpoint, not just
+// what it is now.
+function recordCombineCheckpoint(){
+  state.combineCheckpoints=state.combineCheckpoints||[];
+  state.combineCheckpoints.push({date:todayISO(),overall:ratings().overall});
+}
+// Advances at most one tier per unmet gate, but loops so a strong athlete
+// who clears multiple tiers' gates in one checkpoint isn't artificially
+// held back to a single step.
+function evaluatePromotion(){
+  state.currentTierIndex=state.currentTierIndex||0;
+  let advanced=true;
+  while(advanced&&state.currentTierIndex<tiers.length-1){
+    const nextIndex=state.currentTierIndex+1;
+    const gate=promotionGates[nextIndex];
+    const ratingOk=ratings().overall>=gate.rating;
+    const workoutsOk=state.daily.length>=gate.workouts;
+    const combineOk=combineConfirmed(gate.combineCheckpoint,gate.rating);
+    const engagementOk=engagementSatisfied(nextIndex);
+    if(ratingOk&&workoutsOk&&combineOk&&engagementOk){
+      state.currentTierIndex=nextIndex;
+    }else{
+      advanced=false;
+    }
+  }
+}
+// Item 10: plain-language progress toward the next tier, without exposing
+// the rating threshold, axis weights, or exact gate math.
+function pathToNextTier(){
+  const idx=state.currentTierIndex||0;
+  if(idx>=tiers.length-1) return null;
+  const nextIndex=idx+1;
+  const gate=promotionGates[nextIndex];
+  const ratingOk=ratings().overall>=gate.rating;
+  const workoutsOk=state.daily.length>=gate.workouts;
+  const combineOk=combineConfirmed(gate.combineCheckpoint,gate.rating);
+  const engagementOk=engagementSatisfied(nextIndex);
+  const combineLabel={
+    first:'Awaiting your first verified Combine',
+    mid:'Awaiting Mid-Season Combine confirmation',
+    end:'Awaiting End-of-Season Combine confirmation',
+    mid_or_end:'Awaiting Mid-Season or End-of-Season Combine confirmation',
+    both_mid_and_end:'Awaiting confirmation at both Mid-Season and End-of-Season Combine'
+  }[gate.combineCheckpoint];
+  return{
+    nextTierName:tiers[nextIndex].name,
+    items:[
+      {label:'Rating goal met',done:ratingOk},
+      {label:`${Math.min(state.daily.length,gate.workouts)} of ${gate.workouts} workouts logged`,done:workoutsOk},
+      {label:combineOk?'Combine confirmed':combineLabel,done:combineOk},
+      {label:'Engagement goal met',done:engagementOk}
+    ]
+  };
+}
+function renderPathToNextTier(){
+  const c=$('#pathToNextTier'); if(!c) return;
+  const path=pathToNextTier();
+  if(!path){c.innerHTML='<p class="muted">🏆 Top tier reached — Legend status confirmed.</p>';return}
+  c.innerHTML=`<p class="eyebrow dark">Path to ${path.nextTierName}</p><ul class="path-checklist">${path.items.map(i=>`<li class="${i.done?'done':''}">${i.done?'✅':'⏳'} ${i.label}</li>`).join('')}</ul>`;
+}
+// Real badge artwork is being sourced separately per tier (item 6) — this
+// renders whatever's at tierBadges[name] and falls back to a plain colored
+// initial-letter box on image load failure, so dropping in real files later
+// needs zero code changes.
+function tierBadgeHTML(tierName){
+  const src=tierBadges[tierName];
+  const initial=(tierName||'?').charAt(0);
+  return `<div class="logo-frame tier-badge-slot"><img src="${src}" alt="${tierName} badge" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')"><div class="tier-badge-fallback">${initial}</div></div>`;
+}
+function renderLadder(){
+  const c=$('#ladderContainer'); if(!c) return;
+  c.innerHTML=tiers.map((t,i)=>`<div class="tier cardtier" id="tier${i}">${tierBadgeHTML(t.name)}<span class="tier-name-graffiti">${t.name.toUpperCase()}</span></div>`).join('');
+}
+function renderHeroLadderPreview(){
+  const c=$('#heroLadderPreview'); if(!c) return;
+  c.innerHTML=tierBadgeHTML('Rookie')+tierBadgeHTML('Legend');
+}
 
 function renderPlatformStatus(){
-  const total=xp(), current=tier(), currentIndex=Math.max(0,tiers.findIndex(x=>x.name===current.name));
+  const total=xp(), currentIndex=state.currentTierIndex||0, current=tiers[currentIndex];
   const next=tiers[Math.min(currentIndex+1,tiers.length-1)];
   const packReady=(total%250)>=200;
   if($('#statusTier')) $('#statusTier').textContent=current.name;
@@ -244,12 +440,12 @@ function renderPlatformStatus(){
   if($('#statusStreak')) $('#statusStreak').textContent=streak();
   if($('#statusPack')) $('#statusPack').textContent=packReady?'READY':'LOCKED';
   if($('#homeStreak')) $('#homeStreak').textContent=streak()+' Days';
-  if($('#homeNextCallup')) $('#homeNextCallup').textContent=currentIndex>=tiers.length-1?'THE SHOW':next.name;
+  if($('#homeNextCallup')) $('#homeNextCallup').textContent=next.name;
   if($('#homePackStatus')) $('#homePackStatus').textContent=packReady?'Ready to Open':'Locked';
   if($('#homeMissionName')) $('#homeMissionName').textContent=typeof missionForToday==='function'?missionForToday().title:'Daily Mission';
 }
 function render(){renderPlatformStatus();const r=ratings(), rec=pr(), x=xp(), t=tier();$('#overall').textContent=r.overall;$('#overallBig').textContent=r.overall;$('#streak').textContent=streak();$('#workouts').textContent=state.daily.length;$('#xp').textContent=x;$('#levelName').textContent=t.name;$('#levelDesc').textContent=t.name==='THE SHOW'?'Major league energy. Keep building.':(t.name==='Triple AAA'?'One step from THE SHOW. Keep stacking wins.':'Keep training to get called up.');['speed','strength','power','agility','consistency'].forEach(k=>{$('#'+k).textContent=r[k];$('#'+k+'Bar').style.width=Math.min(100,r[k])+'%'});
-$$('.tier').forEach((el,i)=>el.classList.toggle('active',r.overall>=tiers[i].min));$('#records').innerHTML=`<li>${rec.pushups} max push-ups</li><li>${rec.squats} max squats</li><li>${rec.plank} sec plank</li><li>${rec.shuffleTouches} shuffle touches</li><li>${rec.broadJumpIn} in verified broad jump</li><li>${rec.sprintSec||'—'} sec verified sprint</li>`;
+$$('.tier').forEach((el,i)=>el.classList.toggle('active',i===(state.currentTierIndex||0)));$('#records').innerHTML=`<li>${rec.pushups} max push-ups</li><li>${rec.squats} max squats</li><li>${rec.plank} sec plank</li><li>${rec.shuffleTouches} shuffle touches</li><li>${rec.broadJumpIn} in verified broad jump</li><li>${rec.sprintSec||'—'} sec verified sprint</li>`;renderPathToNextTier();
 const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#meterText').textContent=`${x%250} / 250 XP to next parent surprise`;$('#rewardNotice').textContent=x>=250&&x%250<75?'🎁 Parent surprise may be unlocked. Check Coach/Parent Corner.':'';
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
@@ -515,14 +711,6 @@ function renderCharts(){
 function best(m){let rows=[],b=m==='sprintSec'?Infinity:0;state.combine.filter(x=>x.verified).sort((a,b)=>(+a.week||0)-(+b.week||0)).forEach(x=>{let v=combineValueFor(x,m);if(m==='sprintSec'){if(v>0)b=Math.min(b,v);if(b!==Infinity)rows.push({label:'W'+x.week,value:b})}else{b=Math.max(b,v);rows.push({label:'W'+x.week,value:b})}});return rows}
 
 const demoAthletes=[{name:'Ethan',xp:2845,workouts:42,streak:12,improvement:21,sportsmanship:8,arcade:920},{name:'Jack',xp:2710,workouts:40,streak:9,improvement:16,sportsmanship:10,arcade:880},{name:'Mason',xp:2490,workouts:38,streak:7,improvement:24,sportsmanship:6,arcade:810},{name:'Luke',xp:2380,workouts:36,streak:11,improvement:19,sportsmanship:7,arcade:790},{name:'Noah',xp:2265,workouts:35,streak:6,improvement:14,sportsmanship:9,arcade:760},{name:'Charlie',xp:2140,workouts:33,streak:8,improvement:18,sportsmanship:7,arcade:730}];
-// Round 3: the 8 "Tracked Daily" activities are no longer excluded from the
-// Skill Lab Add button (that gating is retired per round-3 item 6 — Add
-// visibility is now governed purely by builder mode, see renderExerciseLibrary).
-// This set survives only as an internal rating-engine detail: these 8 already
-// feed the Player Card's core score()/benches calculation directly via pr(),
-// so customExerciseLogCount() skips them to avoid double-counting the same
-// log toward both the core score AND the generic category bonus.
-const coreScoredActivityNames=new Set(['Push-ups','Squats','Sit Ups','Skater Jumps','Lateral Shuffle','Broad Jump','20-yard Sprint','Plank']);
 const categoryAxisMap={Strength:'strength',Core:'strength',Speed:'speed',Agility:'agility',Power:'power',Throwing:'consistency',Catching:'consistency',Hitting:'consistency',Pitching:'consistency',Recovery:'consistency',Teamwork:'consistency'};
 
 // ---- Skills Lab activity catalog ----
@@ -636,12 +824,6 @@ function hasLoggedAny(raw){
 // are intentionally left out of the daily map.
 const legacyDailyFieldMap={'Push-ups':'pushups','Squats':'squats','Plank':'plank','Lateral Shuffle':'shuffleTouches','Skater Jumps':'skaterJumps','Sit Ups':'crunches'};
 const legacyCombineFieldMap={'Push-ups':'maxPushups','Squats':'squat60','Plank':'plankMax','Broad Jump':'broadJumpIn','20-yard Sprint':'sprintSec'};
-function customExerciseLogCount(axis){
-  let count=0;
-  state.daily.forEach(d=>{if(d.custom)Object.keys(d.custom).forEach(name=>{if(coreScoredActivityNames.has(name))return;const cat=exerciseCategory(name);if(cat&&categoryAxisMap[cat]===axis&&hasLoggedAny(d.custom[name]))count++})});
-  state.combine.filter(x=>x.verified).forEach(c=>{(c.customCombine||[]).forEach(x=>{if(coreScoredActivityNames.has(x.name))return;const cat=exerciseCategory(x.name);if(cat&&categoryAxisMap[cat]===axis&&hasLoggedAny(x.values!=null?x.values:x.value))count++})});
-  return count;
-}
 function loggedCustomExerciseNames(){
   const set=new Set();
   state.daily.forEach(d=>{if(d.custom)Object.keys(d.custom).forEach(k=>{if(hasLoggedAny(d.custom[k]))set.add(k)})});
@@ -685,6 +867,70 @@ function bestActivityValue(name){
   });
   if(!vals.length) return 0;
   return a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
+}
+// Round 5: the rating axes need combine and daily data kept SEPARATE (unlike
+// bestActivityValue's blended best-ever, used for PR display) so they can be
+// weighted differently — Combine dominates, Daily only nudges.
+function bestDailyActivityValue(name){
+  const a=findActivity(name);
+  if(!a) return 0;
+  const metricKey=a.metric.key;
+  const legacyKey=legacyDailyFieldMap[name];
+  const vals=[];
+  state.daily.forEach(entry=>{
+    vals.push(...valuesForActivityMetric(entry.custom&&entry.custom[name],metricKey));
+    if(legacyKey&&entry[legacyKey]!=null&&entry[legacyKey]!=='')vals.push(+entry[legacyKey]);
+  });
+  if(!vals.length) return 0;
+  return a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
+}
+// One combine entry's value for one activity (not searched across history —
+// used to compare specific checkpoints against each other for the
+// improvement bonus and the promotion gates' checkpoint snapshots).
+function combineEntryValue(entry,name){
+  const a=findActivity(name);
+  if(!a||!entry) return 0;
+  const metricKey=a.metric.key;
+  const found=(entry.customCombine||[]).find(x=>x.name===name);
+  if(found){
+    const vals=valuesForActivityMetric(found.values!=null?found.values:found.value,metricKey);
+    if(vals.length) return a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
+  }
+  const legacyKey=legacyCombineFieldMap[name];
+  if(legacyKey&&entry[legacyKey]!=null&&entry[legacyKey]!=='') return +entry[legacyKey];
+  return 0;
+}
+// "Latest" (most recent verified test), not "best ever" — a rating axis
+// should reflect current standing, not a historical peak that may no longer
+// be true.
+function latestVerifiedCombineValue(name){
+  const verified=state.combine.filter(x=>x.verified);
+  for(let i=verified.length-1;i>=0;i--){
+    const v=combineEntryValue(verified[i],name);
+    if(v) return v;
+  }
+  return 0;
+}
+// Item 5: replaces the old "distinct exercises logged" bonus with credit for
+// real, verified improvement between the two most recent verified Combines —
+// the main lever that makes 99 hard to reach, since it requires the athlete
+// to actually get better at a checkpoint, not just log variety.
+function combineImprovementBonus(axis){
+  const stats=axisStatNames[axis];
+  const verified=state.combine.filter(x=>x.verified);
+  if(!stats||verified.length<2) return 0;
+  const prevEntry=verified[verified.length-2];
+  const latestEntry=verified[verified.length-1];
+  let total=0,count=0;
+  stats.forEach(([name,benchKey])=>{
+    const prevVal=combineEntryValue(prevEntry,name);
+    const latestVal=combineEntryValue(latestEntry,name);
+    if(!prevVal||!latestVal) return;
+    total+=score(latestVal,benchKey)-score(prevVal,benchKey);
+    count++;
+  });
+  if(!count) return 0;
+  return Math.max(0,Math.min(10,Math.round(total/count)));
 }
 function dailyValueFor(entry,key){
   if(key.startsWith('c:')){
@@ -1064,13 +1310,71 @@ document.addEventListener('click',e=>{
   if(rmDraftBtn) removeActivityFromDraft(rmDraftBtn.dataset.activity);
   if(e.target.id==='goToBuilderBtn') switchScreen('library');
 });
+// ---- Team Identity ----
+// Round 5 item 11-13: replaces the hardcoded Spartans name/logo with a
+// coach-defined Team {name, joinCode, logo}, set up from Coach/Parent Corner
+// and joined by athletes entering the code once. On this single-athlete,
+// localStorage-only build "joining" just unlocks the identity display on
+// this device — a real shared roster needs the planned Supabase migration.
+function generateTeamJoinCode(){
+  return Math.random().toString(36).slice(2,8).toUpperCase();
+}
+function teamLogoHTML(sizeClass){
+  if(state.team&&state.team.logo){
+    return `<img src="${state.team.logo}" alt="${state.team.name||'Team'} logo" class="team-logo ${sizeClass||''}">`;
+  }
+  const initial=state.team&&state.team.name?state.team.name.trim().charAt(0).toUpperCase():'⚾';
+  return `<div class="team-logo-fallback ${sizeClass||''}">${initial}</div>`;
+}
+function renderTeamIdentity(){
+  const heroName=$('#teamHeroName'); if(heroName) heroName.textContent=(state.team&&state.team.name)||'Your Team';
+  const heroLogo=$('#teamHeroLogo'); if(heroLogo) heroLogo.innerHTML=teamLogoHTML('team-logo-hero');
+  const pathLogo=$('#pathCardTeamLogo'); if(pathLogo) pathLogo.innerHTML=teamLogoHTML('team-logo-path');
+  const joinCard=$('#teamJoinCard');
+  if(joinCard) joinCard.classList.toggle('hidden',!(state.team&&state.team.joinCode&&!state.teamIdentityJoined));
+}
+function joinTeamIdentity(){
+  const codeInput=$('#teamJoinCodeInput');
+  const code=(codeInput?codeInput.value:'').trim().toUpperCase();
+  if(!state.team||!state.team.joinCode){if($('#teamJoinStatus'))$('#teamJoinStatus').textContent='No team has been set up yet.';return}
+  if(code!==state.team.joinCode){if($('#teamJoinStatus'))$('#teamJoinStatus').textContent='Incorrect join code.';return}
+  state.teamIdentityJoined=true;
+  save();
+  if(codeInput) codeInput.value='';
+  if($('#teamJoinStatus'))$('#teamJoinStatus').textContent='';
+  renderTeamIdentity();
+}
+function saveTeamSetup(){
+  const code=$('#teamSetupCode').value;
+  if(code!==state.parentCode){alert('Incorrect coach/parent code. Team not saved.');return}
+  const name=$('#teamNameInput').value.trim();
+  if(!name){alert('Enter a team name.');return}
+  state.team=state.team||{};
+  state.team.name=name;
+  if(!state.team.joinCode) state.team.joinCode=generateTeamJoinCode();
+  save();
+  $('#teamSetupCode').value='';
+  if($('#teamSetupStatus')) $('#teamSetupStatus').textContent=`Saved "${name}". Join code: ${state.team.joinCode}`;
+  renderTeamIdentity();
+}
+function handleTeamLogoUpload(file){
+  if(!file) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    state.team=state.team||{};
+    state.team.logo=r.result;
+    save();
+    renderTeamIdentity();
+  };
+  r.readAsDataURL(file);
+}
 // ---- Team Program ----
 // Coach/parent-authored program of Skill Lab activities. Uses the existing
 // parentCode as a stand-in "admin" gate since real coach roles aren't built
 // yet. Completion is a simple once-daily checklist bonus (like Daily Mission),
 // not per-metric logging — the individual activities can still be logged
 // directly via the Skill Lab training slots if an athlete wants that detail.
-function teamProgramLabel(){return `TEAM ${TEAM_NAME.toUpperCase()} PROGRAM`}
+function teamProgramLabel(){return `TEAM ${(state.team?.name||'YOUR TEAM').toUpperCase()} PROGRAM`}
 function renderTeamProgramBuilder(){
   const sel=$('#teamProgramActivities');
   if(!sel || sel.options.length) return;
@@ -1086,7 +1390,7 @@ function saveTeamProgram(){
   if(code!==state.parentCode){alert('Incorrect coach/parent code. Team program not saved.');return}
   const chosen=[...$('#teamProgramActivities').selectedOptions].map(o=>o.value);
   if(!chosen.length){alert('Pick at least one activity for the program.');return}
-  const title=$('#teamProgramTitle').value.trim()||`${TEAM_NAME} Baseball Training Program`;
+  const title=$('#teamProgramTitle').value.trim()||`${state.team?.name||'Your Team'} Baseball Training Program`;
   const instructions=($('#teamProgramInstructions')?.value||'').trim();
   state.teamProgram={title,activities:chosen,instructions};
   save();
@@ -1160,7 +1464,7 @@ function renderTeamProgramLogFields(){
   }).join('');
 }
 function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>Score</th></tr></thead><tbody>${[...demoAthletes].sort((a,b)=>b.arcade-a.arcade).map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.arcade}</td></tr>`).join('')}</tbody></table>`}
-function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=state.gameScores?.reaction??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=state.gameScores?.homer??0;renderArcadeExtras()}
+function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=state.gameScores?.reaction??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=state.gameScores?.homer??0;renderArcadeExtras()}
 let reactionStart=0,reactionTimer=null;function startReactionGame(){$('#reactionResult').textContent='Get ready...';$('#reactionBall').classList.add('hidden');clearTimeout(reactionTimer);reactionTimer=setTimeout(()=>{const b=$('#reactionBall');b.style.left=(10+Math.random()*70)+'%';b.style.top=(18+Math.random()*55)+'%';b.classList.remove('hidden');reactionStart=performance.now();$('#reactionResult').textContent='TAP!'},800+Math.random()*1800)}function hitReactionBall(){const ms=Math.round(performance.now()-reactionStart);$('#reactionBall').classList.add('hidden');state.gameScores=state.gameScores||{};if(!state.gameScores.reaction||ms<state.gameScores.reaction)state.gameScores.reaction=ms;const e=awardGameXP(5);$('#reactionResult').textContent=`${ms} ms · +${e} XP`;save()}
 let strikeTarget=0,strikeRound=0,strikeScore=0;function startStrikeGame(){strikeRound=1;strikeScore=0;nextStrike()}function nextStrike(){strikeTarget=1+Math.floor(Math.random()*9);const names={1:'High & Inside',2:'High Center',3:'High & Away',4:'Middle Inside',5:'Middle',6:'Middle Away',7:'Low & Inside',8:'Low Center',9:'Low & Away'};$('#strikePrompt').textContent=`Round ${strikeRound}/5: ${names[strikeTarget]}`}function chooseStrike(z){if(!strikeRound)return;if(z===strikeTarget){strikeScore+=100;$('#strikeResult').textContent='Correct! +100'}else $('#strikeResult').textContent='Missed. Keep learning the zone.';strikeRound++;if(strikeRound>5){state.gameScores=state.gameScores||{};state.gameScores.strike=Math.max(state.gameScores.strike||0,strikeScore);const e=awardGameXP(10);$('#strikePrompt').textContent=`Final Score: ${strikeScore} · +${e} XP`;strikeRound=0;save()}else nextStrike()}
 let homerAnimation=null,homerStart=0,homerActive=false;function startHomerGame(){const ball=$('#timingBall');cancelAnimationFrame(homerAnimation);homerStart=performance.now();homerActive=true;function move(t){const pct=Math.min(100,((t-homerStart)/1800)*100);ball.style.left=pct+'%';if(pct<100&&homerActive)homerAnimation=requestAnimationFrame(move);else if(homerActive){$('#homerResult').textContent='Strike! Try again.';homerActive=false}}homerAnimation=requestAnimationFrame(move)}function swingHomer(){if(!homerActive)return;homerActive=false;cancelAnimationFrame(homerAnimation);const left=parseFloat($('#timingBall').style.left)||0;let score=0,msg='';if(left>=70&&left<=82){score=500;msg='HOME RUN!'}else if(left>=60&&left<=90){score=250;msg='Solid Contact!'}else{score=50;msg=left<60?'Early!':'Late!'}state.gameScores=state.gameScores||{};state.gameScores.homer=Math.max(state.gameScores.homer||0,score);const e=awardGameXP(score>=500?10:5);$('#homerResult').textContent=`${msg} ${score} points · +${e} XP`;save()}
@@ -1285,6 +1589,7 @@ document.addEventListener('click',e=>{
 function handlePhotoUpload(file){if(!file)return;const r=new FileReader();r.onload=()=>{localStorage.setItem('ethansBaseballHQ.profilePhoto',r.result);renderProfilePhoto()};r.readAsDataURL(file)}function renderProfilePhoto(){if(!$('#profilePhoto'))return;const saved=localStorage.getItem('ethansBaseballHQ.profilePhoto');if(saved){$('#profilePhoto').src=saved;$('#profilePhoto').classList.remove('hidden');$('#avatarFallback').classList.add('hidden')}else{$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden')}}function randomAvatar(){const icon=avatarOptions[Math.floor(Math.random()*avatarOptions.length)];$('#avatarFallback').textContent=icon;$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden');localStorage.removeItem('ethansBaseballHQ.profilePhoto')}
 
 seedPresetPrograms();
+renderLadder();renderHeroLadderPreview();
 window.addEventListener('resize',renderCharts);render();renderTeamEdition();renderProfilePhoto();
 
 
@@ -1294,6 +1599,9 @@ if($('#leaderboardMetric'))$('#leaderboardMetric').onchange=renderLeaderboard;
 if($('#libraryCategory'))$('#libraryCategory').onchange=renderExerciseLibrary;
 if($('#addShoutout'))$('#addShoutout').onclick=addShoutout;
 if($('#saveTeamProgram'))$('#saveTeamProgram').onclick=saveTeamProgram;
+if($('#saveTeamSetup'))$('#saveTeamSetup').onclick=saveTeamSetup;
+if($('#joinTeamIdentityBtn'))$('#joinTeamIdentityBtn').onclick=joinTeamIdentity;
+if($('#teamLogoUpload'))$('#teamLogoUpload').onchange=e=>handleTeamLogoUpload(e.target.files[0]);
 if($('#joinTeamProgram'))$('#joinTeamProgram').onclick=joinTeamProgram;
 if($('#completeTeamProgram'))$('#completeTeamProgram').onclick=goToTeamProgramCheckIn;
 $$('.reaction-btn').forEach(b=>b.onclick=()=>addReaction(b.textContent));

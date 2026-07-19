@@ -11,17 +11,14 @@
   <div class="hero-copy">
     <p class="eyebrow">⚾ Ethan's Baseball HQ</p>
     <h1>Train. Level Up. Get Called Up.</h1>
-    <p>Daily baseball training with Spartans-to-Brewers progression, player ratings, parent-approved combine tests, badges, and charts.</p>
+    <p>Daily baseball training with a Rookie-to-Legend progression, player ratings, parent-approved combine tests, badges, and charts.</p>
   </div>
-  <div class="logo-stack">
-    <img src="spartans-logo.png" alt="Northbrook Spartans Baseball logo"/>
-    <img src="brewers-logo.png" alt="Milwaukee Brewers logo"/>
-  </div>
+  <div class="logo-stack" id="heroLadderPreview"></div>
 </header>
 
 <div class="status-bar">
   <button class="brand-home" data-home-button type="button">⚾ BASEBALL HQ</button>
-  <div class="status-athlete"><strong>ETHAN</strong><span id="statusTier">Rookie</span></div>
+  <div class="status-athlete"><strong>ETHAN</strong><span id="statusTier" class="tier-name-graffiti">Rookie</span></div>
   <div class="status-item"><span>XP</span><strong id="statusXP">0</strong></div>
   <div class="status-item"><span>🔥</span><strong id="statusStreak">0</strong></div>
   <div class="status-item pack-status"><span>⭐</span><strong id="statusPack">LOCKED</strong></div>
@@ -74,7 +71,7 @@
       <span>ENTER ATHLETE →</span>
     </button>
     <button class="path-card team-path" data-path="team" type="button">
-      <img src="spartans-logo.png" alt="Spartans">
+      <div id="pathCardTeamLogo"></div>
       <h3>TEAM HQ</h3><p>Squad Up</p>
       <ul><li>Team feed</li><li>Leaderboards</li><li>League challenges</li><li>Coach awards</li></ul>
       <span>ENTER TEAM HQ →</span>
@@ -114,14 +111,8 @@
 
   <div class="card">
     <h2>Call-Up Ladder</h2>
-    <div class="ladder">
-      <div class="tier cardtier" id="tier0"><div class="logo-frame"><img src="little-league-logo.png"/></div><span>ROOKIE</span></div>
-      <div class="tier cardtier" id="tier1"><div class="logo-frame"><img src="spartans-logo.png"/></div><span>TRAVEL BALL</span></div>
-      <div class="tier cardtier" id="tier2"><div class="logo-frame"><img src="single-a-logo.png"/></div><span>SINGLE A</span></div>
-      <div class="tier cardtier" id="tier3"><div class="logo-frame"><img src="double-aa-logo.png"/></div><span>DOUBLE AA</span></div>
-      <div class="tier cardtier" id="tier4"><div class="logo-frame"><img src="triple-aaa-logo.png"/></div><span>TRIPLE AAA</span></div>
-      <div class="tier cardtier" id="tier5"><div class="logo-frame"><img src="brewers-logo.png"/></div><span>THE SHOW</span></div>
-    </div>
+    <div class="ladder" id="ladderContainer"></div>
+    <div id="pathToNextTier" class="path-to-next-tier"></div>
   </div>
 
   <div class="grid two">
@@ -174,7 +165,7 @@
 <div class="profile-photo-wrap"><img id="profilePhoto" class="profile-photo hidden" alt="Athlete profile"><div id="avatarFallback" class="avatar-fallback">E</div><label class="upload-button">Upload Photo<input id="photoUpload" type="file" accept="image/*"></label><button id="randomAvatar" type="button">Create Avatar</button></div>
     <div>
       <p class="eyebrow dark">Player Card</p>
-      <h2 id="levelName">Rookie</h2>
+      <h2 id="levelName" class="tier-name-graffiti">Rookie</h2>
       <p id="levelDesc">Start stacking workouts.</p>
     </div>
     <div class="rating-circle"><span id="overallBig">50</span><small>OVR</small></div>
@@ -294,7 +285,17 @@
 
 
 <section id="team" class="screen">
-<div class="card team-hero"><div><p class="eyebrow dark">Team Edition Demo</p><h2>Northbrook Spartans 10U</h2><p>Summer Season · 12 Athletes · Coach Miller</p></div><img src="spartans-logo.png" class="team-logo" alt="Spartans logo"></div>
+<div class="card hidden" id="teamJoinCard">
+  <p class="eyebrow dark">Team HQ</p>
+  <h2>Join Your Team</h2>
+  <p class="muted">Enter the join code your coach shared to unlock your team's identity here.</p>
+  <div class="form-grid">
+    <label class="wide">Team join code<input id="teamJoinCodeInput" type="text" placeholder="Enter code from your coach"></label>
+    <button id="joinTeamIdentityBtn" class="primary wide" type="button">Join Team</button>
+  </div>
+  <p id="teamJoinStatus" class="muted"></p>
+</div>
+<div class="card team-hero"><div><p class="eyebrow dark">Team Edition Demo</p><h2 id="teamHeroName">Your Team</h2><p>Summer Season · 12 Athletes · Coach Miller</p></div><div id="teamHeroLogo"></div></div>
 <div class="grid stats"><div class="stat"><span>Team XP</span><strong>18,442</strong><small>points</small></div><div class="stat"><span>Weekly Completion</span><strong>83%</strong><small>team</small></div><div class="stat"><span>Current Challenge</span><strong>7/12</strong><small>athletes</small></div><div class="stat"><span>Team Rank</span><strong>3</strong><small>of 14</small></div></div>
 <div class="grid two"><div class="card"><h2>Team Leaderboards</h2><label>Sort by<select id="leaderboardMetric"><option value="xp">Total XP</option><option value="workouts">Workouts</option><option value="streak">Longest Streak</option><option value="improvement">Most Improved</option><option value="sportsmanship">Sportsmanship</option><option value="arcade">Arcade Score</option></select></label><div id="teamLeaderboard"></div></div><div class="card"><h2>Team Feed</h2><div id="teamFeed"></div></div></div>
 <div class="card">
@@ -364,11 +365,23 @@
   </div>
   <div class="card">
     <p class="eyebrow dark">Coach Tools</p>
+    <h2>Team Setup</h2>
+    <p class="muted">Set your team's name and logo, then share the join code below with your athletes.</p>
+    <div class="form-grid">
+      <label class="wide">Coach / parent code<input id="teamSetupCode" type="password" placeholder="Required"></label>
+      <label class="wide">Team name<input id="teamNameInput" type="text" placeholder="e.g. Riverside Raptors"></label>
+      <label class="wide">Team logo (optional)<input id="teamLogoUpload" type="file" accept="image/*"></label>
+      <button id="saveTeamSetup" class="primary wide" type="button">Save Team + Generate Join Code</button>
+    </div>
+    <p id="teamSetupStatus" class="muted"></p>
+  </div>
+  <div class="card">
+    <p class="eyebrow dark">Coach Tools</p>
     <h2>Build the Team Program</h2>
     <p class="muted">Admin roles aren't fully built out yet, so this reuses the Coach/Parent Corner code to confirm it's a coach or parent making the change.</p>
     <div class="form-grid">
       <label class="wide">Coach / parent code<input id="coachCode" type="password" placeholder="Required"></label>
-      <label class="wide">Program title<input id="teamProgramTitle" type="text" placeholder="e.g. Northbrook Spartans Baseball Training Program"></label>
+      <label class="wide">Program title<input id="teamProgramTitle" type="text" placeholder="e.g. Riverside Raptors Baseball Training Program"></label>
       <label class="wide">Pick activities for the program<select id="teamProgramActivities" multiple size="10"></select></label>
       <label class="wide">Instructions for the team (optional)<input id="teamProgramInstructions" type="text" placeholder="e.g. Please attempt to complete this program 2x per week"></label>
       <button id="saveTeamProgram" class="primary wide" type="button">Save Team Program</button>

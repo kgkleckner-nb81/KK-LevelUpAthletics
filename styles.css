@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=Bungee&display=swap');
 
 :root{
   --cream:#FFF3D6;
@@ -23,6 +23,7 @@
   --display:'Baloo 2',sans-serif;
   --accent:'Fredoka',sans-serif;
   --body-font:'Plus Jakarta Sans',sans-serif;
+  --graffiti:'Bungee',cursive;
 }
 
 *{box-sizing:border-box}
@@ -133,6 +134,11 @@ body:before{
   letter-spacing:.18em;
   color:var(--ink);
   opacity:.55;
+}
+
+.logo-stack .tier-badge-slot{
+  width:116px;
+  height:116px;
 }
 
 .logo-stack img{
@@ -669,6 +675,45 @@ footer{
   border-top:3px solid var(--neon-blue);
 }
 
+/* Round 5 item 7: tier NAME text only — bold urban display font with a
+   multi-color gradient clipped to the letterforms, distinct from the rest
+   of the UI's Baloo 2 / Fredoka typography. Applied via a shared class so
+   the status bar, Player Card, and ladder all get identical treatment. */
+/* !important here is deliberate: this is a surgical override utility class
+   meant to win against more specific pre-existing selectors like
+   `.tier.cardtier span` (font-family:var(--display)) without having to
+   chase every context it's dropped into. */
+.tier-name-graffiti{
+  font-family:var(--graffiti)!important;
+  background:linear-gradient(90deg,var(--neon-blue),var(--neon-pink),var(--neon-green),var(--neon-yellow))!important;
+  background-size:200% auto;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;
+  color:var(--neon-pink);
+  letter-spacing:.02em;
+}
+.tier-badge-slot{position:relative}
+.tier-badge-fallback{
+  display:none;
+  width:100%;
+  height:100%;
+  min-height:96px;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--display);
+  font-weight:800;
+  font-size:40px;
+  color:var(--ink);
+  background:linear-gradient(135deg,var(--peach),var(--creamsicle));
+  border:3px solid var(--ink);
+  border-radius:14px;
+}
+.tier-badge-fallback.show{display:flex}
+.path-to-next-tier{margin-top:16px}
+.path-checklist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.path-checklist li{padding:10px 12px;background:var(--white);border:2px solid var(--ink);border-radius:10px;font-family:var(--accent);font-weight:600;font-size:14px}
+.path-checklist li.done{background:#eafff0;border-color:var(--success)}
 .tier.cardtier.active{
   transform:scale(1.045);
   border-color:var(--neon-blue);
@@ -715,6 +760,9 @@ footer{
 .team-hero,.league-hero{background:linear-gradient(135deg,var(--cream),var(--peach))}
 .team-hero{display:flex;align-items:center;justify-content:space-between}
 .team-logo{width:120px;height:120px;object-fit:contain}
+.team-logo-fallback{display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;color:var(--ink);background:linear-gradient(135deg,var(--peach),var(--creamsicle));border:3px solid var(--ink);border-radius:14px}
+.team-logo-hero{width:120px;height:120px;font-size:44px}
+.team-logo-path{width:130px;height:130px;object-fit:contain;align-self:center;margin:25px auto;font-size:48px}
 .feed-item,.shoutout{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center}
 .reaction-row{display:flex;gap:10px;flex-wrap:wrap}
 .reaction-btn{background:var(--ink);color:#fff}
