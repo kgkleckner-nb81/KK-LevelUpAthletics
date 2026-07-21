@@ -91,6 +91,14 @@ body:before{
   color:#2c2c2c;
 }
 
+.hero-logo{
+  display:block;
+  height:56px;
+  width:auto;
+  margin:0 0 14px;
+  border-radius:12px;
+}
+
 .eyebrow{
   display:inline-block;
   margin:0 0 14px;
@@ -543,6 +551,17 @@ footer{
   border-top:4px solid var(--neon-blue);
 }
 
+.brand-signature{
+  margin:8px 0 0;
+  font-size:10px;
+  font-family:var(--accent);
+  font-weight:600;
+  color:var(--neon-blue);
+  text-transform:uppercase;
+  letter-spacing:.22em;
+  opacity:.85;
+}
+
 .file{display:block;margin:12px 0}
 
 @media(max-width:850px){
@@ -837,7 +856,8 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 
 /* Version 3.1 information architecture */
 .status-bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;padding:9px 18px;background:var(--ink);color:#fff;border-bottom:1px solid rgba(255,255,255,.14)}
-.brand-home{background:transparent!important;box-shadow:none!important;border:0!important;padding:6px 10px!important;color:var(--neon-blue)!important;font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:.03em}
+.brand-home{background:transparent!important;box-shadow:none!important;border:0!important;padding:4px 10px!important;display:flex!important;align-items:center}
+.brand-home-logo{height:36px;width:auto;display:block}
 .status-athlete{display:flex;flex-direction:column;margin-right:auto}
 .status-athlete strong{font-family:var(--display);font-weight:800;letter-spacing:.03em}
 .status-athlete span{font-size:10px;color:var(--neon-blue);text-transform:uppercase;letter-spacing:.12em}
