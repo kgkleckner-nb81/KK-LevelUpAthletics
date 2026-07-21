@@ -422,9 +422,12 @@ function tierBadgeHTML(tierName){
   const initial=(tierName||'?').charAt(0);
   return `<div class="logo-frame tier-badge-slot"><img src="${src}" alt="${tierName} badge" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')"><div class="tier-badge-fallback">${initial}</div></div>`;
 }
+// Round 6 item 3: the badge artwork carries the tier name as part of the
+// image itself, so the ladder cards no longer render a separate name banner
+// (unlike the status bar / Player Card, which still show tier name as text).
 function renderLadder(){
   const c=$('#ladderContainer'); if(!c) return;
-  c.innerHTML=tiers.map((t,i)=>`<div class="tier cardtier" id="tier${i}">${tierBadgeHTML(t.name)}<span class="tier-name-graffiti">${t.name.toUpperCase()}</span></div>`).join('');
+  c.innerHTML=tiers.map((t,i)=>`<div class="tier cardtier" id="tier${i}">${tierBadgeHTML(t.name)}</div>`).join('');
 }
 function renderHeroLadderPreview(){
   const c=$('#heroLadderPreview'); if(!c) return;

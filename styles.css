@@ -574,15 +574,19 @@ footer{
   height:52px;
 }
 
-/* Collectible baseball-card style Call-Up Ladder */
+/* Collectible baseball-card style Call-Up Ladder. Round 6: cards go black
+   with a full-bleed badge image (the artwork carries the tier name itself,
+   see renderLadder()) — non-active cards get a warm peach border so they
+   still read against the black background; the active tier's neon-blue
+   glow (below) is unchanged and is what visually says "you are here". */
 .tier.cardtier{
   position:relative;
   min-height:178px;
   padding:12px 10px 0;
   border-radius:18px;
   overflow:hidden;
-  background:var(--white);
-  border:3px solid var(--ink);
+  background:var(--ink);
+  border:3px solid var(--peach);
   box-shadow:var(--shadow);
   transform:none;
   display:flex;
@@ -606,24 +610,10 @@ footer{
   letter-spacing:.16em;
 }
 
-.tier.cardtier::after{
-  content:"";
-  position:absolute;
-  inset:8px;
-  border:1px dashed rgba(22,22,22,.18);
-  border-radius:12px;
-  pointer-events:none;
-}
-
 .tier.cardtier .logo-frame{
   position:relative;
   z-index:1;
   flex:1;
-  min-height:118px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:18px 8px 10px;
 }
 
 .tier.cardtier .logo-frame img,
@@ -632,47 +622,21 @@ footer{
   inset:auto;
   width:100%;
   height:100%;
-  max-width:122px;
-  max-height:104px;
-  object-fit:contain;
+  object-fit:cover;
   background:transparent;
   border:0;
   border-radius:0;
   padding:0;
-  margin:0 auto;
+  margin:0;
   box-shadow:none;
 }
 
-.tier.cardtier:nth-child(4) .logo-frame img,
-.tier.cardtier:nth-child(5) .logo-frame img{
-  max-width:142px;
-  max-height:96px;
-}
-
-.tier.cardtier:nth-child(6) .logo-frame img{
-  max-width:118px;
-  max-height:112px;
-}
-
-.tier.cardtier span{
-  position:relative;
-  z-index:2;
-  display:block;
-  left:auto;
-  right:auto;
-  bottom:auto;
-  margin:0 -10px;
-  padding:12px 8px;
-  color:#fff;
-  background:var(--ink);
-  font-family:var(--display);
-  font-weight:800;
-  font-size:18px;
-  line-height:1;
-  letter-spacing:.06em;
-  text-align:center;
-  text-transform:uppercase;
-  border-top:3px solid var(--neon-blue);
+.tier.cardtier .tier-badge-fallback{
+  width:100%;
+  height:100%;
+  min-height:0;
+  border:0;
+  border-radius:0;
 }
 
 /* Round 5 item 7: tier NAME text only — bold urban display font with a
@@ -727,9 +691,6 @@ footer{
 @media(max-width:850px){
   .tier.cardtier{
     min-height:158px;
-  }
-  .tier.cardtier .logo-frame{
-    min-height:102px;
   }
 }
 
