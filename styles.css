@@ -58,7 +58,7 @@ body:before{
   display:flex;
   justify-content:space-between;
   gap:28px;
-  align-items:center;
+  align-items:flex-end;
   padding:40px 34px 64px;
   color:var(--ink);
   background:
@@ -91,12 +91,19 @@ body:before{
   color:#2c2c2c;
 }
 
+.hero-brand-column{
+  position:relative;
+  z-index:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:18px;
+}
+
 .hero-logo{
   display:block;
-  height:56px;
+  height:200px;
   width:auto;
-  margin:0 0 14px;
-  border-radius:12px;
 }
 
 .eyebrow{
