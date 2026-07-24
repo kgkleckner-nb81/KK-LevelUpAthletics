@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0}};
+const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0},attributePoints:{}};
 let state=load();
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -127,6 +127,7 @@ $('#dailyForm').onsubmit=e=>{
   });
   state.daily.push(d);
   state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  accumulateAttributePoints(d.custom);
   save();
   e.target.reset();
   $('#dailyForm').date.valueAsDate=new Date();
@@ -201,6 +202,7 @@ $('#teamProgramLogForm').onsubmit=e=>{
   if(loggedSomething&&!alreadyAwardedToday){
     state.bonuses.push({date:todayISO(),type:'Team Program',xp:50,reason:state.teamProgram.title});
   }
+  accumulateAttributePoints(d.custom);
   save();
   e.target.reset();
   $('#teamProgramLogForm').date.valueAsDate=new Date();
@@ -230,7 +232,6 @@ function pr(){
   return {
     pushups:bestActivityValue('Push-ups'),
     squats:bestActivityValue('Squats'),
-    crunches:bestActivityValue('Sit Ups'),
     plank:bestActivityValue('Plank'),
     shuffleTouches:bestActivityValue('Lateral Shuffle'),
     skaterJumps:bestActivityValue('Skater Jumps'),
@@ -459,7 +460,7 @@ const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
 $('#pendingList').innerHTML=table(['Week','Program','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.programName||'—',a.status]));
-$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderCoachReport();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderCoachReport();renderAttributeBreakdown();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
 
 
 function xpEvents(){
@@ -646,6 +647,21 @@ function showWorkoutDetail(index){
     <h3>Personal Records</h3><ul>${prHtml}</ul>`;
   $('#workoutDetailModal').classList.remove('hidden');
 }
+// Round 9 item 9 — display only, reads state.attributePoints exclusively;
+// never wired into ratings()/pr()/score(). Bars are scaled relative to the
+// athlete's own highest attribute so the chart stays meaningful regardless
+// of total volume logged.
+const attributeOrder=['Strength','Speed','Quickness','Jump','Core','Balance','Coordination'];
+function renderAttributeBreakdown(){
+  if(!$('#attributeBreakdown')) return;
+  const pts=state.attributePoints||{};
+  const max=Math.max(1,...attributeOrder.map(a=>pts[a]||0));
+  $('#attributeBreakdown').innerHTML=attributeOrder.map(a=>{
+    const v=pts[a]||0;
+    const pct=Math.round((v/max)*100);
+    return `<div class="rating-row"><span>${a}</span><div class="bar"><div style="width:${pct}%"></div></div><strong>${v}</strong></div>`;
+  }).join('');
+}
 function renderCoachReport(){
   if(!$('#coachReport')) return;
   if(!state.daily.length){$('#coachReport').innerHTML='<p class="muted">Complete a few workouts to unlock a weekly coach report.</p>';return;}
@@ -666,7 +682,7 @@ function renderCoachReport(){
     if(!best||improvement>best.improvement) best={label:name,improvement};
   });
   const r=pr();
-  $('#coachReport').innerHTML=`<p><strong>Great work this week.</strong></p><p>You logged <strong>${workouts}</strong> recent workouts.${best?` Biggest improvement area: <strong>${best.label}</strong>.`:''}</p><p><strong>Next goals:</strong> ${(r.pushups||0)+2} push-ups, ${(r.crunches||0)+5} sit ups, ${(r.plank||0)+5}-second plank.</p><p class="muted">Keep stacking small wins and chasing the next call-up.</p>`;
+  $('#coachReport').innerHTML=`<p><strong>Great work this week.</strong></p><p>You logged <strong>${workouts}</strong> recent workouts.${best?` Biggest improvement area: <strong>${best.label}</strong>.`:''}</p><p><strong>Next goals:</strong> ${(r.pushups||0)+2} push-ups, ${(r.plank||0)+5}-second plank.</p><p class="muted">Keep stacking small wins and chasing the next call-up.</p>`;
 }
 document.addEventListener('click',e=>{
   const row=e.target.closest('.workout-row');
@@ -720,7 +736,25 @@ function renderCharts(){
 function best(m){let rows=[],b=m==='sprintSec'?Infinity:0;state.combine.filter(x=>x.verified).sort((a,b)=>(+a.week||0)-(+b.week||0)).forEach(x=>{let v=combineValueFor(x,m);if(m==='sprintSec'){if(v>0)b=Math.min(b,v);if(b!==Infinity)rows.push({label:'W'+x.week,value:b})}else{b=Math.max(b,v);rows.push({label:'W'+x.week,value:b})}});return rows}
 
 const demoAthletes=[{name:'Ethan',xp:2845,workouts:42,streak:12,improvement:21,sportsmanship:8,arcade:920},{name:'Jack',xp:2710,workouts:40,streak:9,improvement:16,sportsmanship:10,arcade:880},{name:'Mason',xp:2490,workouts:38,streak:7,improvement:24,sportsmanship:6,arcade:810},{name:'Luke',xp:2380,workouts:36,streak:11,improvement:19,sportsmanship:7,arcade:790},{name:'Noah',xp:2265,workouts:35,streak:6,improvement:14,sportsmanship:9,arcade:760},{name:'Charlie',xp:2140,workouts:33,streak:8,improvement:18,sportsmanship:7,arcade:730}];
-const categoryAxisMap={Strength:'strength',Core:'strength',Speed:'speed',Agility:'agility',Power:'power',Throwing:'consistency',Catching:'consistency',Hitting:'consistency',Pitching:'consistency',Recovery:'consistency',Teamwork:'consistency'};
+// Round 9: Quickness/Jumping-Plyometrics map to the same rating axes their
+// old names (Agility/Power) did — only the display name changed. Balance
+// and Coordination are new categories with no corresponding rated axis
+// (same as Mobility), so they intentionally fall back to 'consistency'.
+const categoryAxisMap={Strength:'strength',Core:'strength',Speed:'speed',Quickness:'agility','Jumping/Plyometrics':'power',Balance:'consistency',Coordination:'consistency',Mobility:'consistency',Teamwork:'consistency'};
+const categoryIcons={Strength:'💪',Core:'🧱',Speed:'⚡',Quickness:'🏃','Jumping/Plyometrics':'🚀',Balance:'⚖',Coordination:'🎯',Mobility:'🧘',Teamwork:'🤝'};
+// Round 9 item 10 — goal-chip nav, one per non-Teamwork category. Labels
+// and mapping (including "More Durable"->Core) match the change-request
+// doc's explicit list verbatim.
+const goalChipDefs=[
+  {category:'Strength',label:'Stronger',icon:'💪'},
+  {category:'Speed',label:'Faster',icon:'⚡'},
+  {category:'Quickness',label:'Quicker',icon:'🏃'},
+  {category:'Jumping/Plyometrics',label:'Jump Higher',icon:'🚀'},
+  {category:'Core',label:'More Durable',icon:'🛡'},
+  {category:'Balance',label:'Better Balance',icon:'⚖'},
+  {category:'Coordination',label:'Better Coordination',icon:'🎯'},
+  {category:'Mobility',label:'More Flexible',icon:'🧘'}
+];
 
 // ---- Skills Lab activity catalog ----
 // Each activity: {id, name, category, sportTags, ageBand, media, metric}
@@ -744,45 +778,145 @@ const MetricBuilders={
   distanceIn:()=>({key:'distance_in',label:'Distance',unit:'in',inputType:'integer',min:0})
 };
 const M=MetricBuilders;
+// Round 9: consolidated to 8 sport-agnostic athletic-quality categories
+// (Strength/Core/Speed/Quickness/Jumping-Plyometrics/Balance/Coordination/
+// Mobility) plus Teamwork, curated from a youth bodyweight/plyometric
+// research summary — down from the old 11-category, baseball-mixed list.
+// Baseball-specific content (Throwing/Catching/Hitting/Pitching, plus the
+// base-running-specific First-Step Reaction/Base-Stealing Starts) is
+// quarantined in baseballActivityDefs below, not deleted, for a future
+// dedicated Baseball Skill Lab module.
+//
+// Each entry is [name, metricBuilderFn, attributeWeights]. attributeWeights
+// is a small {Attribute:weight} map used only for the informational
+// Attribute Breakdown display (state.attributePoints, Part 4) — never read
+// by ratings()/pr()/score(). The 7 trackable attributes are Strength,
+// Speed, Quickness, Jump, Core, Balance, Coordination; Mobility and
+// Teamwork exercises carry no weight (null) since they aren't a rated
+// athletic quality. HARD CONSTRAINT: Push-ups, Squats, Plank, Lateral
+// Shuffle, Skater Jumps, Broad Jump, and 20-yard Sprint are read by exact
+// string match in pr()/axisStatNames/benches — do not rename or remove.
 const activityDefs={
-  Strength:[['Push-ups',()=>M.reps()],['Wide Push-ups',()=>M.reps()],['Squats',()=>M.reps()],['Jump Squats',()=>M.reps()],['Wall Sit',M.duration],['Calf Raises',()=>M.reps()],['Glute Bridge',()=>M.reps()],['Drop Lunges',()=>M.reps('Reps (each leg)')]],
-  Core:[['Sit Ups',()=>M.reps()],['Dead Bugs',()=>M.reps()],['Bicycle Sit Ups',()=>M.reps()],['Plank',M.duration],['Side Plank',M.duration],['Superman',()=>M.reps()],['Hollow Hold',M.duration]],
-  Speed:[['10-yard Sprint',M.time],['20-yard Sprint',M.time],['Flying Sprint',M.time],['Shuttle Run',M.time],['First-Step Reaction',()=>M.reps()],['Base-Stealing Starts',()=>M.reps()]],
-  Agility:[['Skater Jumps',()=>M.reps()],['Lateral Shuffle',()=>M.reps('Touches')],['Carioca',M.duration],['Zig-Zag Cones',M.duration],['Crossover Runs',()=>M.reps()],['Box Drill',M.duration],['Mirror Drill',M.duration]],
-  Power:[['Broad Jump',M.distanceIn],['Vertical Jump',M.distanceIn],['Lateral Hops',()=>M.reps()],['Single-Leg Hops',()=>M.reps()]],
+  Strength:[
+    ['Push-ups',()=>M.reps(),{Strength:3,Core:1}],
+    ['Wide Push-ups',()=>M.reps(),{Strength:3,Core:1}],
+    ['Squats',()=>M.reps(),{Strength:3,Jump:1}],
+    ['Jump Squats',()=>M.reps(),{Strength:2,Jump:2}],
+    ['Glute Bridge',()=>M.reps(),{Strength:3,Core:1}],
+    ['Drop Lunges',()=>M.reps('Reps (each leg)'),{Strength:3,Balance:1}],
+    ['Pull-Ups',()=>M.reps(),{Strength:3}],
+    ['Dead Hang',M.duration,{Strength:2,Core:1}]
+  ],
+  Core:[
+    ['Plank',M.duration,{Core:3}],
+    ['Side Plank',M.duration,{Core:3,Balance:1}],
+    ['Hollow Hold',M.duration,{Core:3}],
+    ['Dead Bugs',()=>M.reps(),{Core:3,Coordination:1}],
+    ['Bird Dog',()=>M.reps(),{Core:3,Balance:1}],
+    ['Bear Crawl',M.duration,{Core:2,Coordination:2}]
+  ],
+  Speed:[
+    ['10-yard Sprint',M.time,{Speed:3}],
+    ['20-yard Sprint',M.time,{Speed:3}],
+    ['40-Yard Sprint',M.time,{Speed:3}],
+    ['Hill Sprint',M.time,{Speed:3,Strength:1}],
+    ['Flying Sprint',M.time,{Speed:3}]
+  ],
+  Quickness:[
+    ['Skater Jumps',()=>M.reps(),{Quickness:2,Jump:2}],
+    ['Lateral Shuffle',()=>M.reps('Touches'),{Quickness:3}],
+    ['Shuttle Run',M.time,{Quickness:3,Speed:1}],
+    ['Carioca',M.duration,{Quickness:3,Coordination:1}],
+    ['Zig-Zag Cones',M.duration,{Quickness:3}],
+    ['Box Drill',M.duration,{Quickness:3,Coordination:1}]
+  ],
+  'Jumping/Plyometrics':[
+    ['Broad Jump',M.distanceIn,{Jump:3,Speed:1}],
+    ['Vertical Jump',M.distanceIn,{Jump:3,Strength:1}],
+    ['Single-Leg Hops',()=>M.reps(),{Jump:2,Balance:2}],
+    ['Lateral Hops',()=>M.reps(),{Jump:2,Quickness:1}],
+    ['Squat Jump',()=>M.reps(),{Jump:3,Strength:1}],
+    ['Box Jump',()=>M.reps(),{Jump:3}],
+    ['Tuck Jump',()=>M.reps(),{Jump:3,Core:1}],
+    ['Jump Rope',()=>M.reps(),{Coordination:2,Quickness:2}],
+    ['Pogo Jumps',()=>M.reps(),{Jump:3,Quickness:1}]
+  ],
+  Balance:[
+    ['Single-Leg Balance',M.duration,{Balance:3}],
+    ['Single-Leg Reach',()=>M.reps(),{Balance:3,Core:1}],
+    ['Heel-to-Toe Walk',()=>M.reps('Steps'),{Balance:3,Coordination:1}]
+  ],
+  Coordination:[
+    ['High Knees',()=>M.reps(),{Coordination:2,Speed:1}],
+    ['Butt Kicks',()=>M.reps(),{Coordination:2,Speed:1}],
+    ['Ladder Quick Feet',M.duration,{Coordination:3,Quickness:1}],
+    ['Crossovers',()=>M.reps(),{Coordination:3,Quickness:1}],
+    ['Mountain Climbers',()=>M.reps(),{Coordination:2,Core:2}]
+  ],
+  Mobility:[
+    ['Hip Mobility',M.duration,null],
+    ['Shoulder Mobility',M.duration,null],
+    ["World's Greatest Stretch",M.duration,null],
+    ['Deep Squat Hold',M.duration,null],
+    ['Hamstring Stretch',M.duration,null],
+    ['Thoracic Rotation',M.duration,null]
+  ],
+  Teamwork:[['Sportsmanship Challenge',()=>M.reps('Times'),null],['Encourage a Teammate',()=>M.reps('Times'),null],['Equipment Cleanup',()=>M.reps('Times'),null],['Coach Helper',()=>M.reps('Times'),null]]
+};
+const categoryOrder=Object.keys(activityDefs);
+// Quarantined baseball-specific content — intentionally NOT referenced by
+// categoryOrder/activities/the Skill Lab UI. Kept intact (including its
+// authored coaching text) for a future dedicated Baseball Skill Lab module.
+const baseballActivityDefs={
   Throwing:[['Target Throws',()=>M.reps()],['One-Knee Throwing',()=>M.reps()],['Long Toss',M.distanceYd],['Crow Hop',()=>M.reps()],['Quick Release',()=>M.reps()],['Pivot Throws',()=>M.reps()]],
   Catching:[['Tennis Ball Reaction',()=>M.reps()],['Barehand Catches',()=>M.reps()],['Blocking Drill',()=>M.reps()],['Transfer Drill',()=>M.reps()]],
   Hitting:[['Tee Work',()=>M.reps('Swings')],['Front Toss',()=>M.reps('Swings')],['Bat-Speed Swings',()=>M.reps('Swings')],['One-Hand Drills',()=>M.reps('Swings')],['Balance Drills',M.duration],['Launch Position',()=>M.reps()]],
   Pitching:[['Balance Drill',M.duration],['Arm Care',()=>M.reps()],['Hip Rotation',()=>M.reps()],['Towel Drill',()=>M.reps()]],
-  Recovery:[['Shoulder Mobility',M.duration],['Band Work',()=>M.reps()],['Hip Mobility',M.duration],['Foam Rolling',M.duration],['Stretching',M.duration]],
-  Teamwork:[['Sportsmanship Challenge',()=>M.reps('Times')],['Encourage a Teammate',()=>M.reps('Times')],['Equipment Cleanup',()=>M.reps('Times')],['Coach Helper',()=>M.reps('Times')]]
+  Speed:[['First-Step Reaction',()=>M.reps()],['Base-Stealing Starts',()=>M.reps()]]
 };
-const categoryOrder=Object.keys(activityDefs);
-const baseballCategories=new Set(['Throwing','Catching','Hitting','Pitching']);
+const baseballSampleMedia={
+  'Tee Work':{instructionText:'Hit off the batting tee focusing on a consistent, repeatable swing path rather than power.'}
+};
 // A handful of activities ship with real content to prove the "present" and
 // "partially present" states render correctly. Everything else intentionally
 // ships with null/empty media — the "absent" state — until a content pass fills it in.
 const sampleMedia={
-  'Wall Sit':{instructionText:'Slide your back down a wall until your knees are bent to about 90 degrees, like sitting in an invisible chair. Hold the position with your core tight and weight even through both feet.',formCues:['Back flat against the wall','Knees stacked over ankles, not past toes','Squeeze your quads and glutes','Breathe steady, don’t hold your breath'],commonFaults:['Letting the knees drift past the toes','Sliding too low or too high on the wall']},
+  'Hollow Hold':{instructionText:'Lie on your back, press your lower back into the floor, and lift your shoulders and legs slightly off the ground, arms reaching overhead. Hold the "banana" shape with your core braced.',formCues:['Lower back pressed flat, no arch','Legs straight and squeezed together','Arms reaching long overhead','Breathe steady, don’t hold your breath'],commonFaults:['Letting the lower back arch off the floor','Legs dropping too low to compensate']},
   '10-yard Sprint':{instructionText:'A short, explosive sprint from a stopped start. Drive out low for the first few steps, then accelerate through the line without slowing down.',formCues:['Lean forward out of the start','Drive your arms front to back','Push the ground away, don’t reach with your feet','Run through the line, not to it'],commonFaults:['Standing up too tall too early','Taking choppy first steps instead of driving out low']},
   'Box Drill':{instructionText:'Set up four cones in a square. Sprint, shuffle, backpedal, and shuffle again around the box, staying low and under control at every corner.',formCues:['Stay low through every direction change','Chop your feet at each corner','Keep your eyes up, not on your feet','Push off the outside foot on every turn'],commonFaults:['Standing up tall at the corners and losing speed','Crossing your feet during the shuffle sections']},
-  'Hip Mobility':{instructionText:'A continuous flow through 90/90 switches, world’s greatest stretch, and lateral lunges to open the hips before training.',formCues:['Keep both hips square to the front','Move slow and controlled, no bouncing','Breathe out on every stretch position'],commonFaults:['Rushing through positions','Letting the back knee collapse inward']},
-  'Tee Work':{instructionText:'Hit off the batting tee focusing on a consistent, repeatable swing path rather than power.'}
+  'Hip Mobility':{instructionText:'A continuous flow through 90/90 switches, world’s greatest stretch, and lateral lunges to open the hips before training.',formCues:['Keep both hips square to the front','Move slow and controlled, no bouncing','Breathe out on every stretch position'],commonFaults:['Rushing through positions','Letting the back knee collapse inward']}
 };
-const activities=categoryOrder.flatMap(cat=>activityDefs[cat].map(([name,metricFn])=>{
+const activities=categoryOrder.flatMap(cat=>activityDefs[cat].map(([name,metricFn,attrs])=>{
   const m=sampleMedia[name];
   return {
     id:slug(name),
     name,
     category:cat,
-    sportTags:baseballCategories.has(cat)?['baseball']:['multi-sport'],
+    sportTags:['multi-sport'],
     ageBand:'all',
     media:m?{instructionText:m.instructionText,formCues:m.formCues||[],commonFaults:m.commonFaults||[],video:{plannedUrl:null}}:emptyMedia(),
-    metric:metricFn()
+    metric:metricFn(),
+    attributes:attrs||null
   };
 }));
 function findActivity(name){return activities.find(a=>a.name===name)}
 function findActivityById(id){return activities.find(a=>a.id===id)}
+// Round 9 item 9 — HARD CONSTRAINT: attributePoints must never be read by
+// ratings()/pr()/score(). Purely additive, informational display fed by
+// Daily/Team Program Check-In logs (weight x sets logged per activity, not
+// weighted by raw value since reps/seconds/inches aren't unit-compatible),
+// matching the separation Round 8 established for arcadeMetrics.
+function accumulateAttributePoints(custom){
+  state.attributePoints=state.attributePoints||{};
+  Object.entries(custom||{}).forEach(([name,entry])=>{
+    const a=findActivity(name);
+    const sets=entry&&Array.isArray(entry.sets)?entry.sets.length:0;
+    if(!a||!a.attributes||!sets) return;
+    Object.entries(a.attributes).forEach(([attr,weight])=>{
+      state.attributePoints[attr]=(state.attributePoints[attr]||0)+weight*sets;
+    });
+  });
+}
 function exerciseCategory(name){const a=findActivity(name);return a?a.category:null}
 // Three ready-made, locked programs so an athlete can start logging on day
 // one without building anything. Seeded once (state.presetsSeeded) so they
@@ -790,8 +924,8 @@ function exerciseCategory(name){const a=findActivity(name);return a?a.category:n
 // their own programs — presets are a starting point, not a permanent fixture.
 const presetDefs=[
   {name:'Level 1: Base Camp',activities:['Push-ups','Squats','Skater Jumps','Lateral Shuffle','Plank','Broad Jump','20-yard Sprint']},
-  {name:'Level 2: The Grind',activities:['Push-ups','Jump Squats','Skater Jumps','Sit Ups','Plank','Drop Lunges']},
-  {name:'Level 3: Boss Level',activities:['Push-ups','Jump Squats','Skater Jumps','Sit Ups','Plank','Drop Lunges','Wall Sit','Single-Leg Hops']}
+  {name:'Level 2: The Grind',activities:['Push-ups','Jump Squats','Skater Jumps','Hollow Hold','Plank','Drop Lunges']},
+  {name:'Level 3: Boss Level',activities:['Push-ups','Jump Squats','Skater Jumps','Hollow Hold','Plank','Drop Lunges','Dead Hang','Single-Leg Hops']}
 ];
 function seedPresetPrograms(){
   if(state.presetsSeeded) return;
@@ -1202,11 +1336,12 @@ function renderExerciseLibrary(){
   if(!$('#libraryCategory'))return;
   if(!$('#libraryCategory').options.length)$('#libraryCategory').innerHTML=categoryOrder.map(c=>`<option>${c}</option>`).join('');
   const cat=$('#libraryCategory').value||categoryOrder[0];
+  if($('#goalChips'))$('#goalChips').innerHTML=goalChipDefs.map(g=>`<button type="button" class="goal-chip${g.category===cat?' active':''}" data-category="${g.category}">${g.icon} ${g.label}</button>`).join('');
   const draft=state.draftProgram;
   $('#exerciseLibrary').innerHTML=activities.filter(a=>a.category===cat).map(a=>{
     const inDraft=!!(draft&&draft.activityIds.includes(a.id));
     const label=!draft?'Start a Program':(inDraft?'In Program':'Add');
-    return `<div class="library-card${inDraft?' active':''}"><span>⚾</span><strong>${a.name}</strong><div class="library-card-actions"><button type="button" class="view-activity-btn" data-exercise="${a.name}">View</button><button type="button" class="add-exercise-btn" data-exercise="${a.name}" ${(!draft||inDraft)?'disabled':''}>${label}</button></div></div>`;
+    return `<div class="library-card${inDraft?' active':''}"><span>${categoryIcons[cat]||'⭐'}</span><strong>${a.name}</strong><div class="library-card-actions"><button type="button" class="view-activity-btn" data-exercise="${a.name}">View</button><button type="button" class="add-exercise-btn" data-exercise="${a.name}" ${(!draft||inDraft)?'disabled':''}>${label}</button></div></div>`;
   }).join('');
 }
 function whyTrackLine(category){
@@ -1860,6 +1995,7 @@ if($('#completeMission'))$('#completeMission').onclick=completeDailyMission;
 if($('#useRainToken'))$('#useRainToken').onclick=useRainToken;
 if($('#leaderboardMetric'))$('#leaderboardMetric').onchange=renderLeaderboard;
 if($('#libraryCategory'))$('#libraryCategory').onchange=renderExerciseLibrary;
+if($('#goalChips'))$('#goalChips').onclick=e=>{const btn=e.target.closest('.goal-chip');if(!btn)return;$('#libraryCategory').value=btn.dataset.category;renderExerciseLibrary()};
 if($('#addShoutout'))$('#addShoutout').onclick=addShoutout;
 if($('#saveTeamProgram'))$('#saveTeamProgram').onclick=saveTeamProgram;
 if($('#saveTeamSetup'))$('#saveTeamSetup').onclick=saveTeamSetup;
