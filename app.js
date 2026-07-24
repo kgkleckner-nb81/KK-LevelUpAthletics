@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false};
+const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0}};
 let state=load();
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -80,7 +80,13 @@ function enterMode(mode){
   if(mode==='home') switchScreen('home');
   if(mode==='athlete') switchScreen('clubhouse');
   if(mode==='team') switchScreen('team');
-  if(mode==='arcade') switchScreen('arcade');
+  if(mode==='arcade'){
+    // Round 8: each arcade game's per-session difficulty ramp (Home Run
+    // Hero's pitch speed, Web Gem's delay/size, Clutch Catch's in-progress
+    // round) resets on a fresh visit to Arcade, not on every re-render.
+    resetHomerSession();resetWebGemSession();resetClutchSession();
+    switchScreen('arcade');
+  }
   if(mode==='parent') switchScreen('parent');
 }
 $$('.mode-btn').forEach(b=>b.onclick=()=>enterMode(b.dataset.mode));
@@ -1043,6 +1049,37 @@ const triviaQuestions=[
 function todayISO(){return new Date().toISOString().slice(0,10)}
 function ensureGameXPDay(){if(!state.gameXP||state.gameXP.date!==todayISO())state.gameXP={date:todayISO(),xp:0}}
 function awardGameXP(amount){ensureGameXPDay();const avail=Math.max(0,25-state.gameXP.xp),earned=Math.min(avail,amount);state.gameXP.xp+=earned;save();renderTeamEdition();return earned}
+// ---- Arcade storage layer (Round 8) ----
+// Sole read/write path for per-game arcade scores/metrics, so a future
+// Supabase migration only has to change these functions' internals, not
+// every call site in each game's logic.
+function getArcadeBest(gameId){return (state.arcadeScores&&state.arcadeScores[gameId]&&state.arcadeScores[gameId].best)||0}
+function getWebGemBestReaction(){return state.arcadeScores&&state.arcadeScores.webGem?state.arcadeScores.webGem.bestReaction:null}
+function recordArcadeResult(gameId,result){
+  state.arcadeScores=state.arcadeScores||{};
+  const g=state.arcadeScores[gameId]=state.arcadeScores[gameId]||{best:0};
+  const prevBest=g.best||0;
+  const isNewBest=result.score>prevBest;
+  if(isNewBest) g.best=result.score;
+  g.lastPlayed={...result,date:todayISO()};
+  save();
+  return {isNewBest,best:g.best,prevBest};
+}
+function updateWebGemReactionBest(ms){
+  if(ms==null) return;
+  state.arcadeScores=state.arcadeScores||{};
+  const g=state.arcadeScores.webGem=state.arcadeScores.webGem||{best:0};
+  if(g.bestReaction==null||ms<g.bestReaction) g.bestReaction=ms;
+  save();
+}
+// Round 8 item 21 — HARD CONSTRAINT: arcadeMetrics must never be read by
+// ratings()/pr()/score(). It exists only for a possible future "Arcade
+// Stats" display, kept strictly separate from the real rating axes.
+function recordArcadeMetric(gameId,value){
+  state.arcadeMetrics=state.arcadeMetrics||{};
+  state.arcadeMetrics[gameId]=Math.max(0,Math.min(100,Math.round(value)));
+  save();
+}
 function missionForToday(){const m=[{title:'Speed Day',tasks:['6 Sprints','40 Shuffle Touches','20 Skater Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Power Day',tasks:['35 Squats','12 Push-ups','10 Broad Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Core Day',tasks:['30 Sit Ups','45-Second Plank','20 Dead Bugs'],reward:'+40 XP + Mystery Pack'},{title:'Baseball IQ Day',tasks:['Strike Zone Challenge','Target Throws','Coach Helper'],reward:'+35 XP + Card Unlock'},{title:'Recovery Day',tasks:['Shoulder Mobility','Hip Mobility','Easy Stretching'],reward:'+25 XP + Rain Token Chance'}];return m[new Date().getDay()%m.length]}
 function unlockRandomItem(){state.inventory=state.inventory||[];const item=lockerItems[Math.floor(Math.random()*lockerItems.length)];if(!state.inventory.includes(item))state.inventory.push(item);return item}
 function completeDailyMission(){const m=missionForToday();state.bonuses=state.bonuses||[];if(state.bonuses.some(x=>x.type==='Daily Mission'&&x.date===todayISO())){alert('Today’s mission is already complete.');return}state.bonuses.push({date:todayISO(),type:'Daily Mission',xp:40,reason:m.title});unlockRandomItem();save();alert('Mission complete! +40 XP and a mystery item unlocked.');render()}
@@ -1467,10 +1504,233 @@ function renderTeamProgramLogFields(){
   }).join('');
 }
 function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>Score</th></tr></thead><tbody>${[...demoAthletes].sort((a,b)=>b.arcade-a.arcade).map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.arcade}</td></tr>`).join('')}</tbody></table>`}
-function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=state.gameScores?.reaction??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=state.gameScores?.homer??0;renderArcadeExtras()}
-let reactionStart=0,reactionTimer=null;function startReactionGame(){$('#reactionResult').textContent='Get ready...';$('#reactionBall').classList.add('hidden');clearTimeout(reactionTimer);reactionTimer=setTimeout(()=>{const b=$('#reactionBall');b.style.left=(10+Math.random()*70)+'%';b.style.top=(18+Math.random()*55)+'%';b.classList.remove('hidden');reactionStart=performance.now();$('#reactionResult').textContent='TAP!'},800+Math.random()*1800)}function hitReactionBall(){const ms=Math.round(performance.now()-reactionStart);$('#reactionBall').classList.add('hidden');state.gameScores=state.gameScores||{};if(!state.gameScores.reaction||ms<state.gameScores.reaction)state.gameScores.reaction=ms;const e=awardGameXP(5);$('#reactionResult').textContent=`${ms} ms · +${e} XP`;save()}
+function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=getWebGemBestReaction()??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#clutchBest'))$('#clutchBest').textContent=getArcadeBest('clutchCatch');renderArcadeExtras()}
+// ---- Web Gem (Round 8 glow-up of the old Reaction Catch) ----
+// Streak/combo model: a catch immediately queues the next ball at a
+// shorter delay and slightly smaller size; a miss or too-slow tap ends the
+// round. Session (delay/size ramp) resets on Arcade entry via
+// resetWebGemSession, same pattern as Home Run Hero.
+const WEBGEM_START_DELAY=1600,WEBGEM_DELAY_FLOOR=500,WEBGEM_DELAY_STEP=90,WEBGEM_REACT_WINDOW=1400;
+let webGemActive=false,webGemStreak=0,webGemDelay=WEBGEM_START_DELAY,webGemAppearAt=0,webGemBestReactionThisRound=null,webGemSpawnTimer=null,webGemTimeoutTimer=null;
+function resetWebGemSession(){
+  webGemActive=false;webGemStreak=0;webGemDelay=WEBGEM_START_DELAY;webGemBestReactionThisRound=null;
+  clearTimeout(webGemSpawnTimer);clearTimeout(webGemTimeoutTimer);
+}
+function startReactionGame(){
+  resetWebGemSession();
+  startWebGemRound();
+}
+function startWebGemRound(){
+  webGemActive=false;
+  $('#reactionResult').textContent=webGemStreak>0?`Streak: ${webGemStreak} — get ready...`:'Get ready...';
+  $('#reactionBall').classList.add('hidden');
+  clearTimeout(webGemSpawnTimer);clearTimeout(webGemTimeoutTimer);
+  const delay=webGemDelay*0.7+Math.random()*webGemDelay*0.6;
+  webGemSpawnTimer=setTimeout(()=>{
+    const b=$('#reactionBall');
+    const size=Math.max(40,64-Math.floor(webGemStreak/3)*3);
+    b.style.width=size+'px';b.style.height=size+'px';
+    b.style.left=(10+Math.random()*70)+'%';
+    b.style.top=(18+Math.random()*55)+'%';
+    b.classList.remove('hidden');
+    webGemAppearAt=performance.now();
+    webGemActive=true;
+    $('#reactionResult').textContent='TAP!';
+    webGemTimeoutTimer=setTimeout(()=>{if(webGemActive) endWebGemRound()},WEBGEM_REACT_WINDOW);
+  },delay);
+}
+function flashWebGemMilestone(streak){
+  const el=$('#reactionGame'); if(!el) return;
+  el.classList.add('milestone-flash');
+  setTimeout(()=>el.classList.remove('milestone-flash'),700);
+}
+function hitReactionBall(){
+  if(!webGemActive) return;
+  const ms=Math.round(performance.now()-webGemAppearAt);
+  webGemActive=false;
+  clearTimeout(webGemTimeoutTimer);
+  $('#reactionBall').classList.add('hidden');
+  webGemStreak++;
+  if(webGemBestReactionThisRound===null||ms<webGemBestReactionThisRound) webGemBestReactionThisRound=ms;
+  webGemDelay=Math.max(WEBGEM_DELAY_FLOOR,webGemDelay-WEBGEM_DELAY_STEP);
+  const milestone=[5,10,15].includes(webGemStreak);
+  if(milestone){
+    flashWebGemMilestone(webGemStreak);
+    $('#reactionResult').innerHTML=`🔥 <strong>${webGemStreak} in a row!</strong> Keep it up!`;
+  }else{
+    $('#reactionResult').textContent=`Caught! ${ms} ms · Streak: ${webGemStreak}`;
+  }
+  setTimeout(()=>startWebGemRound(),milestone?900:150);
+}
+function endWebGemRound(){
+  webGemActive=false;
+  clearTimeout(webGemSpawnTimer);clearTimeout(webGemTimeoutTimer);
+  $('#reactionBall').classList.add('hidden');
+  const finalStreak=webGemStreak;
+  const xpEarned=Math.min(25,Math.round(finalStreak*1.5));
+  const e=awardGameXP(xpEarned);
+  const res=recordArcadeResult('webGem',{score:finalStreak});
+  updateWebGemReactionBest(webGemBestReactionThisRound);
+  recordArcadeMetric('webGem',Math.min(100,finalStreak/20*100));
+  const bestReaction=getWebGemBestReaction();
+  $('#reactionResult').innerHTML=`Streak ended at <strong>${finalStreak}</strong> · +${e} XP${res.isNewBest?' · New Best Streak! 🎉':''}<br><small>Best streak: ${res.best} · Best time: ${bestReaction!=null?bestReaction+' ms':'—'}</small>`;
+  webGemStreak=0;webGemDelay=WEBGEM_START_DELAY;webGemBestReactionThisRound=null;
+}
+// ---- Clutch Catch (Round 8 new game) ----
+// Several objects fall at once; one is the target (baseball), the rest are
+// decoys. Tap the target to score, tap a decoy or let the target fall
+// un-tapped and lose a life. Spawn rate and decoy ratio both increase over
+// the round. Plain absolutely-positioned DOM elements animated with CSS
+// transitions — no canvas/physics library, per Round 8's explicit scope.
+const CLUTCH_DECOYS=['🟠','⚽','🎾'];
+const CLUTCH_ROUND_MS=50000,CLUTCH_START_LIVES=3;
+let clutchActive=false,clutchLives=CLUTCH_START_LIVES,clutchScore=0,clutchStartTime=0,clutchSpawnTimer=null,clutchRoundTimer=null,clutchObjId=0;
+function resetClutchSession(){
+  clutchActive=false;
+  clearTimeout(clutchSpawnTimer);clearTimeout(clutchRoundTimer);
+  const arena=$('#clutchArena'); if(arena) arena.innerHTML='';
+  if($('#clutchLives')) $('#clutchLives').textContent='';
+}
+function clutchElapsedRatio(){return Math.min(1,(performance.now()-clutchStartTime)/CLUTCH_ROUND_MS)}
+function updateClutchHud(){
+  if(!$('#clutchLives')) return;
+  const lives=Math.max(0,clutchLives);
+  $('#clutchLives').textContent='❤️'.repeat(lives)+'🖤'.repeat(CLUTCH_START_LIVES-lives)+` · Score: ${clutchScore}`;
+}
+function flashClutchStage(cls){
+  const el=$('#clutchGame'); if(!el) return;
+  el.classList.add(cls);
+  setTimeout(()=>el.classList.remove(cls),300);
+}
+function scheduleClutchSpawn(){
+  if(!clutchActive) return;
+  const ratio=clutchElapsedRatio();
+  const interval=Math.max(450,1400-ratio*950);
+  clutchSpawnTimer=setTimeout(()=>{spawnClutchObject();scheduleClutchSpawn()},interval);
+}
+function spawnClutchObject(){
+  if(!clutchActive) return;
+  const arena=$('#clutchArena'); if(!arena) return;
+  const ratio=clutchElapsedRatio();
+  const decoyChance=Math.min(0.75,0.35+ratio*0.4);
+  const isTarget=Math.random()>decoyChance;
+  const el=document.createElement('button');
+  el.type='button';
+  el.className='clutch-object'+(isTarget?' target':' decoy');
+  el.textContent=isTarget?'⚾':CLUTCH_DECOYS[Math.floor(Math.random()*CLUTCH_DECOYS.length)];
+  el.dataset.id=++clutchObjId;
+  el.dataset.target=isTarget?'1':'0';
+  el.style.left=(6+Math.random()*82)+'%';
+  el.style.top='-12%';
+  arena.appendChild(el);
+  const fallMs=Math.max(1600,3000-ratio*1200);
+  requestAnimationFrame(()=>{
+    el.style.transition=`top ${fallMs}ms linear`;
+    el.style.top='108%';
+  });
+  const onExpire=()=>{
+    el.removeEventListener('transitionend',onExpire);
+    if(!el.isConnected) return;
+    if(el.dataset.target==='1'&&clutchActive){
+      clutchLives--;
+      flashClutchStage('clutch-miss-flash');
+      updateClutchHud();
+      if(clutchLives<=0){endClutchGame();return}
+    }
+    el.remove();
+  };
+  el.addEventListener('transitionend',onExpire);
+  el.onclick=()=>tapClutchObject(el);
+}
+function tapClutchObject(el){
+  if(!clutchActive||!el.isConnected) return;
+  const isTarget=el.dataset.target==='1';
+  el.remove();
+  if(isTarget){
+    clutchScore+=10;
+    flashClutchStage('clutch-hit-flash');
+    updateClutchHud();
+  }else{
+    clutchLives--;
+    flashClutchStage('clutch-miss-flash');
+    updateClutchHud();
+    if(clutchLives<=0){endClutchGame();return}
+  }
+}
+function startClutchGame(){
+  resetClutchSession();
+  clutchActive=true;
+  clutchLives=CLUTCH_START_LIVES;
+  clutchScore=0;
+  clutchStartTime=performance.now();
+  updateClutchHud();
+  $('#clutchResult').textContent='';
+  scheduleClutchSpawn();
+  clutchRoundTimer=setTimeout(()=>endClutchGame(),CLUTCH_ROUND_MS);
+}
+function endClutchGame(){
+  clutchActive=false;
+  clearTimeout(clutchSpawnTimer);clearTimeout(clutchRoundTimer);
+  const arena=$('#clutchArena'); if(arena) arena.innerHTML='';
+  const xpEarned=Math.min(25,Math.round(clutchScore/4));
+  const e=awardGameXP(xpEarned);
+  const res=recordArcadeResult('clutchCatch',{score:clutchScore});
+  recordArcadeMetric('clutchCatch',clutchScore/150*100);
+  $('#clutchResult').innerHTML=`Final score: <strong>${clutchScore}</strong> · +${e} XP${res.isNewBest?' · New Best! 🎉':''}`;
+}
 let strikeTarget=0,strikeRound=0,strikeScore=0;function startStrikeGame(){strikeRound=1;strikeScore=0;nextStrike()}function nextStrike(){strikeTarget=1+Math.floor(Math.random()*9);const names={1:'High & Inside',2:'High Center',3:'High & Away',4:'Middle Inside',5:'Middle',6:'Middle Away',7:'Low & Inside',8:'Low Center',9:'Low & Away'};$('#strikePrompt').textContent=`Round ${strikeRound}/5: ${names[strikeTarget]}`}function chooseStrike(z){if(!strikeRound)return;if(z===strikeTarget){strikeScore+=100;$('#strikeResult').textContent='Correct! +100'}else $('#strikeResult').textContent='Missed. Keep learning the zone.';strikeRound++;if(strikeRound>5){state.gameScores=state.gameScores||{};state.gameScores.strike=Math.max(state.gameScores.strike||0,strikeScore);const e=awardGameXP(10);$('#strikePrompt').textContent=`Final Score: ${strikeScore} · +${e} XP`;strikeRound=0;save()}else nextStrike()}
-let homerAnimation=null,homerStart=0,homerActive=false;function startHomerGame(){const ball=$('#timingBall');cancelAnimationFrame(homerAnimation);homerStart=performance.now();homerActive=true;function move(t){const pct=Math.min(100,((t-homerStart)/1800)*100);ball.style.left=pct+'%';if(pct<100&&homerActive)homerAnimation=requestAnimationFrame(move);else if(homerActive){$('#homerResult').textContent='Strike! Try again.';homerActive=false}}homerAnimation=requestAnimationFrame(move)}function swingHomer(){if(!homerActive)return;homerActive=false;cancelAnimationFrame(homerAnimation);const left=parseFloat($('#timingBall').style.left)||0;let score=0,msg='';if(left>=70&&left<=82){score=500;msg='HOME RUN!'}else if(left>=60&&left<=90){score=250;msg='Solid Contact!'}else{score=50;msg=left<60?'Early!':'Late!'}state.gameScores=state.gameScores||{};state.gameScores.homer=Math.max(state.gameScores.homer||0,score);const e=awardGameXP(score>=500?10:5);$('#homerResult').textContent=`${msg} ${score} points · +${e} XP`;save()}
+// ---- Home Run Hero (Round 8 glow-up of the old Home Run Timing) ----
+// Contact-quality tiers by distance from the hit-zone center (76%, matching
+// .hit-zone's left:70%/width:12%), instead of a flat hit/miss. Ball travel
+// time shortens each successful swing within a session (reset on Arcade
+// entry via resetHomerSession) for a starts-easy-gets-harder curve.
+const HOMER_START_SPEED=1800,HOMER_SPEED_FLOOR=900,HOMER_SPEED_STEP=70;
+let homerAnimation=null,homerStart=0,homerActive=false,homerPitchSpeed=HOMER_START_SPEED;
+function resetHomerSession(){homerPitchSpeed=HOMER_START_SPEED}
+function homerContactTier(left){
+  const dist=Math.abs(left-76);
+  if(dist<=3) return{tier:'perfect',label:'PERFECT!',points:125};
+  if(dist<=8) return{tier:'good',label:'Good contact!',points:75};
+  if(dist<=18) return{tier:left<76?'early':'late',label:left<76?'Too early':'Too late',points:40};
+  if(dist<=30) return{tier:left<76?'veryEarly':'veryLate',label:left<76?'Way too early':'Way too late',points:10};
+  return{tier:'miss',label:'Miss!',points:0};
+}
+const HOMER_XP_BY_TIER={perfect:12,good:8,early:5,late:5,veryEarly:2,veryLate:2,miss:0};
+function startHomerGame(){
+  const ball=$('#timingBall');
+  cancelAnimationFrame(homerAnimation);
+  homerStart=performance.now();
+  homerActive=true;
+  $('#homerResult').textContent='';
+  const speed=homerPitchSpeed;
+  function move(t){
+    const pct=Math.min(100,((t-homerStart)/speed)*100);
+    ball.style.left=pct+'%';
+    if(pct<100&&homerActive) homerAnimation=requestAnimationFrame(move);
+    else if(homerActive){$('#homerResult').textContent='Strike! Try again.';homerActive=false}
+  }
+  homerAnimation=requestAnimationFrame(move);
+}
+function flashHomerPerfect(){
+  const zone=$('.hit-zone'); if(!zone) return;
+  zone.classList.add('perfect-flash');
+  setTimeout(()=>zone.classList.remove('perfect-flash'),500);
+}
+function swingHomer(){
+  if(!homerActive) return;
+  homerActive=false;
+  cancelAnimationFrame(homerAnimation);
+  const left=parseFloat($('#timingBall').style.left)||0;
+  const result=homerContactTier(left);
+  const {isNewBest,prevBest}=recordArcadeResult('homeRunHero',{score:result.points});
+  const e=awardGameXP(HOMER_XP_BY_TIER[result.tier]||0);
+  if(result.points>0) homerPitchSpeed=Math.max(HOMER_SPEED_FLOOR,homerPitchSpeed-HOMER_SPEED_STEP);
+  recordArcadeMetric('homeRunHero',result.points/125*100);
+  if(result.tier==='perfect') flashHomerPerfect();
+  const delta=result.points-prevBest;
+  const deltaText=prevBest>0?(delta>=0?`+${delta} above your best`:`${Math.abs(delta)} below your best (${prevBest})`):(result.points>0?'First result logged!':'');
+  $('#homerResult').innerHTML=`<strong>${result.label}</strong> ${result.points} pts · +${e} XP${isNewBest?' · New Best! 🎉':''}${deltaText?`<br><small>${deltaText}</small>`:''}`;
+}
 function ensureArcadeDay(){
   const today=todayISO();
   if(!state.arcadeDaily||state.arcadeDaily.date!==today){
@@ -1614,6 +1874,7 @@ if($('#startStrike'))$('#startStrike').onclick=startStrikeGame;
 $$('#strikeZone button').forEach(b=>b.onclick=()=>chooseStrike(+b.dataset.zone));
 if($('#startHomer'))$('#startHomer').onclick=startHomerGame;
 if($('#swingButton'))$('#swingButton').onclick=swingHomer;
+if($('#startClutch'))$('#startClutch').onclick=startClutchGame;
 if($('#wheelInner'))$('#wheelInner').innerHTML=buildWheelSVG();
 if($('#spinButton'))$('#spinButton').onclick=spinWheel;
 if($('#photoUpload'))$('#photoUpload').onchange=e=>handlePhotoUpload(e.target.files[0]);

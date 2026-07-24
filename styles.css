@@ -769,11 +769,24 @@ footer{
 .arcade-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .game-stage{position:relative;height:240px;border:2px dashed rgba(255,255,255,.3);border-radius:16px;overflow:hidden;display:grid;place-items:center}
 .reaction-ball{position:absolute;width:64px;height:64px;border-radius:50%;padding:0;background:#fff;font-size:34px;box-shadow:0 6px 14px rgba(0,0,0,.35)}
+.game-stage.milestone-flash{animation:milestone-pulse .7s ease-out 1}
+@keyframes milestone-pulse{0%{box-shadow:inset 0 0 0 0 rgba(57,255,136,.6)}30%{box-shadow:inset 0 0 30px 6px rgba(57,255,136,.7)}100%{box-shadow:inset 0 0 0 0 rgba(57,255,136,0)}}
+.clutch-stage{display:flex;flex-direction:column;gap:8px;padding:10px}
+.clutch-arena{position:relative;width:100%;height:180px;border-radius:12px;background:rgba(255,255,255,.06);overflow:hidden}
+.clutch-object{position:absolute;width:44px;height:44px;border-radius:50%;padding:0;border:0;font-size:26px;line-height:44px;text-align:center;background:transparent;box-shadow:none;transform:translate(-50%,0)}
+.clutch-object.target{filter:drop-shadow(0 0 6px rgba(0,229,255,.8))}
+#clutchLives{font-size:14px;letter-spacing:.05em}
+.game-stage.clutch-hit-flash{animation:clutch-hit-pulse .3s ease-out 1}
+.game-stage.clutch-miss-flash{animation:clutch-miss-pulse .3s ease-out 1}
+@keyframes clutch-hit-pulse{0%{box-shadow:inset 0 0 0 0 rgba(0,229,255,.7)}40%{box-shadow:inset 0 0 24px 6px rgba(0,229,255,.7)}100%{box-shadow:inset 0 0 0 0 rgba(0,229,255,0)}}
+@keyframes clutch-miss-pulse{0%{box-shadow:inset 0 0 0 0 rgba(255,46,154,.7)}40%{box-shadow:inset 0 0 24px 6px rgba(255,46,154,.7)}100%{box-shadow:inset 0 0 0 0 rgba(255,46,154,0)}}
 .strike-zone{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:280px;margin:16px auto}
 .strike-zone button{aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,.08);color:#fff;border:2px solid rgba(255,255,255,.3)}
 .timing-track{position:relative;height:70px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden;margin:20px 0}
 #timingBall{position:absolute;left:0;top:13px;font-size:38px}
 .hit-zone{position:absolute;left:70%;width:12%;top:0;bottom:0;background:rgba(249,255,61,.35);border-left:3px solid var(--neon-yellow);border-right:3px solid var(--neon-yellow)}
+.hit-zone.perfect-flash{animation:perfect-pulse .5s ease-out 1}
+@keyframes perfect-pulse{0%{background:rgba(249,255,61,.35);box-shadow:0 0 0 0 rgba(0,229,255,.7)}30%{background:rgba(0,229,255,.55);box-shadow:0 0 24px 8px rgba(255,46,154,.6)}100%{background:rgba(249,255,61,.35);box-shadow:0 0 0 0 rgba(0,229,255,0)}}
 #arcade #arcadeLeaderboard .table th,#arcade #arcadeLeaderboard .table td{color:#fff;border-color:rgba(255,255,255,.14)}
 #arcade .muted{color:rgba(255,255,255,.65)}
 
