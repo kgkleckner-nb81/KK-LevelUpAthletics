@@ -262,10 +262,11 @@
 
 <section id="player" class="screen">
   <div class="card player-card">
-<div class="profile-photo-wrap"><img id="profilePhoto" class="profile-photo hidden" alt="Athlete profile"><div id="avatarFallback" class="avatar-fallback">E</div><label class="upload-button">Upload Photo<input id="photoUpload" type="file" accept="image/*"></label><button id="randomAvatar" type="button">Create Avatar</button></div>
+<div class="profile-photo-wrap"><img id="profilePhoto" class="profile-photo hidden" alt="Athlete profile"><div id="avatarFallback" class="avatar-fallback"><div id="avatarComposite" class="avatar-composite"></div></div><label class="upload-button">Upload Photo<input id="photoUpload" type="file" accept="image/*"></label></div>
     <div>
       <p class="eyebrow dark">Player Card</p>
       <h2 id="levelName" class="tier-name-graffiti">Rookie</h2>
+      <span id="equippedTitleBadge" class="equipped-title-badge hidden"></span>
       <p id="levelDesc">Start stacking workouts.</p>
     </div>
     <div class="rating-circle"><span id="overallBig">50</span><small>OVR</small></div>
@@ -376,6 +377,14 @@
     <h2>Reward Milestones</h2>
     <p class="muted">A milestone is available to claim whenever your current balance covers its cost — if your balance drops back down after spending, it locks again until you re-earn enough.</p>
     <div id="rewardVault" class="reward-grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>🧢 Gear Locker</h2>
+    <p class="muted">Spend your XP balance on cosmetic gear for your Player Card avatar — instant, no parent code needed. Equip anything you own for free, anytime, including switching back to Default.</p>
+    <div id="gearShop"></div>
+    <h3>Equip</h3>
+    <div id="gearEquip" class="gear-equip-grid"></div>
   </div>
 
   <div class="card">

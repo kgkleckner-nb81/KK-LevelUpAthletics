@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0},attributePoints:{}};
+const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0},attributePoints:{}};
 let state=load();
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -468,7 +468,7 @@ const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
 $('#pendingList').innerHTML=table(['Week','Program','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.programName||'—',a.status]));
-$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderCoachReport();renderAttributeBreakdown();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderAvatarComposite();renderCoachReport();renderAttributeBreakdown();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
 
 
 function xpEvents(){
@@ -484,7 +484,11 @@ function xpEvents(){
 // total — a milestone's "available/locked" state is purely a function of the
 // CURRENT balance vs its cost, so it can lock again after spending drops the
 // balance below it. Each claim requires parent-code approval.
-function totalXPSpent(){return (state.claimedRewards||[]).reduce((a,r)=>a+(+r.milestoneXP||0),0)}
+// Round 12: Gear Locker purchases spend from the same balance as reward
+// milestones but are tracked in a separate ledger (state.gearPurchases)
+// so claimedRewards / claimsCountBig stay real-world-reward-only.
+function totalGearXPSpent(){return (state.gearPurchases||[]).reduce((a,p)=>a+(+p.xpCost||0),0)}
+function totalXPSpent(){return (state.claimedRewards||[]).reduce((a,r)=>a+(+r.milestoneXP||0),0)+totalGearXPSpent()}
 function availableBalance(){return xp()-totalXPSpent()}
 function claimReward(xpCost,title){
   const balance=availableBalance();
@@ -533,6 +537,10 @@ function renderRewards(){
 document.addEventListener('click',e=>{
   const claimBtn=e.target.closest('.claim-reward-btn');
   if(claimBtn) claimReward(+claimBtn.dataset.xp,claimBtn.dataset.title);
+  const buyBtn=e.target.closest('.buy-gear-btn');
+  if(buyBtn) buyGearItem(buyBtn.dataset.item);
+  const equipBtn=e.target.closest('.gear-equip-btn');
+  if(equipBtn) equipGearItem(equipBtn.dataset.slot,equipBtn.dataset.item);
 });
 
 function renderQuests(){
@@ -1110,8 +1118,38 @@ function combineValueFor(entry,key){
   }
   return +entry[key]||0;
 }
-const avatarOptions=['⚾','🧢','🦸‍♂️','🐻','🦅','🔥','⭐','💪'];
-const lockerItems=['Blueprint Card Background','Gold Bat Grip','Fire Player Frame','Pinstripe Jersey','Stadium Lights Background','Lightning Eye Black','Captain Title','Diamond Card Border'];
+// Round 12: Player Card Gear Locker. lockerItems is a slotted cosmetic
+// catalog (frame/background/outfit/prop/faceAccent/title), sold via the
+// same availableBalance() pool as rewardMilestones but tracked separately
+// (see totalGearXPSpent()) — rewardMilestones stays real-world-only.
+// Every slot's free option is the sentinel id 'default' rather than a
+// catalog entry, since it's always owned/equippable regardless of slot.
+const gearSlotOrder=['frame','background','outfit','prop','faceAccent','title'];
+const gearSlotLabels={frame:'Frame',background:'Background',outfit:'Outfit',prop:'Prop',faceAccent:'Face Accent',title:'Title'};
+const lockerItems=[
+  {id:'blueprint-bg',name:'Blueprint Card Background',slot:'background',xpCost:75,tier:'Common'},
+  {id:'stadium-lights-bg',name:'Stadium Lights Background',slot:'background',xpCost:150,tier:'Uncommon'},
+  {id:'fire-frame',name:'Fire Player Frame',slot:'frame',xpCost:250,tier:'Rare'},
+  {id:'diamond-frame',name:'Diamond Card Border',slot:'frame',xpCost:400,tier:'Legendary'},
+  {id:'pinstripe-kit',name:'Pinstripe Kit',slot:'outfit',xpCost:75,tier:'Common'},
+  {id:'grip-tape',name:'Grip Tape',slot:'prop',xpCost:150,tier:'Uncommon'},
+  {id:'eye-black',name:'Lightning Eye Black',slot:'faceAccent',xpCost:75,tier:'Common'},
+  {id:'captain-title',name:'Captain Title',slot:'title',xpCost:250,tier:'Rare'}
+];
+function findGearItem(id){return lockerItems.find(i=>i.id===id)}
+const defaultEquipped={frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'};
+// Swappable-art-slot lookups, same pattern as tierBadges — missing files
+// fall back to a plain placeholder (see avatarLayerHTML/tierBadgeHTML).
+const avatarBaseArt='assets/avatar-base.png';
+const gearArt={
+  'blueprint-bg':'assets/gear-blueprint-bg.png',
+  'stadium-lights-bg':'assets/gear-stadium-lights-bg.png',
+  'fire-frame':'assets/gear-fire-frame.png',
+  'diamond-frame':'assets/gear-diamond-frame.png',
+  'pinstripe-kit':'assets/gear-pinstripe-kit.png',
+  'grip-tape':'assets/gear-grip-tape.png',
+  'eye-black':'assets/gear-eye-black.png'
+};
 
 const wheelSegments=[5,10,10,15,20,20,25,25,50,50,100,250,1000];
 // Slice size (and therefore landing odds — the wedge angle IS the probability)
@@ -1223,11 +1261,91 @@ function recordArcadeMetric(gameId,value){
   save();
 }
 function missionForToday(){const m=[{title:'Speed Day',tasks:['6 Sprints','40 Shuffle Touches','20 Skater Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Power Day',tasks:['35 Squats','12 Push-ups','10 Broad Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Core Day',tasks:['30 Sit Ups','45-Second Plank','20 Dead Bugs'],reward:'+40 XP + Mystery Pack'},{title:'Baseball IQ Day',tasks:['Strike Zone Challenge','Target Throws','Coach Helper'],reward:'+35 XP + Card Unlock'},{title:'Recovery Day',tasks:['Shoulder Mobility','Hip Mobility','Easy Stretching'],reward:'+25 XP + Rain Token Chance'}];return m[new Date().getDay()%m.length]}
-function unlockRandomItem(){state.inventory=state.inventory||[];const item=lockerItems[Math.floor(Math.random()*lockerItems.length)];if(!state.inventory.includes(item))state.inventory.push(item);return item}
-function completeDailyMission(){const m=missionForToday();state.bonuses=state.bonuses||[];if(state.bonuses.some(x=>x.type==='Daily Mission'&&x.date===todayISO())){alert('Today’s mission is already complete.');return}state.bonuses.push({date:todayISO(),type:'Daily Mission',xp:40,reason:m.title});unlockRandomItem();save();alert('Mission complete! +40 XP and a mystery item unlocked.');render()}
+// Round 12 item 9 — HARD RULE: one roll per mission, a mystery gear item OR
+// bonus XP, never both. Falls back to XP if every item is already owned (or
+// the roll simply lands on XP) so a completed mission never wastes a dupe.
+function rollDailyMissionReward(){
+  const owned=state.inventory||['default'];
+  const unowned=lockerItems.filter(i=>!owned.includes(i.id));
+  if(unowned.length&&Math.random()<0.5){
+    const item=unowned[Math.floor(Math.random()*unowned.length)];
+    state.inventory=state.inventory||['default'];
+    state.inventory.push(item.id);
+    return {type:'item',item};
+  }
+  return {type:'xp',xp:40};
+}
+function completeDailyMission(){
+  const m=missionForToday();
+  state.bonuses=state.bonuses||[];
+  if(state.bonuses.some(x=>x.type==='Daily Mission'&&x.date===todayISO())){alert('Today’s mission is already complete.');return}
+  const result=rollDailyMissionReward();
+  state.bonuses.push({date:todayISO(),type:'Daily Mission',xp:result.type==='xp'?result.xp:0,reason:m.title});
+  save();
+  alert(result.type==='xp'?`Mission complete! +${result.xp} XP.`:`Mission complete! You unlocked ${result.item.name} for your Gear Locker.`);
+  render();
+}
+// Round 12 items 4-5: instant, no-parent-code cosmetic purchase (unlike
+// claimReward()'s real-world flow) — buying is permanent, equipping is
+// always free including switching back to Default.
+function buyGearItem(itemId){
+  const item=findGearItem(itemId);
+  if(!item) return;
+  state.inventory=state.inventory||['default'];
+  if(state.inventory.includes(itemId)){alert(`${item.name} is already unlocked.`);return}
+  const balance=availableBalance();
+  if(balance<item.xpCost){alert(`Not enough balance to buy ${item.name}. You need ${item.xpCost} XP and have ${balance}.`);return}
+  state.inventory.push(itemId);
+  state.gearPurchases=state.gearPurchases||[];
+  state.gearPurchases.push({itemId,xpCost:item.xpCost,date:todayISO()});
+  save();
+  alert(`${item.name} unlocked! -${item.xpCost} XP.`);
+  render();
+}
+function equipGearItem(slot,itemId){
+  state.equipped=state.equipped||{...defaultEquipped};
+  if(itemId!=='default'){
+    const item=findGearItem(itemId);
+    if(!item||item.slot!==slot||!(state.inventory||[]).includes(itemId)) return;
+  }
+  state.equipped[slot]=itemId;
+  save();
+  render();
+}
 function useRainToken(){state.rainTokens=state.rainTokens??1;if(state.rainTokens<=0){alert('No Rain Delay Tokens available.');return}state.rainTokens-=1;state.bonuses=state.bonuses||[];state.bonuses.push({date:todayISO(),type:'Rain Delay Token',xp:0,reason:'Streak protected'});save();alert('Streak protected for one missed day.');renderTeamEdition()}
 function renderMission(){const m=missionForToday();if($('#missionTitle'))$('#missionTitle').textContent=m.title;if($('#missionTasks'))$('#missionTasks').innerHTML='<ul>'+m.tasks.map(t=>`<li>☐ ${t}</li>`).join('')+'</ul>';if($('#missionReward'))$('#missionReward').textContent=m.reward;if($('#streakLarge'))$('#streakLarge').textContent=streak();if($('#rainTokens'))$('#rainTokens').textContent=state.rainTokens??1}
-function renderLocker(){if(!$('#lockerInventory'))return;const inv=state.inventory||[];$('#lockerInventory').innerHTML=lockerItems.map(i=>`<div class="locker-item ${inv.includes(i)?'unlocked':''}"><div class="locker-icon">${inv.includes(i)?'🔓':'🔒'}</div><strong>${i}</strong></div>`).join('')}
+// Round 12 items 4-5: shop grouped by slot (buy) + equip controls grouped
+// by slot (always free, always includes Default). Replaces the old dead
+// renderLocker(), which targeted a #lockerInventory element that never
+// existed anywhere in index.html.
+function renderGearLocker(){
+  const inv=state.inventory||['default'];
+  const equipped=state.equipped||defaultEquipped;
+  const balance=availableBalance();
+  if($('#gearShop')){
+    $('#gearShop').innerHTML=gearSlotOrder.map(slot=>{
+      const items=lockerItems.filter(i=>i.slot===slot);
+      if(!items.length) return '';
+      return `<div class="gear-slot-group"><h4>${gearSlotLabels[slot]}</h4><div class="reward-grid">${items.map(item=>{
+        const owned=inv.includes(item.id);
+        const afford=balance>=item.xpCost;
+        return `<div class="reward-tile ${owned?'unlocked':''}">
+          <span class="reward-tier-badge tier-${item.tier.toLowerCase()}">${item.tier}</span>
+          <h3>${item.name}</h3>
+          <p><strong>${item.xpCost} XP</strong></p>
+          ${owned?'<strong>Owned</strong>':`<button type="button" class="primary buy-gear-btn" data-item="${item.id}" ${afford?'':'disabled'}>${afford?'Buy':'Not enough XP'}</button>`}
+        </div>`;
+      }).join('')}</div></div>`;
+    }).join('');
+  }
+  if($('#gearEquip')){
+    $('#gearEquip').innerHTML=gearSlotOrder.map(slot=>{
+      const ownedInSlot=lockerItems.filter(i=>i.slot===slot&&inv.includes(i.id));
+      const options=[{id:'default',name:slot==='title'?'No Title':'Default'},...ownedInSlot];
+      return `<div class="gear-equip-row"><span>${gearSlotLabels[slot]}</span><div class="gear-equip-options">${options.map(o=>`<button type="button" class="gear-equip-btn ${equipped[slot]===o.id?'active':''}" data-slot="${slot}" data-item="${o.id}">${o.name}</button>`).join('')}</div></div>`;
+    }).join('');
+  }
+}
 function renderLeaderboard(){if(!$('#teamLeaderboard'))return;const metric=$('#leaderboardMetric')?.value||'xp';const sorted=[...demoAthletes].sort((a,b)=>b[metric]-a[metric]);$('#teamLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>${metric}</th></tr></thead><tbody>${sorted.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a[metric]}</td></tr>`).join('')}</tbody></table>`}
 function renderTeamFeed(){if(!$('#teamFeed'))return;$('#teamFeed').innerHTML=['🏆 Ethan reached Single A','👏 Jack completed today’s mission','🔥 Mason extended a 7-day streak','⭐ Coach awarded Luke Great Hustle','⚾ Noah set a new sit-up PR'].map(x=>`<div class="feed-item">${x}</div>`).join('')}
 // Positive Reactions and Coach/Parent Shout-Outs are one unified feed —
@@ -1647,7 +1765,7 @@ function renderTeamProgramLogFields(){
   }).join('');
 }
 function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>Score</th></tr></thead><tbody>${[...demoAthletes].sort((a,b)=>b.arcade-a.arcade).map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.arcade}</td></tr>`).join('')}</tbody></table>`}
-function renderTeamEdition(){renderMission();renderLocker();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=getWebGemBestReaction()??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#clutchBest'))$('#clutchBest').textContent=getArcadeBest('clutchCatch');renderArcadeExtras()}
+function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=getWebGemBestReaction()??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#clutchBest'))$('#clutchBest').textContent=getArcadeBest('clutchCatch');renderArcadeExtras()}
 // ---- Web Gem (Round 8 glow-up of the old Reaction Catch) ----
 // Streak/combo model: a catch immediately queues the next ball at a
 // shorter delay and slightly smaller size; a miss or too-slow tap ends the
@@ -1992,7 +2110,36 @@ document.addEventListener('click',e=>{
   if(choiceBtn && !choiceBtn.disabled) answerTrivia(+choiceBtn.dataset.choice);
 });
 
-function handlePhotoUpload(file){if(!file)return;const r=new FileReader();r.onload=()=>{localStorage.setItem('ethansBaseballHQ.profilePhoto',r.result);renderProfilePhoto()};r.readAsDataURL(file)}function renderProfilePhoto(){if(!$('#profilePhoto'))return;const saved=localStorage.getItem('ethansBaseballHQ.profilePhoto');if(saved){$('#profilePhoto').src=saved;$('#profilePhoto').classList.remove('hidden');$('#avatarFallback').classList.add('hidden')}else{$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden')}}function randomAvatar(){const icon=avatarOptions[Math.floor(Math.random()*avatarOptions.length)];$('#avatarFallback').textContent=icon;$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden');localStorage.removeItem('ethansBaseballHQ.profilePhoto')}
+function handlePhotoUpload(file){if(!file)return;const r=new FileReader();r.onload=()=>{localStorage.setItem('ethansBaseballHQ.profilePhoto',r.result);renderProfilePhoto()};r.readAsDataURL(file)}function renderProfilePhoto(){if(!$('#profilePhoto'))return;const saved=localStorage.getItem('ethansBaseballHQ.profilePhoto');if(saved){$('#profilePhoto').src=saved;$('#profilePhoto').classList.remove('hidden');$('#avatarFallback').classList.add('hidden')}else{$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden')}}
+// Round 12 item 6: replaces the old randomAvatar()/avatarOptions emoji
+// picker — the avatar is now a direct read of state.equipped, changed only
+// via the Gear Locker's Equip controls, not a randomize button here.
+function avatarLayerHTML(slot){
+  const itemId=(state.equipped&&state.equipped[slot])||'default';
+  if(itemId==='default') return '';
+  const item=findGearItem(itemId);
+  if(!item) return '';
+  const src=gearArt[itemId];
+  return `<div class="avatar-layer avatar-layer-${slot}"><img src="${src}" alt="${item.name}" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')"><div class="avatar-layer-fallback">${item.name}</div></div>`;
+}
+function renderAvatarComposite(){
+  const composite=$('#avatarComposite');
+  if(composite){
+    composite.innerHTML=
+      avatarLayerHTML('background')+
+      `<div class="avatar-layer avatar-layer-figure"><img src="${avatarBaseArt}" alt="Athlete avatar" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')"><div class="avatar-layer-fallback avatar-figure-fallback"><svg class="nav-icon"><use href="#i-athlete"/></svg></div></div>`+
+      avatarLayerHTML('outfit')+
+      avatarLayerHTML('prop')+
+      avatarLayerHTML('faceAccent')+
+      avatarLayerHTML('frame');
+  }
+  if($('#equippedTitleBadge')){
+    const titleId=(state.equipped&&state.equipped.title)||'default';
+    const item=titleId!=='default'?findGearItem(titleId):null;
+    $('#equippedTitleBadge').textContent=item?item.name:'';
+    $('#equippedTitleBadge').classList.toggle('hidden',!item);
+  }
+}
 
 seedPresetPrograms();
 renderLadder();renderHeroLadderPreview();
@@ -2022,7 +2169,6 @@ if($('#startClutch'))$('#startClutch').onclick=startClutchGame;
 if($('#wheelInner'))$('#wheelInner').innerHTML=buildWheelSVG();
 if($('#spinButton'))$('#spinButton').onclick=spinWheel;
 if($('#photoUpload'))$('#photoUpload').onchange=e=>handlePhotoUpload(e.target.files[0]);
-if($('#randomAvatar'))$('#randomAvatar').onclick=randomAvatar;
 renderDailyProgramPicker();
 renderDailyCustomFields();
 renderCombineProgramPicker();
