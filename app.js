@@ -63,7 +63,11 @@ function modeForScreen(id){
   return 'home';
 }
 function showModeNav(mode){
-  $$('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  $$('.mode-btn').forEach(b=>{
+    const isActive=b.dataset.mode===mode;
+    b.classList.toggle('active',isActive);
+    b.querySelector('.icon-badge')?.classList.toggle('is-active',isActive);
+  });
   ['athlete','team','arcade','parent'].forEach(m=>{
     const el=$('#'+m+'Subnav'); if(el) el.classList.toggle('hidden',m!==mode);
   });
@@ -71,7 +75,11 @@ function showModeNav(mode){
 function switchScreen(id){
   const mode=modeForScreen(id);
   showModeNav(mode);
-  $$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.screen===id));
+  $$('.tab').forEach(b=>{
+    const isActive=b.dataset.screen===id;
+    b.classList.toggle('active',isActive);
+    b.querySelector('.icon-badge')?.classList.toggle('is-active',isActive);
+  });
   $$('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
   window.scrollTo({top:0,behavior:'smooth'});
   render();
@@ -1498,8 +1506,8 @@ function teamLogoHTML(sizeClass){
   if(state.team&&state.team.logo){
     return `<img src="${state.team.logo}" alt="${state.team.name||'Team'} logo" class="team-logo ${sizeClass||''}">`;
   }
-  const initial=state.team&&state.team.name?state.team.name.trim().charAt(0).toUpperCase():'⚾';
-  return `<div class="team-logo-fallback ${sizeClass||''}">${initial}</div>`;
+  const inner=state.team&&state.team.name?state.team.name.trim().charAt(0).toUpperCase():'<svg class="nav-icon" style="width:1em;height:1em"><use href="#i-team"/></svg>';
+  return `<div class="team-logo-fallback ${sizeClass||''}">${inner}</div>`;
 }
 function renderTeamIdentity(){
   const heroName=$('#teamHeroName'); if(heroName) heroName.textContent=(state.team&&state.team.name)||'Your Team';

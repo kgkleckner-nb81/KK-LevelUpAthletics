@@ -889,7 +889,7 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .status-item strong{font-family:var(--accent);font-size:16px;color:#fff}
 .pack-status strong{color:var(--neon-yellow)}
 .mode-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;background:var(--ink);position:sticky;top:55px;z-index:25;border-bottom:4px solid var(--neon-blue)}
-.mode-btn{border-radius:0!important;border:0!important;padding:15px 10px!important;background:var(--ink)!important;color:#bbb!important;box-shadow:none!important;border-right:1px solid rgba(255,255,255,.10)!important}
+.mode-btn{border-radius:0!important;border:0!important;padding:15px 10px!important;background:var(--ink)!important;color:#bbb!important;box-shadow:none!important;border-right:1px solid rgba(255,255,255,.10)!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 .mode-btn.active{background:linear-gradient(135deg,var(--neon-pink),var(--creamsicle))!important;color:var(--ink)!important}
 .parent-mode{font-size:11px}
 .subnav{display:flex;gap:8px;overflow-x:auto;padding:12px 18px;background:var(--paper);position:sticky;top:107px;z-index:20;border-bottom:1px solid var(--line)}
@@ -921,3 +921,36 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .home-pulse span{display:block;font-size:10px;color:#aaa;letter-spacing:.1em;text-transform:uppercase}
 .home-pulse strong{display:block;margin-top:5px;font-family:var(--accent);font-size:18px;color:var(--neon-yellow)}
 @media(max-width:900px){.status-bar{gap:6px;padding:7px 8px}.status-item{min-width:40px;padding:3px}.status-athlete{display:none}.mode-nav{top:47px;grid-template-columns:repeat(4,1fr)}.parent-mode{display:none}.subnav{top:96px}.path-grid{grid-template-columns:1fr}.path-card{min-height:350px}.home-pulse{grid-template-columns:1fr 1fr}.path-card h3{font-size:38px}}
+
+/* Round 10: SVG icon system — badges are self-contained chips (own bg/
+   border/shadow), so they read cleanly regardless of what sits behind
+   them. Two variants share every existing :root token, no new hex. */
+.nav-icon{width:1em;height:1em;display:inline-block;vertical-align:-0.15em}
+.icon-badge{
+  display:grid;
+  place-items:center;
+  border-radius:14px;
+  border:2px solid var(--ink);
+  box-shadow:var(--shadow-sm);
+  flex-shrink:0;
+}
+/* Dark badge: true black chrome only (status bar, mode nav, Arcade, footer, League drops) */
+.icon-badge.on-dark{background:var(--ink);color:var(--neon-blue)}
+.icon-badge.on-dark.is-active{color:var(--ink)} /* mode-btn.active already sits on a pink/creamsicle gradient — ink reads better there than blue */
+.icon-badge.on-dark.is-unlocked{color:var(--neon-green)}
+/* Light badge: default, everything on a cream/paper card */
+.icon-badge.on-light{background:var(--cream);color:var(--ink)}
+.icon-badge.on-light.is-active{color:var(--deep-blue);border-color:var(--deep-blue)}
+.icon-badge.on-light.is-unlocked{color:var(--success);border-color:var(--neon-green)}
+
+.path-icon .icon-badge{width:76px;height:76px;border-radius:20px}
+.path-icon .nav-icon{width:42px;height:42px}
+.mode-btn .icon-badge{width:26px;height:26px;margin:0 auto 4px}
+.mode-btn .nav-icon{width:16px;height:16px}
+.subnav .tab .icon-badge{width:22px;height:22px}
+.subnav .tab .nav-icon{width:14px;height:14px}
+.tab-icon-inline{width:26px;height:26px;margin-right:2px}
+.tab-icon-inline .nav-icon{width:16px;height:16px}
+@media(max-width:900px){.mode-btn .icon-badge{width:22px;height:22px}.mode-btn .nav-icon{width:13px;height:13px}.subnav .tab .icon-badge{width:19px;height:19px}.subnav .tab .nav-icon{width:12px;height:12px}}
+.subnav .tab{display:inline-flex;align-items:center;gap:7px}
+.path-icon{display:flex;align-items:center;justify-content:center;align-self:center;margin:30px auto}

@@ -7,6 +7,104 @@
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-athlete" viewBox="0 0 64 64">
+  <path d="M32 4 L54 12 V30 C54 46 44 55 32 59 C20 55 10 46 10 30 V12 Z" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <circle cx="32" cy="26" r="7" fill="currentColor"/>
+  <path d="M17,35 L47,35 C46,50 40,57 32,59 C24,57 18,50 17,35 Z" fill="currentColor"/>
+</symbol>
+<symbol id="i-team" viewBox="0 0 64 64">
+  <polygon points="44,26 38,36.4 26,36.4 20,26 26,15.6 38,15.6" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <polygon points="26,36.4 20,46.8 8,46.8 2,36.4 8,26 20,26" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <polygon points="62,36.4 56,46.8 44,46.8 38,36.4 44,26 56,26" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <circle cx="32" cy="22" r="3.3" fill="currentColor"/>
+  <ellipse cx="32" cy="31" rx="6" ry="5" fill="currentColor"/>
+  <circle cx="14" cy="32.5" r="3" fill="currentColor"/>
+  <ellipse cx="14" cy="41" rx="5.5" ry="4.5" fill="currentColor"/>
+  <circle cx="50" cy="32.5" r="3" fill="currentColor"/>
+  <ellipse cx="50" cy="41" rx="5.5" ry="4.5" fill="currentColor"/>
+</symbol>
+<symbol id="i-arcade" viewBox="0 0 64 64">
+  <polygon points="20,6 44,6 58,20 58,44 44,58 20,58 6,44 6,20" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <circle cx="30" cy="19" r="8" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <line x1="30" y1="27" x2="30" y2="40" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <ellipse cx="30" cy="40" rx="7" ry="3.5" fill="none" stroke="currentColor" stroke-width="3"/>
+  <path d="M30,40 L46,49 L30,56 L14,49 Z" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/>
+  <line x1="20" y1="52" x2="40" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".8"/>
+  <rect x="40" y="11" width="4" height="4" fill="currentColor"/>
+  <rect x="46" y="16" width="5" height="5" fill="currentColor"/>
+  <rect x="41" y="22" width="3.5" height="3.5" fill="currentColor"/>
+  <rect x="48" y="26" width="4.5" height="4.5" fill="currentColor"/>
+</symbol>
+<symbol id="i-clubhouse" viewBox="0 0 64 64">
+  <path d="M10,28 L32,10 L54,28" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="14" y="28" width="36" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <line x1="46" y1="10" x2="46" y2="24" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+  <polygon points="46,10 58,14 46,18" fill="currentColor"/>
+  <rect x="27" y="38" width="10" height="16" fill="currentColor"/>
+</symbol>
+<symbol id="i-daily-check-in" viewBox="0 0 64 64">
+  <rect x="10" y="14" width="44" height="42" rx="6" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <line x1="10" y1="26" x2="54" y2="26" stroke="currentColor" stroke-width="3.5"/>
+  <line x1="20" y1="6" x2="20" y2="18" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <line x1="44" y1="6" x2="44" y2="18" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <path d="M19,39 L28,48 L47,29" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</symbol>
+<symbol id="i-weekly-combine" viewBox="0 0 64 64">
+  <circle cx="32" cy="36" r="22" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <rect x="27" y="4" width="10" height="8" rx="2" fill="currentColor"/>
+  <line x1="48" y1="12" x2="52" y2="16" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M35,22 L23,38 H31 L27,52 L43,32 H35 Z" fill="currentColor"/>
+</symbol>
+<symbol id="i-player-card" viewBox="0 0 64 64">
+  <rect x="8" y="4" width="48" height="56" rx="6" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <path d="M37,9 V20 H43" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M45,9 V17 Q45,20 48.5,20 Q52,20 52,17 V9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="23" cy="27" r="7.5" fill="currentColor"/>
+  <path d="M12,44 Q23,32 34,44" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <rect x="13" y="46" width="28" height="3" rx="1.5" fill="currentColor"/>
+  <rect x="13" y="51" width="18" height="3" rx="1.5" fill="currentColor"/>
+  <rect x="13" y="56" width="24" height="3" rx="1.5" fill="currentColor"/>
+</symbol>
+<symbol id="i-skill-lab" viewBox="0 0 64 64">
+  <path d="M26,6 H38 V22 L48,50 Q50,56 44,56 H20 Q14,56 16,50 L26,22 Z" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M20,42 Q32,36 44,42 L46,48 Q47,52 44,52 H20 Q17,52 18,48 Z" fill="currentColor" opacity=".9"/>
+  <line x1="22" y1="6" x2="42" y2="6" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <path d="M40,14 L33,26 H38 L32,38" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+</symbol>
+<symbol id="i-quests" viewBox="0 0 64 64">
+  <path d="M32 4 L54 12 V30 C54 46 44 55 32 59 C20 55 10 46 10 30 V12 Z" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <path d="M32,17 L35.5,25 L44,26 L37.5,32 L39.5,41 L32,36 L24.5,41 L26.5,32 L20,26 L28.5,25 Z" fill="currentColor"/>
+  <path d="M18,46 L32,52 L46,46" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</symbol>
+<symbol id="i-rewards" viewBox="0 0 64 64">
+  <path d="M9,30 Q9,12 32,12 Q55,12 55,30 Z" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/>
+  <rect x="9" y="30" width="46" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <line x1="9" y1="30" x2="55" y2="30" stroke="currentColor" stroke-width="3.5"/>
+  <line x1="21" y1="13" x2="21" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".85"/>
+  <line x1="43" y1="13" x2="43" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".85"/>
+  <rect x="26" y="26" width="12" height="13" rx="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-leaderboards" viewBox="0 0 64 64">
+  <line x1="6" y1="58" x2="58" y2="58" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <rect x="8" y="42" width="13" height="16" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <rect x="25" y="28" width="13" height="30" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <rect x="42" y="46" width="13" height="12" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <path d="M31.5,6 L34.5,13 L42,14 L36.5,19 L38,26.5 L31.5,22.5 L25,26.5 L26.5,19 L21,14 L28.5,13 Z" fill="currentColor"/>
+</symbol>
+<symbol id="i-battles" viewBox="0 0 64 64">
+  <polygon points="20,6 44,6 58,20 58,44 44,58 20,58 6,44 6,20" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <path d="M37,8 L21,34 H31 L25,56 L45,28 H35 Z" fill="currentColor"/>
+</symbol>
+<symbol id="i-stats-charts" viewBox="0 0 64 64">
+  <path d="M32 4 L54 12 V30 C54 46 44 55 32 59 C20 55 10 46 10 30 V12 Z" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <rect x="18" y="38" width="8" height="10" fill="currentColor"/>
+  <rect x="28" y="30" width="8" height="18" fill="currentColor"/>
+  <rect x="38" y="20" width="8" height="28" fill="currentColor"/>
+</symbol>
+</defs>
+</svg>
 <header class="hero">
   <div class="hero-copy">
     <h1>Train. Level Up. Get Called Up.</h1>
@@ -28,26 +126,26 @@
 
 <nav class="mode-nav">
   <button class="mode-btn active" data-mode="home" type="button">Home</button>
-  <button class="mode-btn" data-mode="athlete" type="button">Athlete</button>
-  <button class="mode-btn" data-mode="team" type="button">Team HQ</button>
-  <button class="mode-btn" data-mode="arcade" type="button">Arcade</button>
+  <button class="mode-btn" data-mode="athlete" type="button"><span class="icon-badge on-dark"><svg class="nav-icon"><use href="#i-athlete"/></svg></span>Athlete</button>
+  <button class="mode-btn" data-mode="team" type="button"><span class="icon-badge on-dark"><svg class="nav-icon"><use href="#i-team"/></svg></span>Team HQ</button>
+  <button class="mode-btn" data-mode="arcade" type="button"><span class="icon-badge on-dark"><svg class="nav-icon"><use href="#i-arcade"/></svg></span>Arcade</button>
   <button class="mode-btn parent-mode" data-mode="parent" type="button">Coach/Parent Corner</button>
 </nav>
 
 <nav class="subnav hidden" id="athleteSubnav">
-  <button class="tab" data-screen="clubhouse">Clubhouse</button>
-  <button class="tab" data-screen="library">Skill Lab</button>
-  <button class="tab" data-screen="daily">Daily Check-In</button>
-  <button class="tab" data-screen="combine">Combine Testing</button>
-  <button class="tab" data-screen="player">Player Card</button>
-  <button class="tab" data-screen="quests">Quests & Battles</button>
-  <button class="tab" data-screen="charts">Progress</button>
-  <button class="tab" data-screen="rewards">Reward Locker</button>
+  <button class="tab" data-screen="clubhouse"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-clubhouse"/></svg></span>Clubhouse</button>
+  <button class="tab" data-screen="library"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-skill-lab"/></svg></span>Skill Lab</button>
+  <button class="tab" data-screen="daily"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-daily-check-in"/></svg></span>Daily Check-In</button>
+  <button class="tab" data-screen="combine"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-weekly-combine"/></svg></span>Combine Testing</button>
+  <button class="tab" data-screen="player"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-player-card"/></svg></span>Player Card</button>
+  <button class="tab" data-screen="quests"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-quests"/></svg></span>Quests & Battles</button>
+  <button class="tab" data-screen="charts"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-stats-charts"/></svg></span>Progress</button>
+  <button class="tab" data-screen="rewards"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-rewards"/></svg></span>Reward Locker</button>
 </nav>
 
 <nav class="subnav hidden" id="teamSubnav">
-  <button class="tab" data-screen="team">Team Dashboard</button>
-  <button class="tab" data-screen="league">League HQ</button>
+  <button class="tab" data-screen="team"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-team"/></svg></span>Team Dashboard</button>
+  <button class="tab" data-screen="league"><span class="icon-badge on-light"><svg class="nav-icon"><use href="#i-leaderboards"/></svg></span>League HQ</button>
 </nav>
 
 <nav class="subnav hidden" id="arcadeSubnav">
@@ -67,7 +165,7 @@
   </div>
   <div class="path-grid">
     <button class="path-card athlete-path" data-path="athlete" type="button">
-      <div class="path-icon">⚾</div>
+      <div class="path-icon"><span class="icon-badge on-dark"><svg class="nav-icon"><use href="#i-athlete"/></svg></span></div>
       <h3>ATHLETE</h3><p>Log the Grind</p>
       <ul><li>Daily missions</li><li>Player card</li><li>Skill Lab</li><li>Quests + rewards</li></ul>
       <span>ENTER ATHLETE →</span>
@@ -79,7 +177,7 @@
       <span>ENTER TEAM HQ →</span>
     </button>
     <button class="path-card arcade-path" data-path="arcade" type="button">
-      <div class="path-icon">🎮</div>
+      <div class="path-icon"><span class="icon-badge on-dark"><svg class="nav-icon"><use href="#i-arcade"/></svg></span></div>
       <h3>ARCADE</h3><p>Play. Flex. Unlock.</p>
       <ul><li>Reaction Catch</li><li>Strike Zone</li><li>Home Run Timing</li><li>Cosmetic rewards</li></ul>
       <span>ENTER ARCADE →</span>
@@ -200,7 +298,7 @@
 
 <section id="quests" class="screen">
   <div class="card">
-    <h2>Quests & Boss Battles</h2>
+    <h2>Quests & Boss Battles <span class="icon-badge on-light tab-icon-inline"><svg class="nav-icon"><use href="#i-battles"/></svg></span></h2>
     <p class="muted">Optional challenges can be completed anytime for bonus XP. Parent code is required to award the points.</p>
     <div id="questList" class="quest-grid"></div>
   </div>
