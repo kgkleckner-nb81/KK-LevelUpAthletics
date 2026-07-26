@@ -657,6 +657,11 @@ footer{
   box-shadow:none;
 }
 
+/* Round 11: the Rookie badge art has more transparent margin around its
+   circular artwork than the shield-shaped badges have around theirs, so
+   object-fit:cover alone leaves a thin edge — nudge it in slightly. */
+#tier0 .logo-frame img{transform:scale(1.12)}
+
 .tier.cardtier .tier-badge-fallback{
   width:100%;
   height:100%;
@@ -750,6 +755,7 @@ footer{
 .team-logo-fallback{display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;color:var(--ink);background:linear-gradient(135deg,var(--peach),var(--creamsicle));border:3px solid var(--ink);border-radius:14px}
 .team-logo-hero{width:120px;height:120px;font-size:44px}
 .team-logo-path{width:130px;height:130px;object-fit:contain;align-self:center;margin:25px auto;font-size:48px}
+#pathCardTeamLogo{align-self:center;display:flex;justify-content:center;width:100%}
 .feed-item,.shoutout{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center}
 .reaction-row{display:flex;gap:10px;flex-wrap:wrap}
 .reaction-btn{background:var(--ink);color:#fff}
