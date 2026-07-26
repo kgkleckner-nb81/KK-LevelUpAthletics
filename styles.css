@@ -936,21 +936,22 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 }
 /* Dark badge: true black chrome only (status bar, mode nav, Arcade, footer, League drops) */
 .icon-badge.on-dark{background:var(--ink);color:var(--neon-blue)}
-.icon-badge.on-dark.is-active{color:var(--ink)} /* mode-btn.active already sits on a pink/creamsicle gradient — ink reads better there than blue */
+.icon-badge.on-dark.is-active{background:var(--cream);color:var(--ink)} /* on-dark's badge bg is always ink — flip to a light chip on active, otherwise an ink-colored icon on an ink badge is invisible */
 .icon-badge.on-dark.is-unlocked{color:var(--neon-green)}
 /* Light badge: default, everything on a cream/paper card */
 .icon-badge.on-light{background:var(--cream);color:var(--ink)}
 .icon-badge.on-light.is-active{color:var(--deep-blue);border-color:var(--deep-blue)}
 .icon-badge.on-light.is-unlocked{color:var(--success);border-color:var(--neon-green)}
 
-.path-icon .icon-badge{width:76px;height:76px;border-radius:20px}
-.path-icon .nav-icon{width:42px;height:42px}
-.mode-btn .icon-badge{width:26px;height:26px;margin:0 auto 4px}
-.mode-btn .nav-icon{width:16px;height:16px}
-.subnav .tab .icon-badge{width:22px;height:22px}
-.subnav .tab .nav-icon{width:14px;height:14px}
-.tab-icon-inline{width:26px;height:26px;margin-right:2px}
-.tab-icon-inline .nav-icon{width:16px;height:16px}
-@media(max-width:900px){.mode-btn .icon-badge{width:22px;height:22px}.mode-btn .nav-icon{width:13px;height:13px}.subnav .tab .icon-badge{width:19px;height:19px}.subnav .tab .nav-icon{width:12px;height:12px}}
-.subnav .tab{display:inline-flex;align-items:center;gap:7px}
+.path-icon .icon-badge{width:152px;height:152px;border-radius:28px}
+.path-icon .nav-icon{width:84px;height:84px}
+.mode-btn .icon-badge{width:52px;height:52px;margin:0 auto 4px}
+.mode-btn .nav-icon{width:32px;height:32px}
+.mode-btn{font-size:12px}
+.subnav .tab .icon-badge{width:44px;height:44px}
+.subnav .tab .nav-icon{width:28px;height:28px}
+.tab-icon-inline{width:52px;height:52px;margin-right:2px}
+.tab-icon-inline .nav-icon{width:32px;height:32px}
+@media(max-width:900px){.mode-btn .icon-badge{width:44px;height:44px}.mode-btn .nav-icon{width:26px;height:26px}.subnav .tab .icon-badge{width:38px;height:38px}.subnav .tab .nav-icon{width:24px;height:24px}}
+.subnav .tab{display:inline-flex;align-items:center;gap:7px;font-size:12px}
 .path-icon{display:flex;align-items:center;justify-content:center;align-self:center;margin:30px auto}
