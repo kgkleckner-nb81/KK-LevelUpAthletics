@@ -52,7 +52,11 @@ const tiers=[{name:'Rookie',min:0},{name:'Grinder',min:55},{name:'Baller',min:65
 // slot lookup, not placeholder art. Missing files fall back to a plain
 // colored badge (see tierBadgeHTML) with zero code changes once files land.
 const tierBadges={Rookie:'assets/tier-rookie.png',Grinder:'assets/tier-grinder.png',Baller:'assets/tier-baller.png','All-Star':'assets/tier-allstar.png',Elite:'assets/tier-elite.png',Legend:'assets/tier-legend.png'};
-const benches={pushups:[5,10,15,20,30],squats:[15,25,40,60,80],plank:[20,30,45,60,90],shuffleTouches:[20,30,40,50,60],skaterJumps:[10,20,30,40,50],broadJumpIn:[40,50,60,70,80],sprintSec:[4.5,4.2,4.0,3.8,3.6]};
+// Round 13 item 13: Body Control's benchmark is new — Single-Leg Balance
+// hold, seconds, same duration-metric shape as Plank. Starting tiers only
+// (no prior benchmark data existed for this axis) — flagged for re-tuning
+// with real data alongside the promotion-gate thresholds (see item 15).
+const benches={pushups:[5,10,15,20,30],squats:[15,25,40,60,80],plank:[20,30,45,60,90],shuffleTouches:[20,30,40,50,60],skaterJumps:[10,20,30,40,50],broadJumpIn:[40,50,60,70,80],sprintSec:[4.5,4.2,4.0,3.8,3.6],singleLegBalanceSec:[15,25,40,60,90]};
 
 $$('.tab').forEach(b=>b.onclick=()=>switchScreen(b.dataset.screen));
 function modeForScreen(id){
@@ -159,6 +163,18 @@ $('#combineForm').onsubmit=e=>{
     const value=collectMetricValue(`combineProgram_${a.id}_${a.metric.key}`,d,a);
     if(value!=null) d.customCombine.push({name:a.name,values:{[a.metric.key]:value}});
   });
+  // Round 13 item 10 — coach grade fields are gated the same way the test
+  // result itself is: only stored on a verified (parent-code-correct) save.
+  const coachGrades={};
+  performanceAxisOrder.forEach(ax=>{
+    const raw=d['grade_'+ax];
+    delete d['grade_'+ax];
+    if(ok&&raw!=null&&raw!==''){
+      const n=+raw;
+      if(n>=1&&n<=10) coachGrades[ax]=n;
+    }
+  });
+  if(Object.keys(coachGrades).length) d.coachGrades=coachGrades;
   state.combine.push(d);
   state.combine.sort((a,b)=>(+a.week||0)-(+b.week||0));
   // Item 9: promotion is only re-evaluated when a VERIFIED Combine is saved
@@ -244,7 +260,8 @@ function pr(){
     shuffleTouches:bestActivityValue('Lateral Shuffle'),
     skaterJumps:bestActivityValue('Skater Jumps'),
     broadJumpIn:bestActivityValue('Broad Jump'),
-    sprintSec:bestActivityValue('20-yard Sprint')
+    sprintSec:bestActivityValue('20-yard Sprint'),
+    singleLegBalanceSec:bestActivityValue('Single-Leg Balance')
   };
 }
 // Round 5: continuous replacement for the old discrete 5-tier snap (which
@@ -281,34 +298,98 @@ function score(v,k){
 // itself, so a genuinely low-but-real value still scores below a never-tried
 // one instead of the two colliding at the same floor.
 function scoreOrBaseline(v,k){return v>0?score(v,k):50}
+// Round 13 item 1: six performance axes, 1:1 with Skill Lab categories
+// except Balance+Coordination which both roll into one Body Control axis
+// (Kurt's decision — not kept as two separate rated axes). Mobility stays
+// untracked, same as before this round.
+const performanceAxisOrder=['strength','speed','quickness','jumpPower','core','bodyControl'];
+const axisLabels={strength:'Strength',speed:'Speed',quickness:'Quickness',jumpPower:'Jump/Power',core:'Core',bodyControl:'Body Control',consistency:'Consistency'};
 // Which activity(ies) feed each performance axis's benches-keyed stat.
-const axisStatNames={strength:[['Push-ups','pushups'],['Squats','squats'],['Plank','plank']],speed:[['20-yard Sprint','sprintSec']],power:[['Broad Jump','broadJumpIn']],agility:[['Skater Jumps','skaterJumps'],['Lateral Shuffle','shuffleTouches']]};
-// Round 5 item 2: each stat blends the latest verified Combine result (heavy
-// weight) with the best self-reported Daily Check-In value (light, capped
-// weight) — Combine stays the primary driver of real rating movement while
-// daily training still visibly nudges the number.
-const COMBINE_WEIGHT=0.82, DAILY_WEIGHT=0.18;
-function blendedStatScore(name,benchKey){
-  const combineVal=latestVerifiedCombineValue(name);
-  const dailyVal=bestDailyActivityValue(name);
-  return Math.round(scoreOrBaseline(combineVal,benchKey)*COMBINE_WEIGHT+scoreOrBaseline(dailyVal,benchKey)*DAILY_WEIGHT);
-}
-function axisScore(axis){
+// Plank moved off Strength onto Core, where it actually belongs now that
+// Core is its own rated axis — Strength keeps Push-ups/Squats.
+const axisStatNames={strength:[['Push-ups','pushups'],['Squats','squats']],speed:[['20-yard Sprint','sprintSec']],quickness:[['Skater Jumps','skaterJumps'],['Lateral Shuffle','shuffleTouches']],jumpPower:[['Broad Jump','broadJumpIn']],core:[['Plank','plank']],bodyControl:[['Single-Leg Balance','singleLegBalanceSec']]};
+// Round 13 item 4: which Skill Lab attribute name(s) (from Round 9's
+// per-exercise weight map, state.attributePoints) feed each axis's
+// completion component. Balance+Coordination both feed bodyControl,
+// matching categoryAxisMap's many-to-one mapping below.
+const axisAttributeMap={strength:['Strength'],speed:['Speed'],quickness:['Quickness'],jumpPower:['Jump'],core:['Core'],bodyControl:['Balance','Coordination']};
+// Round 13 item 6: three-input blend per axis, replacing Round 5's
+// Combine+capped-Daily two-input model. Combine dominant, completion
+// capped small (pure logging volume can't substitute for performance),
+// coach grade a real but non-dominant third. Treat as tunable, same
+// framing Round 5 used for its own weights.
+const AXIS_COMBINE_WEIGHT=0.60, AXIS_COMPLETION_WEIGHT=0.12, AXIS_COACH_WEIGHT=0.28;
+// Points of (post-checkpoint-reset) attributePoints needed for full
+// completion credit — tunable starting point, same spirit as the bench
+// tiers above.
+const COMPLETION_CAP_POINTS=40;
+function combineComponentScore(axis){
   const stats=axisStatNames[axis];
-  const total=stats.reduce((sum,[name,benchKey])=>sum+blendedStatScore(name,benchKey),0);
-  return Math.round(total/stats.length);
+  const total=stats.reduce((sum,[name,benchKey])=>sum+scoreOrBaseline(latestVerifiedCombineValue(name),benchKey),0);
+  return total/stats.length;
+}
+// Repurposes state.attributePoints (Round 9 built this as an inert display
+// tally with a hard constraint against ever reaching ratings() — that
+// constraint is removed per this round) into a real, capped scoring input.
+// Resets each checkpoint (see recordCombineCheckpoint), so this reflects
+// completion since the last verified Combine, not a lifetime tally.
+function completionScore(axis){
+  const attrs=axisAttributeMap[axis]||[];
+  const pts=attrs.reduce((sum,a)=>sum+((state.attributePoints||{})[a]||0),0);
+  const pct=Math.min(1,pts/COMPLETION_CAP_POINTS);
+  return 50+pct*49;
+}
+// Item 11: linear 1-10 -> ~40-99, consistent with score()'s own floor/cap.
+function normalizeCoachGrade(g){return 40+((g-1)/9)*(99-40)}
+// Latest coach grade entered for this axis, across every verified Combine
+// record that has one — "latest", not "best", matching latestVerifiedCombineValue.
+function latestCoachGrade(axis){
+  const withGrade=state.combine.filter(x=>x.verified&&x.coachGrades&&x.coachGrades[axis]!=null);
+  if(!withGrade.length) return null;
+  return withGrade[withGrade.length-1].coachGrades[axis];
+}
+// Item 12: a missing coach grade doesn't score as zero — its ~28% share is
+// redistributed proportionally onto Combine + completion instead.
+function axisScore(axis){
+  const combineComp=combineComponentScore(axis);
+  const completionComp=completionScore(axis);
+  const rawGrade=latestCoachGrade(axis);
+  let wCombine=AXIS_COMBINE_WEIGHT,wCompletion=AXIS_COMPLETION_WEIGHT,wCoach=AXIS_COACH_WEIGHT;
+  let coachComp=0;
+  if(rawGrade==null){
+    const remaining=wCombine+wCompletion;
+    wCombine+=wCoach*(wCombine/remaining);
+    wCompletion+=wCoach*(wCompletion/remaining);
+    wCoach=0;
+  }else{
+    coachComp=normalizeCoachGrade(rawGrade);
+  }
+  return Math.round(combineComp*wCombine+completionComp*wCompletion+coachComp*wCoach);
+}
+// Item 2/8: Teamwork Skill Lab completions don't get their own axis — they
+// nudge Consistency instead, capped the same "small, non-dominant" way the
+// old Daily Check-in input was capped.
+function teamworkCompletionCount(){
+  let count=0;
+  state.daily.forEach(entry=>{
+    if(!entry.custom) return;
+    Object.keys(entry.custom).forEach(name=>{
+      const a=findActivity(name);
+      if(a&&a.category==='Teamwork'&&hasLoggedAny(entry.custom[name])) count++;
+    });
+  });
+  return count;
 }
 function ratings(){
-  // Item 1: Consistency is purely engagement (workout count + streak) — no
-  // XP input, and no longer any exercise-variety bonus either (that bonus
-  // moved to the performance axes as verified-improvement credit, item 5).
-  const consistency=Math.min(99,50+state.daily.length*2+streak()*3);
-  const speed=Math.min(99,axisScore('speed')+combineImprovementBonus('speed'));
-  const strength=Math.min(99,axisScore('strength')+combineImprovementBonus('strength'));
-  const power=Math.min(99,axisScore('power')+combineImprovementBonus('power'));
-  const agility=Math.min(99,axisScore('agility')+combineImprovementBonus('agility'));
-  const overall=Math.round((speed+strength+power+agility+consistency)/5);
-  return{speed,strength,power,agility,consistency,overall}
+  // Item 1: Consistency is purely engagement (workout count + streak) plus
+  // a small capped Teamwork nudge (item 8) — no XP input.
+  const consistency=Math.min(99,50+state.daily.length*2+streak()*3+Math.min(8,teamworkCompletionCount()));
+  const axisScores={};
+  performanceAxisOrder.forEach(axis=>{
+    axisScores[axis]=Math.min(99,axisScore(axis)+combineImprovementBonus(axis));
+  });
+  const overall=Math.round((performanceAxisOrder.reduce((sum,axis)=>sum+axisScores[axis],0)+consistency)/(performanceAxisOrder.length+1));
+  return{...axisScores,consistency,overall};
 }
 function streak(){const dates=[...new Set(state.daily.map(x=>x.date).filter(Boolean))].sort().reverse();if(!dates.length)return 0;let s=0,d=new Date();for(let i=0;i<365;i++){const iso=d.toISOString().slice(0,10);if(dates.includes(iso)){s++;d.setDate(d.getDate()-1)}else if(i===0)d.setDate(d.getDate()-1);else break}return s}
 function spinXP(){return (state.spinLog||[]).reduce((a,x)=>a+(+x.xp||0),0)}
@@ -323,6 +404,14 @@ function tier(){return tiers[state.currentTierIndex||0]}
 // checkpoint requirements are expressed in terms of ordinal verified-Combine
 // position (1st/2nd/3rd+) rather than calendar weeks, since the app has no
 // season-start-date concept — see Round 5 open question 2.
+// Round 13 item 15 — FLAG FOR RE-TUNING: these rating thresholds (55/65/
+// 75/85/93) were tuned against the old 5-axis average (Speed/Strength/
+// Power/Agility/Consistency). Round 13 changed what ratings().overall
+// represents — it's now a 7-axis average including two brand-new axes
+// (Core, Body Control) plus a new 3-input-blend formula per axis — so a
+// given Overall number no longer means what it meant when these numbers
+// were picked. Deliberately NOT re-tuned here (no real usage data to tune
+// against yet); revisit once there's actual athlete data to calibrate to.
 const promotionGates=[
   null,
   {rating:55,workouts:5,combineCheckpoint:'first'},
@@ -373,6 +462,12 @@ function combineConfirmed(gateType,threshold){
 function recordCombineCheckpoint(){
   state.combineCheckpoints=state.combineCheckpoints||[];
   state.combineCheckpoints.push({date:todayISO(),overall:ratings().overall});
+  // Round 13 item 5: completion (state.attributePoints) is a rolling window
+  // since the last checkpoint, not a lifetime tally — reset it here, after
+  // this checkpoint's rating snapshot above has already used the pre-reset
+  // value, so a strong first month doesn't permanently pad every axis's
+  // completion score for the rest of the athlete's time in the app.
+  state.attributePoints={};
 }
 // Advances at most one tier per unmet gate, but loops so a strong athlete
 // who clears multiple tiers' gates in one checkpoint isn't artificially
@@ -462,13 +557,13 @@ function renderPlatformStatus(){
   if($('#homePackStatus')) $('#homePackStatus').textContent=packReady?'Ready to Open':'Locked';
   if($('#homeMissionName')) $('#homeMissionName').textContent=typeof missionForToday==='function'?missionForToday().title:'Daily Mission';
 }
-function render(){renderPlatformStatus();const r=ratings(), rec=pr(), x=xp(), t=tier();$('#overall').textContent=r.overall;$('#overallBig').textContent=r.overall;$('#streak').textContent=streak();$('#workouts').textContent=state.daily.length;$('#xp').textContent=x;$('#levelName').textContent=t.name;$('#levelDesc').textContent=t.name==='THE SHOW'?'Major league energy. Keep building.':(t.name==='Triple AAA'?'One step from THE SHOW. Keep stacking wins.':'Keep training to get called up.');['speed','strength','power','agility','consistency'].forEach(k=>{$('#'+k).textContent=r[k];$('#'+k+'Bar').style.width=Math.min(100,r[k])+'%'});
-$$('.tier').forEach((el,i)=>el.classList.toggle('active',i===(state.currentTierIndex||0)));$('#records').innerHTML=`<li>${rec.pushups} max push-ups</li><li>${rec.squats} max squats</li><li>${rec.plank} sec plank</li><li>${rec.shuffleTouches} shuffle touches</li><li>${rec.broadJumpIn} in verified broad jump</li><li>${rec.sprintSec||'—'} sec verified sprint</li>`;renderPathToNextTier();
+function render(){renderPlatformStatus();const r=ratings(), rec=pr(), x=xp(), t=tier();$('#overall').textContent=r.overall;$('#overallBig').textContent=r.overall;$('#streak').textContent=streak();$('#workouts').textContent=state.daily.length;$('#xp').textContent=x;$('#levelName').textContent=t.name;$('#levelDesc').textContent=t.name==='THE SHOW'?'Major league energy. Keep building.':(t.name==='Triple AAA'?'One step from THE SHOW. Keep stacking wins.':'Keep training to get called up.');[...performanceAxisOrder,'consistency'].forEach(k=>{$('#'+k).textContent=r[k];$('#'+k+'Bar').style.width=Math.min(100,r[k])+'%'});
+$$('.tier').forEach((el,i)=>el.classList.toggle('active',i===(state.currentTierIndex||0)));$('#records').innerHTML=`<li>${rec.pushups} max push-ups</li><li>${rec.squats} max squats</li><li>${rec.plank} sec plank</li><li>${rec.shuffleTouches} shuffle touches</li><li>${rec.broadJumpIn} in verified broad jump</li><li>${rec.sprintSec||'—'} sec verified sprint</li><li>${rec.singleLegBalanceSec||'—'} sec single-leg balance</li>`;renderPathToNextTier();
 const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#meterText').textContent=`${x%250} / 250 XP to next parent surprise`;$('#rewardNotice').textContent=x>=250&&x%250<75?'🎁 Parent surprise may be unlocked. Check Coach/Parent Corner.':'';
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
 $('#pendingList').innerHTML=table(['Week','Program','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.programName||'—',a.status]));
-$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderPlayerCardHero();renderCoachReport();renderAttributeBreakdown();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderPlayerCardHero();renderCoachReport();renderTeamEdition();renderCombineProgramPicker();renderCoachGradeUpdatePanel();renderCharts()}
 
 
 function xpEvents(){
@@ -677,7 +772,7 @@ function renderPlayerCardHero(){
   if($('#statusAthleteName')) $('#statusAthleteName').textContent=name.toUpperCase();
   if($('#playerCardName')) $('#playerCardName').textContent=name;
   if($('#playerCardTeam')) $('#playerCardTeam').textContent=(state.teamIdentityJoined&&state.team&&state.team.name)||'Free Agent';
-  ['speed','strength','power','agility','consistency'].forEach(k=>{
+  [...performanceAxisOrder,'consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
     if(!bar) return;
     bar.classList.remove('tier-red','tier-amber','tier-blue','tier-green');
@@ -724,21 +819,6 @@ function initPlayerCardRotation(){
   slot.addEventListener('mouseleave',()=>paused=false);
   slot.addEventListener('focusin',()=>paused=true);
   slot.addEventListener('focusout',()=>paused=false);
-}
-// Round 9 item 9 — display only, reads state.attributePoints exclusively;
-// never wired into ratings()/pr()/score(). Bars are scaled relative to the
-// athlete's own highest attribute so the chart stays meaningful regardless
-// of total volume logged.
-const attributeOrder=['Strength','Speed','Quickness','Jump','Core','Balance','Coordination'];
-function renderAttributeBreakdown(){
-  if(!$('#attributeBreakdown')) return;
-  const pts=state.attributePoints||{};
-  const max=Math.max(1,...attributeOrder.map(a=>pts[a]||0));
-  $('#attributeBreakdown').innerHTML=attributeOrder.map(a=>{
-    const v=pts[a]||0;
-    const pct=Math.round((v/max)*100);
-    return `<div class="rating-row"><span>${a}</span><div class="bar"><div style="width:${pct}%"></div></div><strong>${v}</strong></div>`;
-  }).join('');
 }
 function renderCoachReport(){
   if(!$('#coachReport')) return;
@@ -814,11 +894,14 @@ function renderCharts(){
 function best(m){let rows=[],b=m==='sprintSec'?Infinity:0;state.combine.filter(x=>x.verified).sort((a,b)=>(+a.week||0)-(+b.week||0)).forEach(x=>{let v=combineValueFor(x,m);if(m==='sprintSec'){if(v>0)b=Math.min(b,v);if(b!==Infinity)rows.push({label:'W'+x.week,value:b})}else{b=Math.max(b,v);rows.push({label:'W'+x.week,value:b})}});return rows}
 
 const demoAthletes=[{name:'Ethan',xp:2845,workouts:42,streak:12,improvement:21,sportsmanship:8,arcade:920},{name:'Jack',xp:2710,workouts:40,streak:9,improvement:16,sportsmanship:10,arcade:880},{name:'Mason',xp:2490,workouts:38,streak:7,improvement:24,sportsmanship:6,arcade:810},{name:'Luke',xp:2380,workouts:36,streak:11,improvement:19,sportsmanship:7,arcade:790},{name:'Noah',xp:2265,workouts:35,streak:6,improvement:14,sportsmanship:9,arcade:760},{name:'Charlie',xp:2140,workouts:33,streak:8,improvement:18,sportsmanship:7,arcade:730}];
-// Round 9: Quickness/Jumping-Plyometrics map to the same rating axes their
-// old names (Agility/Power) did — only the display name changed. Balance
-// and Coordination are new categories with no corresponding rated axis
-// (same as Mobility), so they intentionally fall back to 'consistency'.
-const categoryAxisMap={Strength:'strength',Core:'strength',Speed:'speed',Quickness:'agility','Jumping/Plyometrics':'power',Balance:'consistency',Coordination:'consistency',Mobility:'consistency',Teamwork:'consistency'};
+// Round 13: Core and Body Control are now real rated axes (they weren't
+// before this round). Balance and Coordination both route to the single
+// bodyControl axis — the first many-to-one case here, so whyTrackLine()
+// below can't assume a 1:1 category-to-axis mapping. Teamwork maps to
+// 'consistency' because it's now a literal scoring input there (item 8),
+// not a placeholder fallback. Mobility has no entry at all — it stays
+// unrated recovery work — whyTrackLine() special-cases it instead.
+const categoryAxisMap={Strength:'strength',Core:'core',Speed:'speed',Quickness:'quickness','Jumping/Plyometrics':'jumpPower',Balance:'bodyControl',Coordination:'bodyControl',Teamwork:'consistency'};
 const categoryIcons={Strength:'💪',Core:'🧱',Speed:'⚡',Quickness:'🏃','Jumping/Plyometrics':'🚀',Balance:'⚖',Coordination:'🎯',Mobility:'🧘',Teamwork:'🤝'};
 // Round 9 item 10 — goal-chip nav, one per non-Teamwork category. Labels
 // and mapping (including "More Durable"->Core) match the change-request
@@ -979,11 +1062,13 @@ const activities=categoryOrder.flatMap(cat=>activityDefs[cat].map(([name,metricF
 }));
 function findActivity(name){return activities.find(a=>a.name===name)}
 function findActivityById(id){return activities.find(a=>a.id===id)}
-// Round 9 item 9 — HARD CONSTRAINT: attributePoints must never be read by
-// ratings()/pr()/score(). Purely additive, informational display fed by
+// Round 9 built this as a purely additive, informational-only tally, fed by
 // Daily/Team Program Check-In logs (weight x sets logged per activity, not
-// weighted by raw value since reps/seconds/inches aren't unit-compatible),
-// matching the separation Round 8 established for arcadeMetrics.
+// weighted by raw value since reps/seconds/inches aren't unit-compatible).
+// Round 13 repurposes it into a real (capped) scoring input — see
+// completionScore()/axisScore() — and resets it at each verified-Combine
+// checkpoint (recordCombineCheckpoint) so it reflects completion since the
+// last checkpoint, not a lifetime tally.
 function accumulateAttributePoints(custom){
   state.attributePoints=state.attributePoints||{};
   Object.entries(custom||{}).forEach(([name,entry])=>{
@@ -1085,22 +1170,6 @@ function bestActivityValue(name){
     const f=(entry.customCombine||[]).find(x=>x.name===name);
     if(f)vals.push(...valuesForActivityMetric(f.values!=null?f.values:f.value,metricKey));
     if(legacyCombineKey&&entry[legacyCombineKey]!=null&&entry[legacyCombineKey]!=='')vals.push(+entry[legacyCombineKey]);
-  });
-  if(!vals.length) return 0;
-  return a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
-}
-// Round 5: the rating axes need combine and daily data kept SEPARATE (unlike
-// bestActivityValue's blended best-ever, used for PR display) so they can be
-// weighted differently — Combine dominates, Daily only nudges.
-function bestDailyActivityValue(name){
-  const a=findActivity(name);
-  if(!a) return 0;
-  const metricKey=a.metric.key;
-  const legacyKey=legacyDailyFieldMap[name];
-  const vals=[];
-  state.daily.forEach(entry=>{
-    vals.push(...valuesForActivityMetric(entry.custom&&entry.custom[name],metricKey));
-    if(legacyKey&&entry[legacyKey]!=null&&entry[legacyKey]!=='')vals.push(+entry[legacyKey]);
   });
   if(!vals.length) return 0;
   return a.metric.lowerIsBetter?Math.min(...vals):Math.max(...vals);
@@ -1533,8 +1602,9 @@ function renderExerciseLibrary(){
   }).join('');
 }
 function whyTrackLine(category){
-  const axis=categoryAxisMap[category]||'consistency';
-  const axisLabel={speed:'Speed',strength:'Strength',power:'Power',agility:'Agility',consistency:'training consistency'}[axis];
+  if(category==='Mobility') return 'Recovery and mobility work — not tied to a Player Card rating, but keeps you ready to train.';
+  const axis=categoryAxisMap[category];
+  const axisLabel=(axisLabels[axis]||'training consistency');
   return `We log this so we can chart your ${axisLabel} rating on the Player Card.`;
 }
 function renderActivityDetail(name){
@@ -1639,6 +1709,33 @@ function renderCombineProgramFields(){
     ?chosen.activities.map(a=>metricInputHTML(`combineProgram_${a.id}_${a.metric.key}`,a.name,a.metric)).join('')
     :'<p class="muted">No activities in this program yet.</p>';
 }
+// Round 13 items 10-12: shared field markup for both the Combine Testing
+// form (grade entered alongside a new test) and the Coach/Parent Corner
+// update panel (grade edited anytime, independent of a new submission).
+function coachGradeFieldsHTML(prefix,existing){
+  return performanceAxisOrder.map(ax=>`<label>${axisLabels[ax]} (1-10)<input type="number" min="1" max="10" step="1" name="${prefix}${ax}" value="${existing&&existing[ax]!=null?existing[ax]:''}"></label>`).join('');
+}
+function verifiedCombineOptions(){
+  const opts=[];
+  state.combine.forEach((entry,i)=>{if(entry.verified) opts.push({index:i,label:`Week ${entry.week} — ${entry.programName||'Combine Test'}`})});
+  return opts;
+}
+function renderCoachGradeUpdatePanel(){
+  const sel=$('#coachGradeCombineSelect');
+  if(!sel) return;
+  const opts=verifiedCombineOptions();
+  const current=sel.value;
+  sel.innerHTML=opts.length?opts.map(o=>`<option value="${o.index}">${o.label}</option>`).join(''):'<option value="">No verified Combine tests yet</option>';
+  if(opts.some(o=>String(o.index)===current)) sel.value=current;
+  renderCoachGradeUpdateFields();
+}
+function renderCoachGradeUpdateFields(){
+  const sel=$('#coachGradeCombineSelect');
+  const fields=$('#coachGradeUpdateFields');
+  if(!sel||!fields) return;
+  const entry=state.combine[+sel.value];
+  fields.innerHTML=coachGradeFieldsHTML('update_',entry&&entry.coachGrades);
+}
 document.addEventListener('click',e=>{
   const addSetBtn=e.target.closest('.add-set-btn');
   if(addSetBtn){
@@ -1655,7 +1752,25 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
   if(e.target.id==='dailyProgramSelect'){state.activeProgramId=e.target.value;save();renderDailyCustomFields()}
   if(e.target.id==='combineProgramSelect') renderCombineProgramFields();
+  if(e.target.id==='coachGradeCombineSelect') renderCoachGradeUpdateFields();
 });
+if($('#saveCoachGrades'))$('#saveCoachGrades').onclick=()=>{
+  const code=$('#coachGradeCode').value;
+  if(code!==state.parentCode){alert('Incorrect parent code.');return}
+  const entry=state.combine[+$('#coachGradeCombineSelect').value];
+  if(!entry){alert('Select a verified Combine test first.');return}
+  const grades={};
+  performanceAxisOrder.forEach(ax=>{
+    const el=document.querySelector(`[name="update_${ax}"]`);
+    const v=el?el.value:'';
+    if(v!==''){const n=+v;if(n>=1&&n<=10) grades[ax]=n;}
+  });
+  entry.coachGrades=grades;
+  save();
+  $('#coachGradeCode').value='';
+  alert('Coach grades saved.');
+  render();
+};
 document.addEventListener('click',e=>{
   const addBtn=e.target.closest('.add-exercise-btn');
   if(addBtn && !addBtn.disabled) addActivityToDraft(addBtn.dataset.exercise);
@@ -2204,6 +2319,8 @@ initPlayerCardRotation();
 renderDailyProgramPicker();
 renderDailyCustomFields();
 renderCombineProgramPicker();
+if($('#coachGradeFields'))$('#coachGradeFields').innerHTML=coachGradeFieldsHTML('grade_');
+renderCoachGradeUpdatePanel();
 
 // Version 3.1 initial route
 showModeNav('home');

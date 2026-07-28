@@ -293,16 +293,17 @@
     <div class="player-card-ratings">
       <h3>Player Ratings</h3>
       <div class="rating-grid">
-        <div class="rating-row"><span>Speed</span><div class="bar"><div id="speedBar"></div></div><strong id="speed">50</strong></div>
         <div class="rating-row"><span>Strength</span><div class="bar"><div id="strengthBar"></div></div><strong id="strength">50</strong></div>
-        <div class="rating-row"><span>Power</span><div class="bar"><div id="powerBar"></div></div><strong id="power">50</strong></div>
-        <div class="rating-row"><span>Agility</span><div class="bar"><div id="agilityBar"></div></div><strong id="agility">50</strong></div>
+        <div class="rating-row"><span>Speed</span><div class="bar"><div id="speedBar"></div></div><strong id="speed">50</strong></div>
+        <div class="rating-row"><span>Quickness</span><div class="bar"><div id="quicknessBar"></div></div><strong id="quickness">50</strong></div>
+        <div class="rating-row"><span>Jump/Power</span><div class="bar"><div id="jumpPowerBar"></div></div><strong id="jumpPower">50</strong></div>
+        <div class="rating-row"><span>Core</span><div class="bar"><div id="coreBar"></div></div><strong id="core">50</strong></div>
+        <div class="rating-row"><span>Body Control</span><div class="bar"><div id="bodyControlBar"></div></div><strong id="bodyControl">50</strong></div>
         <div class="rating-row"><span>Consistency</span><div class="bar"><div id="consistencyBar"></div></div><strong id="consistency">50</strong></div>
       </div>
     </div>
   </div>
   <div class="card"><h2>Next Targets</h2><div id="targets"></div></div>
-  <div class="card"><h2>Attribute Breakdown</h2><p class="muted">Informational only — built from Skill Lab check-ins, not part of your OVR rating.</p><div id="attributeBreakdown"></div></div>
 </section>
 
 <section id="combine" class="screen">
@@ -314,6 +315,11 @@
       <label>Week<input type="number" name="week" min="1" max="12" required></label>
       <label class="wide">Testing which program?<select id="combineProgramSelect" name="combineProgram"></select></label>
       <div id="combineProgramFields" style="display:contents"></div>
+      <div class="wide">
+        <p class="eyebrow dark">Coach Grade (optional)</p>
+        <p class="muted">1-10 per axis, coach/parent judgment — skip any you're not ready to grade yet. Only saved if the parent code below is correct.</p>
+        <div class="form-grid" id="coachGradeFields"></div>
+      </div>
       <label class="wide">Parent code<input type="password" name="parentCode" placeholder="Required for verified result"></label>
       <button class="primary wide" type="submit">Save Combine Test</button>
     </form>
@@ -496,6 +502,17 @@
       <label>Parent code<input id="reviewCode" type="password"></label>
       <button class="primary" id="approvePending">Approve Pending Tests</button>
       <div id="pendingList"></div>
+    </div>
+  </div>
+  <div class="card">
+    <p class="eyebrow dark">Coach Tools</p>
+    <h2>Update Coach Grades</h2>
+    <p class="muted">Grades aren't locked to the moment a Combine test was submitted — pick any verified test and update its 1-10 axis grades anytime.</p>
+    <div class="form-grid">
+      <label class="wide">Verified Combine test<select id="coachGradeCombineSelect"></select></label>
+      <div id="coachGradeUpdateFields" class="form-grid" style="display:contents"></div>
+      <label class="wide">Coach / parent code<input id="coachGradeCode" type="password" placeholder="Required"></label>
+      <button id="saveCoachGrades" class="primary wide" type="button">Save Coach Grades</button>
     </div>
   </div>
   <div class="card">
