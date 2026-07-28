@@ -676,7 +676,7 @@ function renderPlayerCardHero(){
   const name=state.athleteName||'Athlete';
   if($('#statusAthleteName')) $('#statusAthleteName').textContent=name.toUpperCase();
   if($('#playerCardName')) $('#playerCardName').textContent=name;
-  if($('#playerCardTeam')) $('#playerCardTeam').textContent=(state.team&&state.team.name)||'Your Team';
+  if($('#playerCardTeam')) $('#playerCardTeam').textContent=(state.teamIdentityJoined&&state.team&&state.team.name)||'Free Agent';
   ['speed','strength','power','agility','consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
     if(!bar) return;
