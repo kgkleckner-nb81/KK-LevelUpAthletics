@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0},attributePoints:{}};
+const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0},attributePoints:{}};
 let state=load();
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -468,7 +468,7 @@ const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
 $('#pendingList').innerHTML=table(['Week','Program','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.programName||'—',a.status]));
-$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderAvatarComposite();renderCoachReport();renderAttributeBreakdown();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderPlayerCardHero();renderCoachReport();renderAttributeBreakdown();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
 
 
 function xpEvents(){
@@ -662,6 +662,68 @@ function showWorkoutDetail(index){
     ${entry.notes?`<p><strong>Notes:</strong> ${entry.notes}</p>`:''}
     <h3>Personal Records</h3><ul>${prHtml}</ul>`;
   $('#workoutDetailModal').classList.remove('hidden');
+}
+// Player Card hero — name/team text binding + rating-bar tier coloring.
+// Ratings stay the real ratings()-engine axes (Speed/Strength/Power/
+// Agility/Consistency), not the placeholder set from the design reference.
+function ratingTierClass(v){
+  if(v>=80) return 'tier-green';
+  if(v>=65) return 'tier-blue';
+  if(v>=50) return 'tier-amber';
+  return 'tier-red';
+}
+function renderPlayerCardHero(){
+  const name=state.athleteName||'Athlete';
+  if($('#statusAthleteName')) $('#statusAthleteName').textContent=name.toUpperCase();
+  if($('#playerCardName')) $('#playerCardName').textContent=name;
+  if($('#playerCardTeam')) $('#playerCardTeam').textContent=(state.team&&state.team.name)||'Your Team';
+  ['speed','strength','power','agility','consistency'].forEach(k=>{
+    const bar=$('#'+k+'Bar');
+    if(!bar) return;
+    bar.classList.remove('tier-red','tier-amber','tier-blue','tier-green');
+    bar.classList.add(ratingTierClass(+($('#'+k).textContent)||0));
+  });
+}
+// TODO(Build Your Athlete): stub for the future selfie-capture -> 3D-avatar
+// render -> Reward Locker gear-purchase flow described in
+// design-reference/player-card-avatar-attributes.md. No destination yet.
+function buildYourAthlete(){
+  alert('Coming soon: take a selfie, render your 3D avatar, and gear it up in the Reward Locker!');
+}
+// One-time setup (not called from render()) — the rotation is decorative
+// sample content, independent of app state, so it shouldn't be torn down
+// and rebuilt on every re-render. Respects prefers-reduced-motion by
+// slowing the interval and shortening the crossfade (see styles.css) rather
+// than disabling the preview outright.
+function initPlayerCardRotation(){
+  const slot=$('#playerCardSlot');
+  const dotsWrap=$('#playerCardDots');
+  if(!slot||!dotsWrap) return;
+  const images=[...slot.querySelectorAll('img')];
+  if(!images.length) return;
+  images.forEach((_,i)=>{
+    const dot=document.createElement('span');
+    if(i===0) dot.classList.add('active');
+    dotsWrap.appendChild(dot);
+  });
+  const dots=[...dotsWrap.querySelectorAll('span')];
+  const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ROTATE_MS=reduceMotion?12000:3500;
+  let current=0;
+  let paused=false;
+  setInterval(()=>{
+    if(paused) return;
+    images[current].classList.remove('active');
+    dots[current].classList.remove('active');
+    current=(current+1)%images.length;
+    images[current].classList.add('active');
+    dots[current].classList.add('active');
+  },ROTATE_MS);
+  slot.setAttribute('tabindex','0');
+  slot.addEventListener('mouseenter',()=>paused=true);
+  slot.addEventListener('mouseleave',()=>paused=false);
+  slot.addEventListener('focusin',()=>paused=true);
+  slot.addEventListener('focusout',()=>paused=false);
 }
 // Round 9 item 9 — display only, reads state.attributePoints exclusively;
 // never wired into ratings()/pr()/score(). Bars are scaled relative to the
@@ -2110,40 +2172,9 @@ document.addEventListener('click',e=>{
   if(choiceBtn && !choiceBtn.disabled) answerTrivia(+choiceBtn.dataset.choice);
 });
 
-function handlePhotoUpload(file){if(!file)return;const r=new FileReader();r.onload=()=>{localStorage.setItem('ethansBaseballHQ.profilePhoto',r.result);renderProfilePhoto()};r.readAsDataURL(file)}function renderProfilePhoto(){if(!$('#profilePhoto'))return;const saved=localStorage.getItem('ethansBaseballHQ.profilePhoto');if(saved){$('#profilePhoto').src=saved;$('#profilePhoto').classList.remove('hidden');$('#avatarFallback').classList.add('hidden')}else{$('#profilePhoto').classList.add('hidden');$('#avatarFallback').classList.remove('hidden')}}
-// Round 12 item 6: replaces the old randomAvatar()/avatarOptions emoji
-// picker — the avatar is now a direct read of state.equipped, changed only
-// via the Gear Locker's Equip controls, not a randomize button here.
-function avatarLayerHTML(slot){
-  const itemId=(state.equipped&&state.equipped[slot])||'default';
-  if(itemId==='default') return '';
-  const item=findGearItem(itemId);
-  if(!item) return '';
-  const src=gearArt[itemId];
-  return `<div class="avatar-layer avatar-layer-${slot}"><img src="${src}" alt="${item.name}" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')"><div class="avatar-layer-fallback">${item.name}</div></div>`;
-}
-function renderAvatarComposite(){
-  const composite=$('#avatarComposite');
-  if(composite){
-    composite.innerHTML=
-      avatarLayerHTML('background')+
-      `<div class="avatar-layer avatar-layer-figure"><img src="${avatarBaseArt}" alt="Athlete avatar" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')"><div class="avatar-layer-fallback avatar-figure-fallback"><svg class="nav-icon"><use href="#i-athlete"/></svg></div></div>`+
-      avatarLayerHTML('outfit')+
-      avatarLayerHTML('prop')+
-      avatarLayerHTML('faceAccent')+
-      avatarLayerHTML('frame');
-  }
-  if($('#equippedTitleBadge')){
-    const titleId=(state.equipped&&state.equipped.title)||'default';
-    const item=titleId!=='default'?findGearItem(titleId):null;
-    $('#equippedTitleBadge').textContent=item?item.name:'';
-    $('#equippedTitleBadge').classList.toggle('hidden',!item);
-  }
-}
-
 seedPresetPrograms();
 renderLadder();renderHeroLadderPreview();
-window.addEventListener('resize',renderCharts);render();renderTeamEdition();renderProfilePhoto();
+window.addEventListener('resize',renderCharts);render();renderTeamEdition();
 
 
 if($('#completeMission'))$('#completeMission').onclick=completeDailyMission;
@@ -2168,7 +2199,8 @@ if($('#swingButton'))$('#swingButton').onclick=swingHomer;
 if($('#startClutch'))$('#startClutch').onclick=startClutchGame;
 if($('#wheelInner'))$('#wheelInner').innerHTML=buildWheelSVG();
 if($('#spinButton'))$('#spinButton').onclick=spinWheel;
-if($('#photoUpload'))$('#photoUpload').onchange=e=>handlePhotoUpload(e.target.files[0]);
+if($('#buildYourAthleteBtn'))$('#buildYourAthleteBtn').onclick=buildYourAthlete;
+initPlayerCardRotation();
 renderDailyProgramPicker();
 renderDailyCustomFields();
 renderCombineProgramPicker();

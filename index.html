@@ -118,7 +118,7 @@
 
 <div class="status-bar">
   <button class="brand-home" data-home-button type="button"><img src="assets/brand-logo.png" alt="Level Up Athletics" class="brand-home-logo"></button>
-  <div class="status-athlete"><strong>ETHAN</strong><span id="statusTier" class="tier-name-graffiti">Rookie</span></div>
+  <div class="status-athlete"><strong id="statusAthleteName">ETHAN</strong><span id="statusTier" class="tier-name-graffiti">Rookie</span></div>
   <div class="status-item"><span>XP</span><strong id="statusXP">0</strong></div>
   <div class="status-item"><span>🔥</span><strong id="statusStreak">0</strong></div>
   <div class="status-item pack-status"><span>⭐</span><strong id="statusPack">LOCKED</strong></div>
@@ -261,21 +261,46 @@
 </section>
 
 <section id="player" class="screen">
-  <div class="card player-card">
-<div class="profile-photo-wrap"><img id="profilePhoto" class="profile-photo hidden" alt="Athlete profile"><div id="avatarFallback" class="avatar-fallback"><div id="avatarComposite" class="avatar-composite"></div></div><label class="upload-button">Upload Photo<input id="photoUpload" type="file" accept="image/*"></label></div>
-    <div>
-      <p class="eyebrow dark">Player Card</p>
-      <h2 id="levelName" class="tier-name-graffiti">Rookie</h2>
-      <span id="equippedTitleBadge" class="equipped-title-badge hidden"></span>
-      <p id="levelDesc">Start stacking workouts.</p>
+  <div class="card player-card-panel">
+    <div class="player-card-top">
+      <div class="player-card-image-col">
+        <div class="player-card-slot" id="playerCardSlot">
+          <img src="assets/cards/card-shark.jpg" class="active" alt="Player card design 1">
+          <img src="assets/cards/card-ascher.jpg" alt="Player card design 2">
+          <img src="assets/cards/card-hentry.jpg" alt="Player card design 3">
+          <img src="assets/cards/card-cam.jpg" alt="Player card design 4">
+        </div>
+        <div class="player-card-dots" id="playerCardDots"></div>
+      </div>
+      <div class="player-card-info">
+        <p class="eyebrow dark">Player Card</p>
+        <h2 id="playerCardName">Ethan</h2>
+        <p id="playerCardTeam" class="player-card-team">Your Team</p>
+        <div class="player-card-badges">
+          <div class="player-card-badge overall">
+            <span class="label">Overall Ranking</span>
+            <strong id="overallBig">50</strong>
+          </div>
+          <div class="player-card-badge callup">
+            <span class="label">Call Up Level</span>
+            <strong id="levelName" class="tier-name-graffiti">Rookie</strong>
+          </div>
+        </div>
+        <p id="levelDesc" class="muted">Start stacking workouts.</p>
+        <button type="button" id="buildYourAthleteBtn" class="primary player-card-cta">Build Your Athlete →</button>
+      </div>
     </div>
-    <div class="rating-circle"><span id="overallBig">50</span><small>OVR</small></div>
+    <div class="player-card-ratings">
+      <h3>Player Ratings</h3>
+      <div class="rating-grid">
+        <div class="rating-row"><span>Speed</span><div class="bar"><div id="speedBar"></div></div><strong id="speed">50</strong></div>
+        <div class="rating-row"><span>Strength</span><div class="bar"><div id="strengthBar"></div></div><strong id="strength">50</strong></div>
+        <div class="rating-row"><span>Power</span><div class="bar"><div id="powerBar"></div></div><strong id="power">50</strong></div>
+        <div class="rating-row"><span>Agility</span><div class="bar"><div id="agilityBar"></div></div><strong id="agility">50</strong></div>
+        <div class="rating-row"><span>Consistency</span><div class="bar"><div id="consistencyBar"></div></div><strong id="consistency">50</strong></div>
+      </div>
+    </div>
   </div>
-  <div class="rating-row"><span>Speed</span><div class="bar"><div id="speedBar"></div></div><strong id="speed">50</strong></div>
-  <div class="rating-row"><span>Strength</span><div class="bar"><div id="strengthBar"></div></div><strong id="strength">50</strong></div>
-  <div class="rating-row"><span>Power</span><div class="bar"><div id="powerBar"></div></div><strong id="power">50</strong></div>
-  <div class="rating-row"><span>Agility</span><div class="bar"><div id="agilityBar"></div></div><strong id="agility">50</strong></div>
-  <div class="rating-row"><span>Consistency</span><div class="bar"><div id="consistencyBar"></div></div><strong id="consistency">50</strong></div>
   <div class="card"><h2>Next Targets</h2><div id="targets"></div></div>
   <div class="card"><h2>Attribute Breakdown</h2><p class="muted">Informational only — built from Skill Lab check-ins, not part of your OVR rating.</p><div id="attributeBreakdown"></div></div>
 </section>

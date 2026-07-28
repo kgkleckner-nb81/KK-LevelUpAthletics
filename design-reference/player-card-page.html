@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player Card — LevelUp Athletics</title>
+<style>
+  :root{
+    --bg-1:#0b1220;
+    --bg-2:#141d33;
+    --panel:#161f36;
+    --panel-border:rgba(56,189,248,0.35);
+    --text-main:#eef2ff;
+    --text-sub:#93a2c7;
+    --accent-blue:#38bdf8;
+    --accent-gold:#f5b942;
+    --meter-track:#1e2842;
+    --red:#ef4444;
+    --amber:#f5b942;
+    --green:#22c55e;
+    --blue:#38bdf8;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background:
+      radial-gradient(circle at 15% 10%, rgba(56,189,248,0.10), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(245,185,66,0.08), transparent 45%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    color:var(--text-main);
+    padding:32px 16px;
+    display:flex;
+    justify-content:center;
+  }
+
+  .page{
+    width:100%;
+    max-width:980px;
+  }
+
+  /* ===== ONE CONTINUOUS PANEL ===== */
+  .card-panel{
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.00));
+    border:1px solid var(--panel-border);
+    border-radius:22px;
+    padding:28px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+    position:relative;
+    overflow:hidden;
+  }
+
+  .card-panel::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      repeating-linear-gradient(115deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 6px);
+    pointer-events:none;
+  }
+
+  .top-row{
+    display:grid;
+    grid-template-columns:280px 1fr;
+    gap:32px;
+    align-items:stretch;
+  }
+
+  /* ---- Rotating card ---- */
+  .card-slot{
+    position:relative;
+    width:100%;
+    aspect-ratio:3 / 4;
+    border-radius:16px;
+    overflow:hidden;
+    border:3px solid var(--accent-blue);
+    box-shadow:0 0 0 1px rgba(56,189,248,0.25), 0 12px 30px rgba(0,0,0,0.5), 0 0 24px rgba(56,189,248,0.25);
+    background:#0d1526;
+  }
+
+  .card-slot img{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    opacity:0;
+    transition:opacity 1s ease-in-out;
+  }
+
+  .card-slot img.active{
+    opacity:1;
+  }
+
+  .card-dots{
+    display:flex;
+    justify-content:center;
+    gap:6px;
+    margin-top:10px;
+  }
+
+  .card-dots span{
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.25);
+    transition:background 0.3s ease, transform 0.3s ease;
+  }
+
+  .card-dots span.active{
+    background:var(--accent-blue);
+    transform:scale(1.3);
+  }
+
+  /* ---- Info column ---- */
+  .info-column{
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+
+  .identity .name{
+    font-size:32px;
+    font-weight:800;
+    letter-spacing:0.3px;
+    margin:0 0 2px 0;
+  }
+
+  .identity .team{
+    font-size:15px;
+    color:var(--text-sub);
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    margin:0;
+  }
+
+  .stat-badges{
+    display:flex;
+    gap:16px;
+    margin:20px 0;
+    flex-wrap:wrap;
+  }
+
+  .badge{
+    flex:1;
+    min-width:130px;
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px;
+    padding:14px 16px;
+  }
+
+  .badge .label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--text-sub);
+    margin-bottom:6px;
+  }
+
+  .badge .value{
+    font-size:26px;
+    font-weight:800;
+  }
+
+  .badge.overall .value{ color:var(--accent-gold); }
+  .badge.callup .value{ font-size:18px; color:var(--accent-blue); }
+
+  .build-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    margin-top:auto;
+    padding:16px 22px;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:0.3px;
+    color:#0b1220;
+    background:linear-gradient(135deg, var(--accent-gold), #ffd980);
+    border:none;
+    border-radius:14px;
+    cursor:pointer;
+    box-shadow:0 8px 24px rgba(245,185,66,0.35);
+    transition:transform 0.15s ease, box-shadow 0.15s ease;
+    text-decoration:none;
+    width:100%;
+  }
+
+  .build-btn:hover{
+    transform:translateY(-2px);
+    box-shadow:0 12px 28px rgba(245,185,66,0.45);
+  }
+
+  .build-btn:active{
+    transform:translateY(0px);
+  }
+
+  /* ---- Ratings section ---- */
+  .ratings{
+    margin-top:30px;
+    padding-top:26px;
+    border-top:1px solid rgba(255,255,255,0.08);
+  }
+
+  .ratings h2{
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--text-sub);
+    margin:0 0 18px 0;
+  }
+
+  .rating-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px 32px;
+  }
+
+  .rating-row{
+    display:grid;
+    grid-template-columns:110px 1fr 40px;
+    align-items:center;
+    gap:12px;
+  }
+
+  .rating-row .r-label{
+    font-size:14px;
+    font-weight:600;
+    color:var(--text-main);
+  }
+
+  .r-track{
+    height:10px;
+    background:var(--meter-track);
+    border-radius:6px;
+    overflow:hidden;
+  }
+
+  .r-fill{
+    height:100%;
+    border-radius:6px;
+  }
+
+  .r-value{
+    font-size:14px;
+    font-weight:700;
+    text-align:right;
+  }
+
+  /* Responsive */
+  @media (max-width:680px){
+    .top-row{ grid-template-columns:1fr; }
+    .card-slot{ max-width:280px; margin:0 auto; }
+    .rating-grid{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="card-panel">
+
+    <div class="top-row">
+
+      <!-- Rotating player card -->
+      <div>
+        <div class="card-slot" id="cardSlot">
+          <img src="cards/card-shark.jpg" class="active" alt="Player card design 1">
+          <img src="cards/card-ascher.jpg" alt="Player card design 2">
+          <img src="cards/card-hentry.jpg" alt="Player card design 3">
+          <img src="cards/card-cam.jpg" alt="Player card design 4">
+        </div>
+        <div class="card-dots" id="cardDots"></div>
+      </div>
+
+      <!-- Identity + stats + CTA -->
+      <div class="info-column">
+        <div class="identity">
+          <p class="name">Jordan Ellis</p>
+          <p class="team">Team Falcons</p>
+        </div>
+
+        <div class="stat-badges">
+          <div class="badge overall">
+            <div class="label">Overall Ranking</div>
+            <div class="value">91 OVR</div>
+          </div>
+          <div class="badge callup">
+            <div class="label">Call Up Level</div>
+            <div class="value">Varsity Elite</div>
+          </div>
+        </div>
+
+        <button class="build-btn" onclick="alert('This will open the avatar builder — selfie capture, rendering, and reward locker.')">
+          Build Your Athlete →
+        </button>
+      </div>
+    </div>
+
+    <!-- Ratings -->
+    <div class="ratings">
+      <h2>Player Ratings</h2>
+      <div class="rating-grid" id="ratingGrid"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ---- Card image rotation ----
+  const images = document.querySelectorAll('#cardSlot img');
+  const dotsWrap = document.getElementById('cardDots');
+  images.forEach((_, i) => {
+    const dot = document.createElement('span');
+    if (i === 0) dot.classList.add('active');
+    dotsWrap.appendChild(dot);
+  });
+  const dots = dotsWrap.querySelectorAll('span');
+
+  let current = 0;
+  const ROTATE_MS = 3500;
+
+  setInterval(() => {
+    images[current].classList.remove('active');
+    dots[current].classList.remove('active');
+    current = (current + 1) % images.length;
+    images[current].classList.add('active');
+    dots[current].classList.add('active');
+  }, ROTATE_MS);
+
+  // ---- Rating meters ----
+  const ratings = [
+    { label: 'Speed', value: 82 },
+    { label: 'Power', value: 74 },
+    { label: 'Accuracy', value: 91 },
+    { label: 'Agility', value: 88 },
+    { label: 'Endurance', value: 79 },
+    { label: 'Game IQ', value: 85 }
+  ];
+
+  function colorFor(v){
+    if (v >= 85) return getComputedStyle(document.documentElement).getPropertyValue('--green');
+    if (v >= 70) return getComputedStyle(document.documentElement).getPropertyValue('--blue');
+    if (v >= 50) return getComputedStyle(document.documentElement).getPropertyValue('--amber');
+    return getComputedStyle(document.documentElement).getPropertyValue('--red');
+  }
+
+  const grid = document.getElementById('ratingGrid');
+  ratings.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'rating-row';
+    row.innerHTML = `
+      <div class="r-label">${r.label}</div>
+      <div class="r-track"><div class="r-fill" style="width:${r.value}%; background:${colorFor(r.value)};"></div></div>
+      <div class="r-value">${r.value}</div>
+    `;
+    grid.appendChild(row);
+  });
+</script>
+
+</body>
+</html>
