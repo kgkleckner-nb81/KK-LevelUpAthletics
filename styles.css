@@ -941,10 +941,15 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .path-icon .lua-icon{width:130px;height:130px}
 .mode-btn{display:flex;align-items:center;justify-content:center;padding:12px 10px!important}
 .mode-btn .lua-icon{width:34px;height:34px}
-.subnav .tab{display:flex;align-items:center;gap:8px;font-size:12px}
-.subnav .tab .lua-icon{width:18px;height:18px}
+/* Round 15: mode-nav icons only (Athlete/Team/Arcade) get a heavier visual
+   weight — the source SVGs are solid-fill silhouettes with no stroke-width
+   to bump, so feMorphology dilates the filled shape's edges outward
+   instead. Subnav/home-card icons stay unbolded. */
+.icon-bold{filter:url(#icon-bold-filter)}
+.subnav .tab{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:12px}
+.subnav .tab .lua-icon{width:36px;height:36px}
 .team-logo-fallback .lua-icon{width:44px;height:44px;color:var(--ink)}
-@media(max-width:900px){.mode-btn .lua-icon{width:26px;height:26px}.subnav .tab .lua-icon{width:16px;height:16px}}
+@media(max-width:900px){.mode-btn .lua-icon{width:26px;height:26px}}
 .path-icon{display:flex;align-items:center;justify-content:center;align-self:center;margin:30px auto}
 
 

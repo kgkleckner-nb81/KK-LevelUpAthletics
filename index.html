@@ -7,6 +7,11 @@
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="icon-bold-filter" x="-25%" y="-25%" width="150%" height="150%">
+    <feMorphology operator="dilate" radius="1.1"/>
+  </filter>
+</svg>
 <header class="hero">
   <div class="hero-copy">
     <h1>Train. Level Up. Get Called Up.</h1>
@@ -28,9 +33,9 @@
 
 <nav class="mode-nav">
   <button class="mode-btn active" data-mode="home" type="button">Home</button>
-  <button class="mode-btn" data-mode="athlete" type="button" aria-label="Athlete"><span class="lua-icon icon-athlete" aria-hidden="true"></span></button>
-  <button class="mode-btn" data-mode="team" type="button" aria-label="Team HQ"><span class="lua-icon icon-team" aria-hidden="true"></span></button>
-  <button class="mode-btn" data-mode="arcade" type="button" aria-label="Arcade"><span class="lua-icon icon-arcade" aria-hidden="true"></span></button>
+  <button class="mode-btn" data-mode="athlete" type="button" aria-label="Athlete"><span class="lua-icon icon-athlete icon-bold" aria-hidden="true"></span></button>
+  <button class="mode-btn" data-mode="team" type="button" aria-label="Team HQ"><span class="lua-icon icon-team icon-bold" aria-hidden="true"></span></button>
+  <button class="mode-btn" data-mode="arcade" type="button" aria-label="Arcade"><span class="lua-icon icon-arcade icon-bold" aria-hidden="true"></span></button>
   <button class="mode-btn parent-mode" data-mode="parent" type="button">Coach/Parent Corner</button>
 </nav>
 
