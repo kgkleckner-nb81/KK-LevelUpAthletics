@@ -67,11 +67,10 @@ function modeForScreen(id){
   return 'home';
 }
 function showModeNav(mode){
-  $$('.mode-btn').forEach(b=>{
-    const isActive=b.dataset.mode===mode;
-    b.classList.toggle('active',isActive);
-    b.querySelector('.icon-badge')?.classList.toggle('is-active',isActive);
-  });
+  // Round 14: active-state icon color now cascades from the button's own
+  // .active class via plain CSS descendant selectors (.mode-btn.active
+  // .lua-icon), so no separate icon-level class to toggle here anymore.
+  $$('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
   ['athlete','team','arcade','parent'].forEach(m=>{
     const el=$('#'+m+'Subnav'); if(el) el.classList.toggle('hidden',m!==mode);
   });
@@ -79,11 +78,7 @@ function showModeNav(mode){
 function switchScreen(id){
   const mode=modeForScreen(id);
   showModeNav(mode);
-  $$('.tab').forEach(b=>{
-    const isActive=b.dataset.screen===id;
-    b.classList.toggle('active',isActive);
-    b.querySelector('.icon-badge')?.classList.toggle('is-active',isActive);
-  });
+  $$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.screen===id));
   $$('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
   window.scrollTo({top:0,behavior:'smooth'});
   render();
@@ -1801,7 +1796,7 @@ function teamLogoHTML(sizeClass){
   if(state.team&&state.team.logo){
     return `<img src="${state.team.logo}" alt="${state.team.name||'Team'} logo" class="team-logo ${sizeClass||''}">`;
   }
-  const inner=state.team&&state.team.name?state.team.name.trim().charAt(0).toUpperCase():'<svg class="nav-icon" style="width:1em;height:1em"><use href="#i-team"/></svg>';
+  const inner=state.team&&state.team.name?state.team.name.trim().charAt(0).toUpperCase():'<span class="lua-icon icon-team" aria-hidden="true"></span>';
   return `<div class="team-logo-fallback ${sizeClass||''}">${inner}</div>`;
 }
 function renderTeamIdentity(){

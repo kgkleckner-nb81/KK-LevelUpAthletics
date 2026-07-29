@@ -890,38 +890,61 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .home-pulse strong{display:block;margin-top:5px;font-family:var(--accent);font-size:18px;color:var(--neon-yellow)}
 @media(max-width:900px){.status-bar{gap:6px;padding:7px 8px}.status-item{min-width:40px;padding:3px}.status-athlete{display:none}.mode-nav{top:47px;grid-template-columns:repeat(4,1fr)}.parent-mode{display:none}.subnav{top:96px}.path-grid{grid-template-columns:1fr}.path-card{min-height:350px}.home-pulse{grid-template-columns:1fr 1fr}.path-card h3{font-size:38px}}
 
-/* Round 10: SVG icon system — badges are self-contained chips (own bg/
-   border/shadow), so they read cleanly regardless of what sits behind
-   them. Two variants share every existing :root token, no new hex. */
-.nav-icon{width:1em;height:1em;display:inline-block;vertical-align:-0.15em}
-.icon-badge{
-  display:grid;
-  place-items:center;
-  border-radius:14px;
-  border:2px solid var(--ink);
-  box-shadow:var(--shadow-sm);
-  flex-shrink:0;
+/* Round 14: final vector icon library, referenced as CSS masks (files are
+   plain solid-fill silhouettes, no currentColor built in) so every state
+   below — default/hover/active/unlocked — is a plain color change, no SVG
+   editing. Supersedes Round 10's inline <symbol> sprite + .icon-badge
+   two-layer chip system entirely. */
+.lua-icon{
+  display:inline-block;
+  background-color:currentColor;
+  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+  -webkit-mask-position:center;  mask-position:center;
+  -webkit-mask-size:contain;     mask-size:contain;
+  vertical-align:middle;
+  flex:none;
 }
-/* Dark badge: true black chrome only (status bar, mode nav, Arcade, footer, League drops) */
-.icon-badge.on-dark{background:var(--ink);color:var(--neon-blue)}
-.icon-badge.on-dark.is-active{background:var(--cream);color:var(--ink)} /* on-dark's badge bg is always ink — flip to a light chip on active, otherwise an ink-colored icon on an ink badge is invisible */
-.icon-badge.on-dark.is-unlocked{color:var(--neon-green)}
-/* Light badge: default, everything on a cream/paper card */
-.icon-badge.on-light{background:var(--cream);color:var(--ink)}
-.icon-badge.on-light.is-active{color:var(--deep-blue);border-color:var(--deep-blue)}
-.icon-badge.on-light.is-unlocked{color:var(--success);border-color:var(--neon-green)}
+.icon-athlete       { -webkit-mask-image:url('assets/icons/LUA_Athlete.svg');        mask-image:url('assets/icons/LUA_Athlete.svg'); }
+.icon-team          { -webkit-mask-image:url('assets/icons/LUA_Team.svg');           mask-image:url('assets/icons/LUA_Team.svg'); }
+.icon-arcade        { -webkit-mask-image:url('assets/icons/LUA_Arcade.svg');         mask-image:url('assets/icons/LUA_Arcade.svg'); }
+.icon-clubhouse     { -webkit-mask-image:url('assets/icons/LUA_Clubhouse.svg');      mask-image:url('assets/icons/LUA_Clubhouse.svg'); }
+.icon-daily-checkin { -webkit-mask-image:url('assets/icons/LUA_Daily-Check-In.svg'); mask-image:url('assets/icons/LUA_Daily-Check-In.svg'); }
+.icon-combine       { -webkit-mask-image:url('assets/icons/LUA_Weekly-Combine.svg'); mask-image:url('assets/icons/LUA_Weekly-Combine.svg'); }
+.icon-player-card   { -webkit-mask-image:url('assets/icons/LUA_Player-Card.svg');    mask-image:url('assets/icons/LUA_Player-Card.svg'); }
+.icon-skill-lab     { -webkit-mask-image:url('assets/icons/LUA_Skill-Lab.svg');      mask-image:url('assets/icons/LUA_Skill-Lab.svg'); }
+.icon-quests        { -webkit-mask-image:url('assets/icons/LUA_Quests.svg');         mask-image:url('assets/icons/LUA_Quests.svg'); }
+.icon-battles       { -webkit-mask-image:url('assets/icons/LUA_Battles.svg');        mask-image:url('assets/icons/LUA_Battles.svg'); }
+.icon-rewards       { -webkit-mask-image:url('assets/icons/LUA_Rewards.svg');        mask-image:url('assets/icons/LUA_Rewards.svg'); }
+.icon-leaderboards  { -webkit-mask-image:url('assets/icons/LUA_Leaderboards.svg');   mask-image:url('assets/icons/LUA_Leaderboards.svg'); }
+.icon-stats-charts  { -webkit-mask-image:url('assets/icons/LUA_Stats-Charts.svg');   mask-image:url('assets/icons/LUA_Stats-Charts.svg'); }
 
-.path-icon .icon-badge{width:152px;height:152px;border-radius:28px}
-.path-icon .nav-icon{width:84px;height:84px}
-.mode-btn .icon-badge{width:52px;height:52px;margin:0 auto 4px}
-.mode-btn .nav-icon{width:32px;height:32px}
-.mode-btn{font-size:12px}
-.subnav .tab .icon-badge{width:44px;height:44px}
-.subnav .tab .nav-icon{width:28px;height:28px}
-.tab-icon-inline{width:52px;height:52px;margin-right:2px}
-.tab-icon-inline .nav-icon{width:32px;height:32px}
-@media(max-width:900px){.mode-btn .icon-badge{width:44px;height:44px}.mode-btn .nav-icon{width:26px;height:26px}.subnav .tab .icon-badge{width:38px;height:38px}.subnav .tab .nav-icon{width:24px;height:24px}}
-.subnav .tab{display:inline-flex;align-items:center;gap:7px;font-size:12px}
+/* Color states — default/hover/active, existing :root tokens only. */
+.mode-btn .lua-icon{color:var(--neon-blue)}
+.mode-btn:hover .lua-icon{filter:drop-shadow(0 0 6px rgba(0,229,255,.75))}
+.mode-btn.active .lua-icon{color:var(--ink)} /* active bg is the pink/creamsicle gradient — ink reads best on it */
+
+.subnav .tab .lua-icon{color:var(--paper)} /* matches the existing white text on the dark .tab pill */
+.subnav .tab:hover .lua-icon{color:var(--neon-blue)}
+.subnav .tab.active .lua-icon{color:var(--ink)} /* active bg flips to var(--neon-blue) */
+
+.path-card .lua-icon{color:var(--paper)}
+.path-card:hover .lua-icon{filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
+
+.tab-icon-inline{color:var(--ink);width:32px;height:32px} /* Boss Battles inline icon sits on a cream .card, not a nav element */
+/* No .lua-icon currently lives inside .reward-tile/.quest-card (those use
+   separate decorative emoji) — this is a forward-compatible hook in case
+   one is placed there in a future round, per the unlocked/complete color
+   treatment this round's spec calls for. */
+.reward-tile.unlocked .lua-icon,.quest-card.complete .lua-icon{color:var(--success)}
+
+/* Layout per placement */
+.path-icon .lua-icon{width:130px;height:130px}
+.mode-btn{display:flex;align-items:center;justify-content:center;padding:12px 10px!important}
+.mode-btn .lua-icon{width:34px;height:34px}
+.subnav .tab{display:flex;align-items:center;gap:8px;font-size:12px}
+.subnav .tab .lua-icon{width:18px;height:18px}
+.team-logo-fallback .lua-icon{width:44px;height:44px;color:var(--ink)}
+@media(max-width:900px){.mode-btn .lua-icon{width:26px;height:26px}.subnav .tab .lua-icon{width:16px;height:16px}}
 .path-icon{display:flex;align-items:center;justify-content:center;align-self:center;margin:30px auto}
 
 
