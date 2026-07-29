@@ -947,7 +947,7 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
    instead. Subnav/home-card icons stay unbolded. */
 .icon-bold{filter:url(#icon-bold-filter)}
 .subnav .tab{display:flex;align-items:center;gap:10px;padding:6px 16px 6px 6px;font-size:10px}
-.subnav .tab .lua-icon{width:84px;height:84px}
+.subnav .tab .lua-icon{width:42px;height:42px}
 .team-logo-fallback .lua-icon{width:44px;height:44px;color:var(--ink)}
 @media(max-width:900px){.mode-btn .lua-icon{width:26px;height:26px}}
 .path-icon{display:flex;align-items:center;justify-content:center;align-self:center;margin:30px auto}
