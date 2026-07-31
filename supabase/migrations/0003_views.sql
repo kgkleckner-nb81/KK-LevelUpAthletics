@@ -5,8 +5,13 @@
 -- keeps Team/League HQ numbers always-correct without a separate refresh
 -- step. At pilot scale (a handful of teams/leagues) this is fine; swap to a
 -- materialized view later, without touching app.js, only if it's ever slow.
+--
+-- All CREATE VIEW statements use CREATE OR REPLACE so this file is safe to
+-- re-run from scratch at any point, even after a partial prior failure —
+-- confirmed the Supabase SQL editor commits each statement as it executes
+-- rather than rolling back the whole pasted block on a later error.
 
-create view athlete_xp_totals as
+create or replace view athlete_xp_totals as
 select athlete_id, coalesce(sum(amount),0) as total_xp
 from xp_ledger
 group by athlete_id;
@@ -24,7 +29,7 @@ group by athlete_id;
 -- which checks authorization first and only then reads from the view. The
 -- view itself is just a shared query definition, never queried directly by
 -- a client.
-create view team_roster_view
+create or replace view team_roster_view
 with (security_invoker = false) as
 select
   tm.team_id,
@@ -74,7 +79,7 @@ end $$;
 revoke all on function get_team_roster(uuid) from public;
 grant execute on function get_team_roster(uuid) to authenticated;
 
-create view team_xp_totals as
+create or replace view team_xp_totals as
 select
   t.id as team_id,
   t.name as team_name,
@@ -90,7 +95,7 @@ left join (
 group by t.id, t.name;
 grant select on team_xp_totals to authenticated;
 
-create view league_team_totals as
+create or replace view league_team_totals as
 select
   l.id as league_id, l.name as league_name,
   t.id as team_id, t.name as team_name,
