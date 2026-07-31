@@ -104,8 +104,10 @@ begin
   insert into attribute_points_ledger(athlete_id, attribute, points, source)
   select p_athlete_id, key, (value::text)::int, v_id::text
   from jsonb_each(coalesce(p_attribute_points, '{}'::jsonb));
-  -- Team Program's once-daily +50 XP bonus.
-  if p_program_type = 'team' and not exists (
+  -- Team Program's once-daily +50 XP bonus — only when something was
+  -- actually logged (matches the old app's loggedSomething gate), and only
+  -- once per day.
+  if p_program_type = 'team' and coalesce(p_exercise_data, '{}'::jsonb) <> '{}'::jsonb and not exists (
     select 1 from xp_ledger where athlete_id = p_athlete_id and source = 'team_program_bonus'
       and created_at::date = p_date
   ) then

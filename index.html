@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Level Up Athletics</title>
   <link rel="stylesheet" href="styles.css"/>
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+    window.supabase = createClient(
+      'https://nnujbsvljquzxziivknb.supabase.co',
+      'sb_publishable_twOy8ZwTP00ZDqgJMVdCnw_HM7yL2gO'
+    );
+    window.dispatchEvent(new Event('supabase-ready'));
+  </script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -29,6 +37,11 @@
   <div class="status-item"><span>XP</span><strong id="statusXP">0</strong></div>
   <div class="status-item"><span>🔥</span><strong id="statusStreak">0</strong></div>
   <div class="status-item pack-status"><span>⭐</span><strong id="statusPack">LOCKED</strong></div>
+  <div class="status-item auth-controls">
+    <button id="signInBtn" class="auth-trigger" type="button">Sign In</button>
+    <select id="athleteSwitcher" class="athlete-switcher hidden"></select>
+    <button id="signOutBtn" class="auth-trigger hidden" type="button">Sign Out</button>
+  </div>
 </div>
 
 <nav class="mode-nav">
@@ -468,10 +481,44 @@
   </div>
 </div>
 
+<div id="authModal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closeAuthModal" class="modal-close" type="button">×</button>
+    <div id="authStepEmail">
+      <h2>Sign In</h2>
+      <p class="muted">Parents and coaches sign in with a magic link — no password to remember. We'll email you a link that logs you straight in.</p>
+      <label>Email<input id="authEmailInput" type="email" placeholder="you@example.com"></label>
+      <button id="sendMagicLinkBtn" class="primary" type="button">Send Magic Link</button>
+      <p id="authEmailStatus" class="muted"></p>
+    </div>
+    <div id="authStepProfile" class="hidden">
+      <h2>Set Up Your Account</h2>
+      <p class="muted">One-time setup — tell us who you are.</p>
+      <label>Your name<input id="authDisplayName" type="text" placeholder="e.g. Kurt Kleckner"></label>
+      <label class="checkbox-row"><input id="authIsParent" type="checkbox" checked> I'm a parent</label>
+      <label class="checkbox-row"><input id="authIsCoach" type="checkbox"> I'm a coach</label>
+      <button id="saveProfileBtn" class="primary" type="button">Continue</button>
+      <p id="authProfileStatus" class="muted"></p>
+    </div>
+  </div>
+</div>
+
+<div id="addAthleteModal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closeAddAthleteModal" class="modal-close" type="button">×</button>
+    <h2>Add an Athlete</h2>
+    <p class="muted">Add a profile for each of your kids — you can switch between them anytime from the top bar.</p>
+    <label>Athlete's name<input id="newAthleteName" type="text" placeholder="e.g. Ethan"></label>
+    <button id="saveNewAthleteBtn" class="primary" type="button">Add Athlete</button>
+    <p id="addAthleteStatus" class="muted"></p>
+  </div>
+</div>
+
 <footer>
   <p>Play fast. Have fun. Get a little better every day.</p>
   <p class="brand-signature">Level Up Athletics</p>
 </footer>
+<script src="data.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

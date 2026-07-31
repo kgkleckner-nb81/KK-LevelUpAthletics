@@ -118,24 +118,27 @@ function collectActivitySets(prefix,d,a,setCount){
   }
   return sets;
 }
-$('#dailyForm').onsubmit=e=>{
+$('#dailyForm').onsubmit=async e=>{
   e.preventDefault();
+  if(!activeAthlete){alert('Sign in and select an athlete before logging a workout.');return}
   const d=Object.fromEntries(new FormData(e.target).entries());
-  d.custom={};
+  const custom={};
   const prog=findProgram(state.activeProgramId);
-  d.programType='personal';
-  d.programId=prog?prog.id:null;
-  d.programName=prog?prog.name:null;
+  const programId=prog?prog.id:null;
+  const programName=prog?prog.name:null;
   (prog?prog.activityIds:[]).forEach(actId=>{
     const a=findActivityById(actId);
     if(!a) return;
     const sets=collectActivitySets('set',d,a,dailySetCounts[actId]||1);
-    if(sets.length) d.custom[a.name]={sets};
+    if(sets.length) custom[a.name]={sets};
   });
-  state.daily.push(d);
-  state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  accumulateAttributePoints(d.custom);
-  save();
+  try{
+    await submitDailyCheckIn(activeAthlete.id,d.date||todayISO(),'personal',programId,programName,custom,computeAttributePointsDelta(custom));
+  }catch(err){
+    alert('Could not save workout: '+(err.message||'unknown error'));
+    return;
+  }
+  await refreshAthleteState();
   e.target.reset();
   $('#dailyForm').date.valueAsDate=new Date();
   dailySetCounts={};
@@ -197,32 +200,27 @@ function questCompletedThisWeek(id){
   return (state.quests||[]).some(x=>x.id===id&&weekStartISO(x.date)===wk);
 }
 if($('#teamProgramLogForm')?.date) $('#teamProgramLogForm').date.valueAsDate=new Date();
-$('#teamProgramLogForm').onsubmit=e=>{
+$('#teamProgramLogForm').onsubmit=async e=>{
   e.preventDefault();
+  if(!activeAthlete){alert('Sign in and select an athlete before logging a team check-in.');return}
   const d=Object.fromEntries(new FormData(e.target).entries());
-  d.custom={};
-  d.programType='team';
-  d.programId='team';
-  d.programName=state.teamProgram?state.teamProgram.title:null;
+  const custom={};
+  const programName=state.teamProgram?state.teamProgram.title:null;
   (state.teamProgram?.activities||[]).forEach(name=>{
     const a=findActivity(name);
     if(!a) return;
     const sets=collectActivitySets('teamset',d,a,teamSetCounts[a.id]||1);
-    if(sets.length) d.custom[a.name]={sets};
+    if(sets.length) custom[a.name]={sets};
   });
-  state.daily.push(d);
-  state.daily.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  // Round 4: the 50 XP team-program bonus fires here — on an actual save with
-  // at least one logged exercise — not on the Clubhouse click that got the
-  // athlete here. Still only once per day, same gate as before.
-  state.bonuses=state.bonuses||[];
-  const loggedSomething=Object.keys(d.custom).length>0;
-  const alreadyAwardedToday=state.bonuses.some(x=>x.type==='Team Program'&&x.date===todayISO());
-  if(loggedSomething&&!alreadyAwardedToday){
-    state.bonuses.push({date:todayISO(),type:'Team Program',xp:50,reason:state.teamProgram.title});
+  // The 50 XP team-program bonus fires server-side (log_daily_check_in RPC)
+  // only when custom is non-empty and only once per day — same gate as before.
+  try{
+    await submitDailyCheckIn(activeAthlete.id,d.date||todayISO(),'team','team',programName,custom,computeAttributePointsDelta(custom));
+  }catch(err){
+    alert('Could not save check-in: '+(err.message||'unknown error'));
+    return;
   }
-  accumulateAttributePoints(d.custom);
-  save();
+  await refreshAthleteState();
   e.target.reset();
   $('#teamProgramLogForm').date.valueAsDate=new Date();
   teamSetCounts={};
@@ -388,7 +386,12 @@ function ratings(){
 }
 function streak(){const dates=[...new Set(state.daily.map(x=>x.date).filter(Boolean))].sort().reverse();if(!dates.length)return 0;let s=0,d=new Date();for(let i=0;i<365;i++){const iso=d.toISOString().slice(0,10);if(dates.includes(iso)){s++;d.setDate(d.getDate()-1)}else if(i===0)d.setDate(d.getDate()-1);else break}return s}
 function spinXP(){return (state.spinLog||[]).reduce((a,x)=>a+(+x.xp||0),0)}
-function xp(){return state.daily.length*25+state.combine.filter(x=>x.verified).length*75+questXP()+bonusXP()+spinXP()}
+// Phase B: daily-check-in/mission/team-bonus XP now comes from the server
+// (state.totalXP, via xp_ledger) instead of state.daily.length*25 — those
+// write paths are migrated. Combine/quest/bonus/reward XP still come from
+// local state until Phase D migrates their approval flows too, so this is
+// a deliberate hybrid, not a full switch to state.totalXP alone.
+function xp(){return (state.totalXP||0)+state.combine.filter(x=>x.verified).length*75+questXP()+bonusXP()+spinXP()}
 // Round 5 item 9: tier is now stateful (state.currentTierIndex), advanced
 // only by evaluatePromotion() at a verified-Combine save — not a pure
 // function of the current rating, so it doesn't flicker as raw numbers
@@ -1060,20 +1063,25 @@ function findActivityById(id){return activities.find(a=>a.id===id)}
 // Round 9 built this as a purely additive, informational-only tally, fed by
 // Daily/Team Program Check-In logs (weight x sets logged per activity, not
 // weighted by raw value since reps/seconds/inches aren't unit-compatible).
-// Round 13 repurposes it into a real (capped) scoring input — see
-// completionScore()/axisScore() — and resets it at each verified-Combine
-// checkpoint (recordCombineCheckpoint) so it reflects completion since the
-// last checkpoint, not a lifetime tally.
-function accumulateAttributePoints(custom){
-  state.attributePoints=state.attributePoints||{};
+// Round 13 repurposed it into a real (capped) scoring input — see
+// completionScore()/axisScore() — reset at each verified-Combine checkpoint
+// so it reflects completion since the last checkpoint, not a lifetime tally.
+// Phase B: the checkpoint-tagged reset now lives server-side
+// (attribute_points_ledger.checkpoint_id), so this only computes the point
+// delta for a single check-in — log_daily_check_in's RPC does the
+// insert/accumulation; app.js never mutates state.attributePoints directly
+// anymore, it's refreshed from the server after every check-in.
+function computeAttributePointsDelta(custom){
+  const delta={};
   Object.entries(custom||{}).forEach(([name,entry])=>{
     const a=findActivity(name);
     const sets=entry&&Array.isArray(entry.sets)?entry.sets.length:0;
     if(!a||!a.attributes||!sets) return;
     Object.entries(a.attributes).forEach(([attr,weight])=>{
-      state.attributePoints[attr]=(state.attributePoints[attr]||0)+weight*sets;
+      delta[attr]=(delta[attr]||0)+weight*sets;
     });
   });
+  return delta;
 }
 function exerciseCategory(name){const a=findActivity(name);return a?a.category:null}
 // Three ready-made, locked programs so an athlete can start logging on day
@@ -1401,41 +1409,59 @@ function rollDailyMissionReward(){
   }
   return {type:'xp',xp:40};
 }
-function completeDailyMission(){
+async function completeDailyMission(){
+  if(!activeAthlete){alert('Sign in and select an athlete before completing today’s mission.');return}
   const m=missionForToday();
-  state.bonuses=state.bonuses||[];
-  if(state.bonuses.some(x=>x.type==='Daily Mission'&&x.date===todayISO())){alert('Today’s mission is already complete.');return}
-  const result=rollDailyMissionReward();
-  state.bonuses.push({date:todayISO(),type:'Daily Mission',xp:result.type==='xp'?result.xp:0,reason:m.title});
-  save();
-  alert(result.type==='xp'?`Mission complete! +${result.xp} XP.`:`Mission complete! You unlocked ${result.item.name} for your Gear Locker.`);
+  let result;
+  try{
+    result=await completeDailyMissionRemote(activeAthlete.id,m.title);
+  }catch(err){
+    alert(err.message==='mission already complete today'?'Today’s mission is already complete.':('Could not complete mission: '+(err.message||'unknown error')));
+    return;
+  }
+  await refreshAthleteState();
+  if(result.type==='xp'){
+    alert(`Mission complete! +${result.xp} XP.`);
+  }else{
+    const item=findGearItem(result.item_id);
+    alert(`Mission complete! You unlocked ${item?item.name:'a new item'} for your Gear Locker.`);
+  }
   render();
 }
-// Round 12 items 4-5: instant, no-parent-code cosmetic purchase (unlike
-// claimReward()'s real-world flow) — buying is permanent, equipping is
-// always free including switching back to Default.
-function buyGearItem(itemId){
+// Round 12 items 4-5: instant, no-PIN cosmetic purchase (unlike claimReward()'s
+// real-world flow) — buying is permanent, equipping is always free including
+// switching back to Default. Phase B: both now go through Supabase.
+async function buyGearItem(itemId){
+  if(!activeAthlete){alert('Sign in and select an athlete before visiting the Gear Locker.');return}
   const item=findGearItem(itemId);
   if(!item) return;
-  state.inventory=state.inventory||['default'];
-  if(state.inventory.includes(itemId)){alert(`${item.name} is already unlocked.`);return}
+  if((state.inventory||['default']).includes(itemId)){alert(`${item.name} is already unlocked.`);return}
   const balance=availableBalance();
   if(balance<item.xpCost){alert(`Not enough balance to buy ${item.name}. You need ${item.xpCost} XP and have ${balance}.`);return}
-  state.inventory.push(itemId);
-  state.gearPurchases=state.gearPurchases||[];
-  state.gearPurchases.push({itemId,xpCost:item.xpCost,date:todayISO()});
-  save();
+  try{
+    await buyGearItemRemote(activeAthlete.id,itemId);
+  }catch(err){
+    alert('Could not complete purchase: '+(err.message||'unknown error'));
+    return;
+  }
+  await refreshAthleteState();
   alert(`${item.name} unlocked! -${item.xpCost} XP.`);
   render();
 }
-function equipGearItem(slot,itemId){
-  state.equipped=state.equipped||{...defaultEquipped};
+async function equipGearItem(slot,itemId){
+  if(!activeAthlete) return;
   if(itemId!=='default'){
     const item=findGearItem(itemId);
     if(!item||item.slot!==slot||!(state.inventory||[]).includes(itemId)) return;
   }
+  try{
+    await equipGearItemRemote(activeAthlete.id,slot,itemId);
+  }catch(err){
+    alert('Could not update equipped gear: '+(err.message||'unknown error'));
+    return;
+  }
+  state.equipped=state.equipped||{...defaultEquipped};
   state.equipped[slot]=itemId;
-  save();
   render();
 }
 function useRainToken(){state.rainTokens=state.rainTokens??1;if(state.rainTokens<=0){alert('No Rain Delay Tokens available.');return}state.rainTokens-=1;state.bonuses=state.bonuses||[];state.bonuses.push({date:todayISO(),type:'Rain Delay Token',xp:0,reason:'Streak protected'});save();alert('Streak protected for one missed day.');renderTeamEdition()}
@@ -2316,6 +2342,149 @@ renderDailyCustomFields();
 renderCombineProgramPicker();
 if($('#coachGradeFields'))$('#coachGradeFields').innerHTML=coachGradeFieldsHTML('grade_');
 renderCoachGradeUpdatePanel();
+
+// ---- Supabase auth, profile, and athlete switcher (Phase B) ----
+// currentSession/currentProfile/currentAthletes/activeAthlete are the
+// account-layer equivalent of `state` — they describe WHO is signed in and
+// WHICH athlete is selected, not athlete data itself. Once an athlete is
+// selected, refreshAthleteState() overlays that athlete's Supabase data
+// onto the existing `state` object so every render()/ratings() call below
+// keeps working unchanged.
+let currentSession=null;
+let currentProfile=null;
+let currentAthletes=[];
+let activeAthlete=null;
+
+async function refreshAthleteState(){
+  if(!activeAthlete) return;
+  const remote=await loadAthleteState(activeAthlete.id);
+  Object.assign(state,remote);
+  render();
+}
+async function selectAthlete(athleteId){
+  const a=currentAthletes.find(x=>x.id===athleteId);
+  if(!a) return;
+  activeAthlete=a;
+  setStoredActiveAthleteId(a.id);
+  state.athleteName=a.display_name;
+  await refreshAthleteState();
+}
+function updateAuthUI(){
+  const signedIn=!!currentSession;
+  if($('#signInBtn'))$('#signInBtn').classList.toggle('hidden',signedIn);
+  if($('#signOutBtn'))$('#signOutBtn').classList.toggle('hidden',!signedIn);
+  if($('#athleteSwitcher'))$('#athleteSwitcher').classList.toggle('hidden',!signedIn||!currentAthletes.length);
+}
+function renderAthleteSwitcher(){
+  const sel=$('#athleteSwitcher');
+  if(!sel) return;
+  sel.innerHTML=currentAthletes.map(a=>`<option value="${a.id}">${a.display_name}</option>`).join('')
+    +'<option value="__add__">+ Add Athlete</option>';
+  if(activeAthlete) sel.value=activeAthlete.id;
+}
+function showAuthModal(step){
+  $('#authModal').classList.remove('hidden');
+  $('#authStepEmail').classList.toggle('hidden',step==='profile');
+  $('#authStepProfile').classList.toggle('hidden',step!=='profile');
+}
+function hideAuthModal(){$('#authModal').classList.add('hidden')}
+function showAddAthleteModal(){
+  $('#addAthleteModal').classList.remove('hidden');
+  $('#addAthleteStatus').textContent='';
+  $('#newAthleteName').value='';
+}
+function hideAddAthleteModal(){$('#addAthleteModal').classList.add('hidden')}
+
+async function afterSignedIn(session){
+  currentSession=session;
+  const profile=await fetchProfile(session.user.id);
+  if(!profile){
+    showAuthModal('profile');
+    return;
+  }
+  currentProfile=profile;
+  hideAuthModal();
+  currentAthletes=await listAthletes(profile.id);
+  updateAuthUI();
+  if(!currentAthletes.length){
+    showAddAthleteModal();
+    return;
+  }
+  renderAthleteSwitcher();
+  const storedId=getStoredActiveAthleteId();
+  const initial=currentAthletes.find(a=>a.id===storedId)||currentAthletes[0];
+  await selectAthlete(initial.id);
+}
+function afterSignedOut(){
+  currentSession=null;
+  currentProfile=null;
+  currentAthletes=[];
+  activeAthlete=null;
+  updateAuthUI();
+}
+function initAuthUI(){
+  onSupabaseReady(async()=>{
+    onAuthChange((event,session)=>{
+      if(session) afterSignedIn(session);
+      else afterSignedOut();
+    });
+    const existing=await getCurrentSession();
+    if(existing) afterSignedIn(existing);
+  });
+  if($('#signInBtn'))$('#signInBtn').onclick=()=>showAuthModal('email');
+  if($('#signOutBtn'))$('#signOutBtn').onclick=()=>signOutUser();
+  if($('#closeAuthModal'))$('#closeAuthModal').onclick=hideAuthModal;
+  if($('#sendMagicLinkBtn'))$('#sendMagicLinkBtn').onclick=async()=>{
+    const email=$('#authEmailInput').value.trim();
+    if(!email){$('#authEmailStatus').textContent='Enter an email address.';return}
+    $('#authEmailStatus').textContent='Sending...';
+    try{
+      await sendMagicLink(email);
+      $('#authEmailStatus').textContent='Check your email for a sign-in link.';
+    }catch(err){
+      $('#authEmailStatus').textContent=err.message||'Something went wrong. Try again.';
+    }
+  };
+  if($('#saveProfileBtn'))$('#saveProfileBtn').onclick=async()=>{
+    const name=$('#authDisplayName').value.trim();
+    if(!name){$('#authProfileStatus').textContent='Enter your name.';return}
+    const isParent=$('#authIsParent').checked, isCoach=$('#authIsCoach').checked;
+    if(!isParent&&!isCoach){$('#authProfileStatus').textContent='Select parent, coach, or both.';return}
+    try{
+      currentProfile=await createProfile(currentSession.user.id,name,isParent,isCoach);
+      hideAuthModal();
+      currentAthletes=await listAthletes(currentProfile.id);
+      updateAuthUI();
+      if(!currentAthletes.length) showAddAthleteModal();
+      else { renderAthleteSwitcher(); await selectAthlete(currentAthletes[0].id); }
+    }catch(err){
+      $('#authProfileStatus').textContent=err.message||'Something went wrong. Try again.';
+    }
+  };
+  if($('#closeAddAthleteModal'))$('#closeAddAthleteModal').onclick=hideAddAthleteModal;
+  if($('#saveNewAthleteBtn'))$('#saveNewAthleteBtn').onclick=async()=>{
+    const name=$('#newAthleteName').value.trim();
+    if(!name){$('#addAthleteStatus').textContent='Enter a name.';return}
+    try{
+      const a=await createAthlete(currentProfile.id,name);
+      currentAthletes.push(a);
+      hideAddAthleteModal();
+      renderAthleteSwitcher();
+      await selectAthlete(a.id);
+    }catch(err){
+      $('#addAthleteStatus').textContent=err.message||'Something went wrong. Try again.';
+    }
+  };
+  if($('#athleteSwitcher'))$('#athleteSwitcher').onchange=async e=>{
+    if(e.target.value==='__add__'){
+      renderAthleteSwitcher();
+      showAddAthleteModal();
+      return;
+    }
+    await selectAthlete(e.target.value);
+  };
+}
+initAuthUI();
 
 // Version 3.1 initial route
 showModeNav('home');
