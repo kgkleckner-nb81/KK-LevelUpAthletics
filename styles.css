@@ -719,6 +719,9 @@ footer{
 .team-logo-path{width:130px;height:130px;object-fit:contain;align-self:center;margin:25px auto;font-size:48px}
 #pathCardTeamLogo{align-self:center;display:flex;justify-content:center;width:100%}
 .feed-item,.shoutout{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center}
+.pending-request-row{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;justify-content:space-between}
+.pending-request-row span{font-weight:600}
+.pending-request-row button{padding:8px 14px;font-size:12px}
 .reaction-row{display:flex;gap:10px;flex-wrap:wrap}
 .reaction-btn{background:var(--ink);color:#fff}
 .drop-card{position:relative;padding:18px;border-radius:18px;background:linear-gradient(160deg,#191033,#3d1770);color:#fff}

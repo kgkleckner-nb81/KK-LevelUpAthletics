@@ -82,6 +82,9 @@ function switchScreen(id){
   $$('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
   window.scrollTo({top:0,behavior:'smooth'});
   render();
+  // League HQ needs its own fetch (league standings aren't part of the
+  // athlete-state refresh) — only on navigating there, not on every render().
+  if(id==='league'&&typeof renderLeagueHQ==='function') renderLeagueHQ();
 }
 function enterMode(mode){
   if(mode==='home') switchScreen('home');
@@ -205,8 +208,8 @@ $('#teamProgramLogForm').onsubmit=async e=>{
   if(!activeAthlete){alert('Sign in and select an athlete before logging a team check-in.');return}
   const d=Object.fromEntries(new FormData(e.target).entries());
   const custom={};
-  const programName=state.teamProgram?state.teamProgram.title:null;
-  (state.teamProgram?.activities||[]).forEach(name=>{
+  const programName=currentTeamProgram?currentTeamProgram.title:null;
+  (currentTeamProgram?.activity_names||[]).forEach(name=>{
     const a=findActivity(name);
     if(!a) return;
     const sets=collectActivitySets('teamset',d,a,teamSetCounts[a.id]||1);
@@ -769,7 +772,7 @@ function renderPlayerCardHero(){
   const name=state.athleteName||'Athlete';
   if($('#statusAthleteName')) $('#statusAthleteName').textContent=name.toUpperCase();
   if($('#playerCardName')) $('#playerCardName').textContent=name;
-  if($('#playerCardTeam')) $('#playerCardTeam').textContent=(state.teamIdentityJoined&&state.team&&state.team.name)||'Free Agent';
+  if($('#playerCardTeam')) $('#playerCardTeam').textContent=(athleteTeamMembership&&athleteTeamMembership.status==='approved'&&athleteTeamMembership.teams&&athleteTeamMembership.teams.name)||'Free Agent';
   [...performanceAxisOrder,'consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
     if(!bar) return;
@@ -891,7 +894,6 @@ function renderCharts(){
 }
 function best(m){let rows=[],b=m==='sprintSec'?Infinity:0;state.combine.filter(x=>x.verified).sort((a,b)=>(+a.week||0)-(+b.week||0)).forEach(x=>{let v=combineValueFor(x,m);if(m==='sprintSec'){if(v>0)b=Math.min(b,v);if(b!==Infinity)rows.push({label:'W'+x.week,value:b})}else{b=Math.max(b,v);rows.push({label:'W'+x.week,value:b})}});return rows}
 
-const demoAthletes=[{name:'Ethan',xp:2845,workouts:42,streak:12,improvement:21,sportsmanship:8,arcade:920},{name:'Jack',xp:2710,workouts:40,streak:9,improvement:16,sportsmanship:10,arcade:880},{name:'Mason',xp:2490,workouts:38,streak:7,improvement:24,sportsmanship:6,arcade:810},{name:'Luke',xp:2380,workouts:36,streak:11,improvement:19,sportsmanship:7,arcade:790},{name:'Noah',xp:2265,workouts:35,streak:6,improvement:14,sportsmanship:9,arcade:760},{name:'Charlie',xp:2140,workouts:33,streak:8,improvement:18,sportsmanship:7,arcade:730}];
 // Round 13: Core and Body Control are now real rated axes (they weren't
 // before this round). Balance and Coordination both route to the single
 // bodyControl axis — the first many-to-one case here, so whyTrackLine()
@@ -1498,8 +1500,23 @@ function renderGearLocker(){
     }).join('');
   }
 }
-function renderLeaderboard(){if(!$('#teamLeaderboard'))return;const metric=$('#leaderboardMetric')?.value||'xp';const sorted=[...demoAthletes].sort((a,b)=>b[metric]-a[metric]);$('#teamLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>${metric}</th></tr></thead><tbody>${sorted.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a[metric]}</td></tr>`).join('')}</tbody></table>`}
-function renderTeamFeed(){if(!$('#teamFeed'))return;$('#teamFeed').innerHTML=['🏆 Ethan reached Single A','👏 Jack completed today’s mission','🔥 Mason extended a 7-day streak','⭐ Coach awarded Luke Great Hustle','⚾ Noah set a new sit-up PR'].map(x=>`<div class="feed-item">${x}</div>`).join('')}
+// Phase C: sourced from currentTeamRoster (get_team_roster() RPC — name +
+// aggregate XP/participation only, the narrowed coach-view data), cached by
+// refreshTeamMembershipUI() and repainted here synchronously so this can
+// stay in the render() chain without refetching on every render.
+function renderLeaderboard(){
+  if(!$('#teamLeaderboard')) return;
+  const metric=$('#leaderboardMetric')?.value||'xp';
+  const rows=(currentTeamRoster||[]).filter(r=>r.status==='approved');
+  const sorted=[...rows].sort((a,b)=>metric==='workouts'?(b.workout_count||0)-(a.workout_count||0):(b.total_xp||0)-(a.total_xp||0));
+  const label=metric==='workouts'?'Workouts':'XP';
+  $('#teamLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>${label}</th></tr></thead><tbody>${sorted.map((r,i)=>`<tr><td>${i+1}</td><td>${r.display_name}</td><td>${metric==='workouts'?(r.workout_count||0):(r.total_xp||0)}</td></tr>`).join('')}</tbody></table>`;
+}
+// Phase C: the old fake feed named specific "teammates" doing things that
+// never happened — misleading now that real teammates exist. No activity
+// feed table exists yet, so this is an honest placeholder, not a real
+// migration, until a future round adds one.
+function renderTeamFeed(){if(!$('#teamFeed'))return;$('#teamFeed').innerHTML='<p class="muted">Team activity feed is coming in a future update.</p>'}
 // Positive Reactions and Coach/Parent Shout-Outs are one unified feed —
 // both are positive-only entries in state.shoutouts, distinguished by
 // `source` only for icon rendering.
@@ -1704,8 +1721,8 @@ function renderDailyCustomFields(){
 // a workout log, so no "Add Set" here (unlike Daily/Team Check-In).
 function combineProgramOptions(){
   const opts=(state.programs||[]).map(p=>({id:p.id,name:p.name,activities:p.activityIds.map(findActivityById).filter(Boolean)}));
-  if(state.teamProgram&&state.teamProgramOptIn){
-    opts.push({id:'team',name:state.teamProgram.title,activities:state.teamProgram.activities.map(findActivity).filter(Boolean)});
+  if(currentTeamProgram&&currentTeamProgramOptedIn){
+    opts.push({id:'team',name:currentTeamProgram.title,activities:currentTeamProgram.activity_names.map(findActivity).filter(Boolean)});
   }
   return opts;
 }
@@ -1809,106 +1826,273 @@ document.addEventListener('click',e=>{
   if(rmDraftBtn) removeActivityFromDraft(rmDraftBtn.dataset.activity);
   if(e.target.id==='goToBuilderBtn') switchScreen('library');
 });
-// ---- Team Identity ----
-// Round 5 item 11-13: replaces the hardcoded Spartans name/logo with a
-// coach-defined Team {name, joinCode, logo}, set up from Coach/Parent Corner
-// and joined by athletes entering the code once. On this single-athlete,
-// localStorage-only build "joining" just unlocks the identity display on
-// this device — a real shared roster needs the planned Supabase migration.
+// ---- Team Identity (Phase C) ----
+// Real team join is now request -> pending -> coach approve/decline
+// (team_members.status), not an instant local unlock. Team data comes from
+// Supabase (teams/team_members), scoped to the active athlete's own
+// membership row. coachTeam (below, in the auth block) is a SEPARATE
+// concept — the team a signed-in coach profile owns/manages — since a
+// person can be both a parent and a coach at once, and those are different
+// identities in the data model.
+let athleteTeamMembership=null, currentTeamXpTotals=null, currentTeamRank=null, currentTeamRankTotal=null, currentTeamRoster=[];
 function generateTeamJoinCode(){
   return Math.random().toString(36).slice(2,8).toUpperCase();
 }
-function teamLogoHTML(sizeClass){
-  if(state.team&&state.team.logo){
-    return `<img src="${state.team.logo}" alt="${state.team.name||'Team'} logo" class="team-logo ${sizeClass||''}">`;
+function teamLogoHTML(sizeClass,team){
+  if(team&&team.logo_url){
+    return `<img src="${team.logo_url}" alt="${team.name||'Team'} logo" class="team-logo ${sizeClass||''}">`;
   }
-  const inner=state.team&&state.team.name?state.team.name.trim().charAt(0).toUpperCase():'<span class="lua-icon icon-team" aria-hidden="true"></span>';
+  const inner=team&&team.name?team.name.trim().charAt(0).toUpperCase():'<span class="lua-icon icon-team" aria-hidden="true"></span>';
   return `<div class="team-logo-fallback ${sizeClass||''}">${inner}</div>`;
 }
+// Synchronous repaint from cached state (athleteTeamMembership/
+// currentTeamRoster/currentTeamXpTotals/currentTeamRank*, populated by the
+// async refreshTeamMembershipUI() below) — safe to call from the render()
+// chain on every mutation without refetching from Supabase each time.
 function renderTeamIdentity(){
-  const heroName=$('#teamHeroName'); if(heroName) heroName.textContent=(state.team&&state.team.name)||'Your Team';
-  const heroLogo=$('#teamHeroLogo'); if(heroLogo) heroLogo.innerHTML=teamLogoHTML('team-logo-hero');
-  const pathLogo=$('#pathCardTeamLogo'); if(pathLogo) pathLogo.innerHTML=teamLogoHTML('team-logo-path');
-  const joinCard=$('#teamJoinCard');
-  if(joinCard) joinCard.classList.toggle('hidden',!(state.team&&state.team.joinCode&&!state.teamIdentityJoined));
+  const m=athleteTeamMembership;
+  const approved=!!(m&&m.status==='approved');
+  const joinCard=$('#teamJoinCard'), heroCard=$('#teamHeroCard'), statsGrid=$('#teamStatsGrid'), boardsGrid=$('#teamBoardsGrid');
+  if(joinCard) joinCard.classList.toggle('hidden',approved);
+  if(heroCard) heroCard.classList.toggle('hidden',!approved);
+  if(statsGrid) statsGrid.classList.toggle('hidden',!approved);
+  if(boardsGrid) boardsGrid.classList.toggle('hidden',!approved);
+  if(!approved){
+    const formFields=$('#teamJoinFormFields');
+    if(m&&m.status==='pending'){
+      if(formFields) formFields.classList.add('hidden');
+      if($('#teamJoinStatus')) $('#teamJoinStatus').textContent=`Request sent to "${m.teams?.name||'the team'}" — waiting for coach approval.`;
+    }else{
+      if(formFields) formFields.classList.remove('hidden');
+      if($('#teamJoinStatus')) $('#teamJoinStatus').textContent=m&&m.status==='declined'?'Your last request was declined. You can try again.':'';
+    }
+  }
+  const pathLogo=$('#pathCardTeamLogo');
+  if(pathLogo) pathLogo.innerHTML=teamLogoHTML('team-logo-path',approved?m.teams:null);
+  if(!approved) return;
+  const heroName=$('#teamHeroName'); if(heroName) heroName.textContent=m.teams?.name||'Your Team';
+  const heroLogo=$('#teamHeroLogo'); if(heroLogo) heroLogo.innerHTML=teamLogoHTML('team-logo-hero',m.teams);
+  if($('#teamStatXP')) $('#teamStatXP').textContent=currentTeamXpTotals?currentTeamXpTotals.team_xp:0;
+  if($('#teamStatRoster')) $('#teamStatRoster').textContent=currentTeamXpTotals?currentTeamXpTotals.athlete_count:0;
+  if($('#teamStatRank')) $('#teamStatRank').textContent=currentTeamRank||'—';
+  if($('#teamStatRankOf')) $('#teamStatRankOf').textContent=currentTeamRankTotal?`of ${currentTeamRankTotal}`:'';
+  if($('#teamHeroMeta')) $('#teamHeroMeta').textContent=`${currentTeamXpTotals?currentTeamXpTotals.athlete_count:0} Athletes`;
+  const approvedRoster=(currentTeamRoster||[]).filter(r=>r.status==='approved');
+  const weekMs=7*24*60*60*1000, now=Date.now();
+  const activeThisWeek=approvedRoster.filter(r=>r.last_workout_date&&(now-new Date(r.last_workout_date).getTime())<=weekMs).length;
+  if($('#teamStatCompletion')) $('#teamStatCompletion').textContent=(approvedRoster.length?Math.round(activeThisWeek/approvedRoster.length*100):0)+'%';
 }
-function joinTeamIdentity(){
-  const codeInput=$('#teamJoinCodeInput');
-  const code=(codeInput?codeInput.value:'').trim().toUpperCase();
-  if(!state.team||!state.team.joinCode){if($('#teamJoinStatus'))$('#teamJoinStatus').textContent='No team has been set up yet.';return}
-  if(code!==state.team.joinCode){if($('#teamJoinStatus'))$('#teamJoinStatus').textContent='Incorrect join code.';return}
-  state.teamIdentityJoined=true;
-  save();
-  if(codeInput) codeInput.value='';
-  if($('#teamJoinStatus'))$('#teamJoinStatus').textContent='';
+// Async: fetches the active athlete's membership + (if approved) roster/
+// totals/rank, caches them, then repaints. Called on athlete select and
+// after a join request — NOT from the general render() chain.
+async function refreshTeamMembershipUI(){
+  if(!activeAthlete) return;
+  athleteTeamMembership=await getAthleteTeamMembership(activeAthlete.id);
+  const approved=athleteTeamMembership&&athleteTeamMembership.status==='approved';
+  if(approved){
+    const teamId=athleteTeamMembership.teams.id;
+    const [totals,ranked,roster]=await Promise.all([
+      loadTeamXpTotals(teamId), loadAllTeamXpTotalsRanked(), loadTeamRoster(teamId)
+    ]);
+    currentTeamXpTotals=totals;
+    currentTeamRoster=roster;
+    const rankIndex=ranked.findIndex(t=>t.team_id===teamId);
+    currentTeamRank=rankIndex>=0?rankIndex+1:null;
+    currentTeamRankTotal=ranked.length;
+  }else{
+    currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
+  }
   renderTeamIdentity();
+  renderLeaderboard();
+  await refreshTeamProgramForAthlete();
 }
-function saveTeamSetup(){
-  const code=$('#teamSetupCode').value;
-  if(code!==state.parentCode){alert('Incorrect coach/parent code. Team not saved.');return}
+async function joinTeamIdentity(){
+  if(!activeAthlete){alert('Sign in and select an athlete first.');return}
+  const codeInput=$('#teamJoinCodeInput');
+  const code=(codeInput?codeInput.value:'').trim();
+  if(!code){if($('#teamJoinStatus'))$('#teamJoinStatus').textContent='Enter a join code.';return}
+  try{
+    await requestTeamJoinForAthlete(activeAthlete.id,code);
+  }catch(err){
+    if($('#teamJoinStatus'))$('#teamJoinStatus').textContent=err.message||'Could not send join request.';
+    return;
+  }
+  if(codeInput) codeInput.value='';
+  await refreshTeamMembershipUI();
+}
+// ---- Coach Team Setup (Phase C) ----
+// Operates on the signed-in profile's OWN team (coach_profile_id=auth.uid(),
+// enforced by RLS) — no shared code anymore, real identity via the session.
+async function saveTeamSetup(){
+  if(!currentProfile){alert('Sign in first.');return}
   const name=$('#teamNameInput').value.trim();
   if(!name){alert('Enter a team name.');return}
-  state.team=state.team||{};
-  state.team.name=name;
-  if(!state.team.joinCode) state.team.joinCode=generateTeamJoinCode();
-  save();
-  $('#teamSetupCode').value='';
-  if($('#teamSetupStatus')) $('#teamSetupStatus').textContent=`Saved "${name}". Join code: ${state.team.joinCode}`;
-  renderTeamIdentity();
+  let created=null,lastErr=null;
+  for(let attempt=0;attempt<5&&!created;attempt++){
+    try{ created=await createTeam(currentProfile.id,name,generateTeamJoinCode()); }
+    catch(err){ lastErr=err; if(!/duplicate key|unique/i.test(err.message||'')) break; }
+  }
+  if(!created){alert('Could not save team: '+(lastErr?.message||'unknown error'));return}
+  coachTeam=created;
+  $('#teamNameInput').value='';
+  if($('#teamSetupStatus')) $('#teamSetupStatus').textContent=`Saved "${created.name}". Join code: ${created.join_code}`;
+  renderTeamSetupPanel();
+  renderCoachOnlyVisibility();
+  await renderPendingTeamRequests();
 }
-function handleTeamLogoUpload(file){
-  if(!file) return;
+async function handleTeamLogoUpload(file){
+  if(!file||!coachTeam) return;
   const r=new FileReader();
-  r.onload=()=>{
-    state.team=state.team||{};
-    state.team.logo=r.result;
-    save();
-    renderTeamIdentity();
+  r.onload=async()=>{
+    try{
+      await updateTeamLogo(coachTeam.id,r.result);
+      coachTeam.logo_url=r.result;
+      if($('#teamSetupStatus')) $('#teamSetupStatus').textContent='Logo updated.';
+      if(activeAthlete) await refreshTeamMembershipUI();
+    }catch(err){
+      alert('Could not save logo: '+(err.message||'unknown error'));
+    }
   };
   r.readAsDataURL(file);
 }
-// ---- Team Program ----
-// Coach/parent-authored program of Skill Lab activities. Uses the existing
-// parentCode as a stand-in "admin" gate since real coach roles aren't built
-// yet. Completion is a simple once-daily checklist bonus (like Daily Mission),
-// not per-metric logging — the individual activities can still be logged
-// directly via the Skill Lab training slots if an athlete wants that detail.
-function teamProgramLabel(){return `TEAM ${(state.team?.name||'YOUR TEAM').toUpperCase()} PROGRAM`}
+function renderTeamSetupPanel(){
+  const createFields=$('#teamSetupCreateFields'), existing=$('#teamSetupExisting');
+  if(!createFields) return;
+  if(coachTeam){
+    createFields.classList.add('hidden');
+    if(existing){
+      existing.classList.remove('hidden');
+      $('#teamSetupName').textContent=coachTeam.name;
+      $('#teamSetupJoinCode').textContent=coachTeam.join_code;
+    }
+  }else{
+    createFields.classList.remove('hidden');
+    if(existing) existing.classList.add('hidden');
+  }
+}
+async function joinLeagueAction(){
+  if(!coachTeam){return}
+  const code=$('#leagueJoinCodeInput').value.trim();
+  if(!code){if($('#leagueJoinStatus'))$('#leagueJoinStatus').textContent='Enter a league code.';return}
+  try{
+    const result=await joinLeagueForTeam(coachTeam.id,code);
+    coachTeam.league_id=result?.league_id;
+    if($('#leagueJoinStatus')) $('#leagueJoinStatus').textContent=`Joined "${result?.league_name||'the league'}"!`;
+    $('#leagueJoinCodeInput').value='';
+    if(activeAthlete) await refreshTeamMembershipUI();
+  }catch(err){
+    if($('#leagueJoinStatus')) $('#leagueJoinStatus').textContent=err.message||'Could not join league.';
+  }
+}
+async function renderPendingTeamRequests(){
+  const list=$('#pendingRequestsList');
+  if(!list||!coachTeam) return;
+  const rows=await loadPendingRequestsForTeam(coachTeam.id);
+  list.innerHTML=rows.length?rows.map(r=>`<div class="pending-request-row"><span>${r.athletes?.display_name||'Athlete'}</span><button class="primary" data-approve="${r.id}" type="button">Approve</button><button class="danger" data-decline="${r.id}" type="button">Decline</button></div>`).join(''):'<p class="muted">No pending requests.</p>';
+}
+async function decideTeamJoinAction(teamMemberId,approve){
+  try{
+    await decideTeamJoinRemote(teamMemberId,approve);
+    await renderPendingTeamRequests();
+  }catch(err){
+    alert('Could not update request: '+(err.message||'unknown error'));
+  }
+}
+// ---- Coach team context (loaded once per sign-in, not athlete-scoped) ----
+let coachTeam=null;
+async function refreshCoachTeamContext(){
+  if(!currentProfile||!currentProfile.is_coach){
+    coachTeam=null; renderCoachOnlyVisibility();
+    return;
+  }
+  const teams=await loadCoachTeams(currentProfile.id);
+  coachTeam=teams[0]||null;
+  renderCoachOnlyVisibility();
+  renderTeamSetupPanel();
+  if(coachTeam){
+    await renderPendingTeamRequests();
+    await refreshTeamProgramBuilderFields();
+  }
+}
+function renderCoachOnlyVisibility(){
+  const isCoach=!!(currentProfile&&currentProfile.is_coach);
+  $$('[data-coach-only]').forEach(el=>el.classList.toggle('hidden',!isCoach));
+  if($('#leagueJoinCard')) $('#leagueJoinCard').classList.toggle('hidden',!isCoach||!coachTeam);
+  if($('#pendingRequestsCard')) $('#pendingRequestsCard').classList.toggle('hidden',!isCoach||!coachTeam);
+}
+
+// ---- Team Program (Phase C) ----
+// One row per team (team_programs), overwritten wholesale on each coach
+// save — same one-object-per-team model the old state.teamProgram used,
+// just server-side now. currentTeamProgram/currentTeamProgramOptedIn are
+// the ACTIVE ATHLETE's team's program (for the athlete-side summary/opt-in/
+// check-in UI), refreshed alongside team membership, not the coach's own —
+// a parent isn't necessarily the coach of their kid's team.
+let currentTeamProgram=null, currentTeamProgramOptedIn=false;
+function teamProgramLabel(){return `TEAM ${(athleteTeamMembership?.teams?.name||'YOUR TEAM').toUpperCase()} PROGRAM`}
+// Builds the activity multi-select's option list once (cheap/sync) — safe
+// in the render() chain. Pre-filling it with an existing program's
+// selections is a separate async step (refreshTeamProgramBuilderFields).
 function renderTeamProgramBuilder(){
   const sel=$('#teamProgramActivities');
   if(!sel || sel.options.length) return;
   sel.innerHTML=categoryOrder.map(cat=>`<optgroup label="${cat}">${activities.filter(a=>a.category===cat).map(a=>`<option value="${a.name}">${a.name}</option>`).join('')}</optgroup>`).join('');
-  if(state.teamProgram){
-    [...sel.options].forEach(o=>{o.selected=state.teamProgram.activities.includes(o.value)});
-    if($('#teamProgramTitle')) $('#teamProgramTitle').value=state.teamProgram.title;
-    if($('#teamProgramInstructions')) $('#teamProgramInstructions').value=state.teamProgram.instructions||'';
+}
+async function refreshTeamProgramBuilderFields(){
+  renderTeamProgramBuilder();
+  if(!coachTeam) return;
+  const sel=$('#teamProgramActivities');
+  const existing=await loadTeamProgram(coachTeam.id);
+  if(existing&&sel){
+    [...sel.options].forEach(o=>{o.selected=existing.activity_names.includes(o.value)});
+    if($('#teamProgramTitle')) $('#teamProgramTitle').value=existing.title;
+    if($('#teamProgramInstructions')) $('#teamProgramInstructions').value=existing.instructions||'';
   }
 }
-function saveTeamProgram(){
-  const code=$('#coachCode').value;
-  if(code!==state.parentCode){alert('Incorrect coach/parent code. Team program not saved.');return}
+async function saveTeamProgram(){
+  if(!coachTeam){alert('Set up your team first.');return}
   const chosen=[...$('#teamProgramActivities').selectedOptions].map(o=>o.value);
   if(!chosen.length){alert('Pick at least one activity for the program.');return}
-  const title=$('#teamProgramTitle').value.trim()||`${state.team?.name||'Your Team'} Baseball Training Program`;
+  const title=$('#teamProgramTitle').value.trim()||`${coachTeam.name} Baseball Training Program`;
   const instructions=($('#teamProgramInstructions')?.value||'').trim();
-  state.teamProgram={title,activities:chosen,instructions};
-  save();
-  $('#coachCode').value='';
+  try{
+    await saveTeamProgramRemote(coachTeam.id,title,chosen,instructions,currentProfile.id);
+  }catch(err){
+    alert('Could not save team program: '+(err.message||'unknown error'));
+    return;
+  }
   if($('#teamProgramStatus')) $('#teamProgramStatus').textContent=`Saved "${title}" with ${chosen.length} activities.`;
-  renderTeamProgramSummary();
-  renderClubhouseTeamProgram();
+  if(activeAthlete&&athleteTeamMembership?.teams?.id===coachTeam.id) await refreshTeamProgramForAthlete();
 }
 // Joining is one-way — there's no leave action from the athlete's side.
-function joinTeamProgram(){
-  if(!state.teamProgram || state.teamProgramOptIn) return;
-  state.teamProgramOptIn=true;
-  save();
+async function joinTeamProgram(){
+  if(!currentTeamProgram||currentTeamProgramOptedIn||!activeAthlete) return;
+  try{
+    await optInTeamProgramRemote(currentTeamProgram.id,activeAthlete.id);
+  }catch(err){
+    alert('Could not join team program: '+(err.message||'unknown error'));
+    return;
+  }
+  currentTeamProgramOptedIn=true;
   renderTeamProgramSummary();
   renderClubhouseTeamProgram();
+  renderTeamProgramLogFields();
+}
+async function refreshTeamProgramForAthlete(){
+  const team=athleteTeamMembership&&athleteTeamMembership.status==='approved'?athleteTeamMembership.teams:null;
+  if(!team){
+    currentTeamProgram=null; currentTeamProgramOptedIn=false;
+  }else{
+    currentTeamProgram=await loadTeamProgram(team.id);
+    currentTeamProgramOptedIn=currentTeamProgram?await getTeamProgramOptIn(currentTeamProgram.id,activeAthlete.id):false;
+  }
+  renderTeamProgramSummary();
+  renderClubhouseTeamProgram();
+  renderTeamProgramLogFields();
 }
 function renderTeamProgramSummary(){
   if(!$('#teamProgramSummaryCard')) return;
-  const p=state.teamProgram;
+  const p=currentTeamProgram;
   if(!p){
     $('#teamProgramSummaryTitle').textContent='No Team Program Yet';
     $('#teamProgramActivityList').innerHTML='<p class="muted">Your coach hasn’t created a team program yet.</p>';
@@ -1916,10 +2100,10 @@ function renderTeamProgramSummary(){
     return;
   }
   $('#teamProgramSummaryTitle').textContent=p.title;
-  $('#teamProgramActivityList').innerHTML='<ul>'+p.activities.map(n=>`<li>${n}</li>`).join('')+'</ul>'+(p.instructions?`<p class="muted team-program-notes"><strong>Coach note:</strong> ${p.instructions}</p>`:'');
+  $('#teamProgramActivityList').innerHTML='<ul>'+p.activity_names.map(n=>`<li>${n}</li>`).join('')+'</ul>'+(p.instructions?`<p class="muted team-program-notes"><strong>Coach note:</strong> ${p.instructions}</p>`:'');
   $('#joinTeamProgram').classList.remove('hidden');
-  $('#joinTeamProgram').disabled=!!state.teamProgramOptIn;
-  $('#joinTeamProgram').textContent=state.teamProgramOptIn?'Joined ✓':'Join Team Program';
+  $('#joinTeamProgram').disabled=!!currentTeamProgramOptedIn;
+  $('#joinTeamProgram').textContent=currentTeamProgramOptedIn?'Joined ✓':'Join Team Program';
 }
 // Round 4: the Clubhouse button no longer awards XP itself — it's a jump-off
 // point to the real logging screen. The 50 XP only fires from an actual save
@@ -1935,34 +2119,57 @@ function goToTeamProgramCheckIn(){
 }
 function renderClubhouseTeamProgram(){
   const card=$('#teamProgramCard'); if(!card) return;
-  const show=!!(state.teamProgramOptIn && state.teamProgram && state.teamProgram.activities.length);
+  const show=!!(currentTeamProgramOptedIn && currentTeamProgram && currentTeamProgram.activity_names.length);
   card.classList.toggle('hidden',!show);
   if(!show) return;
   $('#teamProgramCardTitle').textContent=teamProgramLabel();
-  $('#teamProgramTasks').innerHTML='<ul>'+state.teamProgram.activities.map(n=>`<li>☐ ${n}</li>`).join('')+'</ul>';
-  const doneToday=(state.bonuses||[]).some(x=>x.type==='Team Program'&&x.date===todayISO());
+  $('#teamProgramTasks').innerHTML='<ul>'+currentTeamProgram.activity_names.map(n=>`<li>☐ ${n}</li>`).join('')+'</ul>';
+  const doneToday=(state.daily||[]).some(x=>x.programType==='team'&&x.date===todayISO());
   if($('#completeTeamProgram')){
     $('#completeTeamProgram').disabled=doneToday;
     $('#completeTeamProgram').textContent=doneToday?'Completed Today':'Log Team Program';
   }
 }
 // Daily Check-In: a parallel logging section sourced from the Team Program's
-// activities (by name, matching how teamProgram.activities is already
-// stored) rather than a personal Program's activityIds. Only shown once the
-// athlete has joined a team program.
+// activities (by name, matching how activity_names is already stored)
+// rather than a personal Program's activityIds. Only shown once the athlete
+// has joined a team program.
 function renderTeamProgramLogFields(){
   const card=$('#teamProgramLogCard'); if(!card) return;
-  const show=!!(state.teamProgramOptIn && state.teamProgram && state.teamProgram.activities.length);
+  const show=!!(currentTeamProgramOptedIn && currentTeamProgram && currentTeamProgram.activity_names.length);
   card.classList.toggle('hidden',!show);
   if(!show) return;
   const c=$('#teamProgramLogFields'); if(!c) return;
   teamSetCounts={};
-  c.innerHTML=state.teamProgram.activities.map(name=>{
+  c.innerHTML=currentTeamProgram.activity_names.map(name=>{
     const a=findActivity(name);
     return a?activitySetBlockHTML('teamset',a,teamSetCounts):'';
   }).join('');
 }
-function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>Score</th></tr></thead><tbody>${[...demoAthletes].sort((a,b)=>b.arcade-a.arcade).map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.arcade}</td></tr>`).join('')}</tbody></table>`}
+// Phase C: Arcade has no server table (deliberately out of scope, see the
+// migration plan) — an honest placeholder instead of the old fake-data
+// leaderboard, which named specific "teammates" and their scores.
+function renderArcadeLeaderboard(){if(!$('#arcadeLeaderboard'))return;$('#arcadeLeaderboard').innerHTML='<p class="muted">Team arcade leaderboards are coming in a future update.</p>'}
+// ---- League HQ (Phase C) ----
+async function renderLeagueHQ(){
+  const heroCard=$('#leagueHeroCard'), emptyCard=$('#leagueEmptyCard'), boardCard=$('#leagueLeaderboardCard');
+  if(!heroCard) return;
+  const m=athleteTeamMembership;
+  const team=m&&m.status==='approved'?m.teams:null;
+  if(!team||!team.league_id){
+    heroCard.classList.add('hidden'); boardCard.classList.add('hidden'); emptyCard.classList.remove('hidden');
+    return;
+  }
+  const {league,standings}=await loadLeagueForTeam(team.id,team.league_id);
+  if(!league){
+    heroCard.classList.add('hidden'); boardCard.classList.add('hidden'); emptyCard.classList.remove('hidden');
+    return;
+  }
+  emptyCard.classList.add('hidden'); heroCard.classList.remove('hidden'); boardCard.classList.remove('hidden');
+  $('#leagueName').textContent=league.name;
+  $('#leagueMeta').textContent=`${standings.length} Team${standings.length===1?'':'s'}${league.season?' · '+league.season:''}`;
+  $('#leagueLeaderboardBody').innerHTML=standings.map(s=>`<tr><td>${s.team_name}</td><td>${s.athlete_count}</td><td>${s.team_xp}</td></tr>`).join('');
+}
 function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();ensureGameXPDay();if($('#gameXPToday'))$('#gameXPToday').textContent=state.gameXP.xp;if($('#reactionBest'))$('#reactionBest').textContent=getWebGemBestReaction()??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#clutchBest'))$('#clutchBest').textContent=getArcadeBest('clutchCatch');renderArcadeExtras()}
 // ---- Web Gem (Round 8 glow-up of the old Reaction Catch) ----
 // Streak/combo model: a catch immediately queues the next ball at a
@@ -2368,6 +2575,7 @@ async function selectAthlete(athleteId){
   setStoredActiveAthleteId(a.id);
   state.athleteName=a.display_name;
   await refreshAthleteState();
+  await refreshTeamMembershipUI();
 }
 function updateAuthUI(){
   const signedIn=!!currentSession;
@@ -2404,6 +2612,7 @@ async function afterSignedIn(session){
   }
   currentProfile=profile;
   hideAuthModal();
+  await refreshCoachTeamContext();
   currentAthletes=await listAthletes(profile.id);
   updateAuthUI();
   if(!currentAthletes.length){
@@ -2420,7 +2629,17 @@ function afterSignedOut(){
   currentProfile=null;
   currentAthletes=[];
   activeAthlete=null;
+  coachTeam=null;
+  athleteTeamMembership=null;
+  currentTeamXpTotals=null;
+  currentTeamRank=null;
+  currentTeamRankTotal=null;
+  currentTeamRoster=[];
+  currentTeamProgram=null;
+  currentTeamProgramOptedIn=false;
   updateAuthUI();
+  renderCoachOnlyVisibility();
+  renderTeamIdentity();
 }
 function initAuthUI(){
   onSupabaseReady(async()=>{
@@ -2453,6 +2672,7 @@ function initAuthUI(){
     try{
       currentProfile=await createProfile(currentSession.user.id,name,isParent,isCoach);
       hideAuthModal();
+      await refreshCoachTeamContext();
       currentAthletes=await listAthletes(currentProfile.id);
       updateAuthUI();
       if(!currentAthletes.length) showAddAthleteModal();
@@ -2483,6 +2703,12 @@ function initAuthUI(){
     }
     await selectAthlete(e.target.value);
   };
+  if($('#joinLeagueBtn'))$('#joinLeagueBtn').onclick=joinLeagueAction;
+  if($('#pendingRequestsList'))$('#pendingRequestsList').addEventListener('click',async e=>{
+    const approveId=e.target.dataset.approve, declineId=e.target.dataset.decline;
+    if(!approveId&&!declineId) return;
+    await decideTeamJoinAction(approveId||declineId,!!approveId);
+  });
 }
 initAuthUI();
 

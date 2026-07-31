@@ -160,3 +160,138 @@ async function completeDailyMissionRemote(athleteId,missionTitle){
   if(error) throw error;
   return data;
 }
+
+// ---------------- Teams (coach side, Phase C) ----------------
+// A coach's Team Setup/Team Program panels operate on the coach's own
+// `profiles.id`, not the current athlete — a person can be a parent and a
+// coach at once, and these are separate identities in the data model.
+
+async function loadCoachTeams(coachProfileId){
+  const {data,error}=await supabase.from('teams').select('*')
+    .eq('coach_profile_id',coachProfileId).order('created_at');
+  if(error) throw error;
+  return data||[];
+}
+
+async function createTeam(coachProfileId,name,joinCode){
+  const {data,error}=await supabase.from('teams')
+    .insert({coach_profile_id:coachProfileId,name,join_code:joinCode})
+    .select().single();
+  if(error) throw error;
+  return data;
+}
+
+async function updateTeamLogo(teamId,logoDataUrl){
+  const {error}=await supabase.from('teams').update({logo_url:logoDataUrl}).eq('id',teamId);
+  if(error) throw error;
+}
+
+async function joinLeagueForTeam(teamId,joinCode){
+  const {data,error}=await supabase.rpc('join_league',{p_team_id:teamId,p_join_code:joinCode});
+  if(error) throw error;
+  return data && data[0];
+}
+
+async function loadLeagueForTeam(teamId,leagueId){
+  if(!leagueId) return {league:null,standings:[]};
+  const [leagueRes,standingsRes]=await Promise.all([
+    supabase.from('leagues').select('*').eq('id',leagueId).maybeSingle(),
+    supabase.from('league_team_totals').select('*').eq('league_id',leagueId).order('team_xp',{ascending:false})
+  ]);
+  if(leagueRes.error) throw leagueRes.error;
+  if(standingsRes.error) throw standingsRes.error;
+  return {league:leagueRes.data,standings:standingsRes.data||[]};
+}
+
+// ---------------- Team membership (athlete side, Phase C) ----------------
+
+async function getAthleteTeamMembership(athleteId){
+  const {data,error}=await supabase.from('team_members')
+    .select('*, teams(*)').eq('athlete_id',athleteId)
+    .order('requested_at',{ascending:false}).limit(1).maybeSingle();
+  if(error) throw error;
+  return data;
+}
+
+async function requestTeamJoinForAthlete(athleteId,joinCode){
+  const {error}=await supabase.rpc('request_team_join',{p_athlete_id:athleteId,p_join_code:joinCode});
+  if(error) throw error;
+}
+
+// ---------------- Pending join requests (coach side, Phase C) ----------------
+
+async function loadPendingRequestsForTeam(teamId){
+  const {data,error}=await supabase.from('team_members')
+    .select('*, athletes(display_name)').eq('team_id',teamId).eq('status','pending')
+    .order('requested_at');
+  if(error) throw error;
+  return data||[];
+}
+
+async function decideTeamJoinRemote(teamMemberId,approve){
+  const {error}=await supabase.rpc('decide_team_join',{p_team_member_id:teamMemberId,p_approve:approve});
+  if(error) throw error;
+}
+
+// ---------------- Team roster / dashboard (Phase C) ----------------
+// get_team_roster() is the narrowed view — name + aggregate XP/participation
+// only, never raw workout/combine records. Used for both the coach's roster
+// and a teammate-parent's leaderboard view (same narrowed access for both).
+
+async function loadTeamRoster(teamId){
+  const {data,error}=await supabase.rpc('get_team_roster',{p_team_id:teamId});
+  if(error) throw error;
+  return data||[];
+}
+
+async function loadTeamXpTotals(teamId){
+  const {data,error}=await supabase.from('team_xp_totals').select('*').eq('team_id',teamId).maybeSingle();
+  if(error) throw error;
+  return data;
+}
+
+async function loadAllTeamXpTotalsRanked(){
+  const {data,error}=await supabase.from('team_xp_totals').select('*').order('team_xp',{ascending:false});
+  if(error) throw error;
+  return data||[];
+}
+
+// ---------------- Team Program (Phase C) ----------------
+// Mirrors the old single-object-per-team model (state.teamProgram): one row
+// per team, overwritten wholesale on each save rather than versioned.
+
+async function loadTeamProgram(teamId){
+  const {data,error}=await supabase.from('team_programs').select('*')
+    .eq('team_id',teamId).order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(error) throw error;
+  return data;
+}
+
+async function saveTeamProgramRemote(teamId,title,activityNames,instructions,createdBy){
+  const existing=await loadTeamProgram(teamId);
+  if(existing){
+    const {data,error}=await supabase.from('team_programs')
+      .update({title,activity_names:activityNames,instructions})
+      .eq('id',existing.id).select().single();
+    if(error) throw error;
+    return data;
+  }
+  const {data,error}=await supabase.from('team_programs')
+    .insert({team_id:teamId,title,activity_names:activityNames,instructions,created_by:createdBy})
+    .select().single();
+  if(error) throw error;
+  return data;
+}
+
+async function getTeamProgramOptIn(teamProgramId,athleteId){
+  const {data,error}=await supabase.from('team_program_opt_ins').select('*')
+    .eq('team_program_id',teamProgramId).eq('athlete_id',athleteId).maybeSingle();
+  if(error) throw error;
+  return !!data;
+}
+
+async function optInTeamProgramRemote(teamProgramId,athleteId){
+  const {error}=await supabase.from('team_program_opt_ins')
+    .insert({team_program_id:teamProgramId,athlete_id:athleteId});
+  if(error) throw error;
+}

@@ -349,16 +349,16 @@
 <div class="card hidden" id="teamJoinCard">
   <p class="eyebrow dark">Team HQ</p>
   <h2>Join Your Team</h2>
-  <p class="muted">Enter the join code your coach shared to unlock your team's identity here.</p>
-  <div class="form-grid">
+  <p class="muted">Enter the join code your coach shared. A coach will need to approve your request before your team shows up here.</p>
+  <div class="form-grid" id="teamJoinFormFields">
     <label class="wide">Team join code<input id="teamJoinCodeInput" type="text" placeholder="Enter code from your coach"></label>
-    <button id="joinTeamIdentityBtn" class="primary wide" type="button">Join Team</button>
+    <button id="joinTeamIdentityBtn" class="primary wide" type="button">Request to Join</button>
   </div>
   <p id="teamJoinStatus" class="muted"></p>
 </div>
-<div class="card team-hero"><div><p class="eyebrow dark">Team Edition Demo</p><h2 id="teamHeroName">Your Team</h2><p>Summer Season · 12 Athletes · Coach Miller</p></div><div id="teamHeroLogo"></div></div>
-<div class="grid stats"><div class="stat"><span>Team XP</span><strong>18,442</strong><small>points</small></div><div class="stat"><span>Weekly Completion</span><strong>83%</strong><small>team</small></div><div class="stat"><span>Current Challenge</span><strong>7/12</strong><small>athletes</small></div><div class="stat"><span>Team Rank</span><strong>3</strong><small>of 14</small></div></div>
-<div class="grid two"><div class="card"><h2>Team Leaderboards</h2><label>Sort by<select id="leaderboardMetric"><option value="xp">Total XP</option><option value="workouts">Workouts</option><option value="streak">Longest Streak</option><option value="improvement">Most Improved</option><option value="sportsmanship">Sportsmanship</option><option value="arcade">Arcade Score</option></select></label><div id="teamLeaderboard"></div></div><div class="card"><h2>Team Feed</h2><div id="teamFeed"></div></div></div>
+<div class="card team-hero hidden" id="teamHeroCard"><div><p class="eyebrow dark">Team HQ</p><h2 id="teamHeroName">Your Team</h2><p id="teamHeroMeta" class="muted"></p></div><div id="teamHeroLogo"></div></div>
+<div class="grid stats hidden" id="teamStatsGrid"><div class="stat"><span>Team XP</span><strong id="teamStatXP">—</strong><small>points</small></div><div class="stat"><span>Weekly Completion</span><strong id="teamStatCompletion">—</strong><small>team</small></div><div class="stat"><span>Roster Size</span><strong id="teamStatRoster">—</strong><small>athletes</small></div><div class="stat"><span>Team Rank</span><strong id="teamStatRank">—</strong><small id="teamStatRankOf"></small></div></div>
+<div class="grid two hidden" id="teamBoardsGrid"><div class="card"><h2>Team Leaderboards</h2><label>Sort by<select id="leaderboardMetric"><option value="xp">Total XP</option><option value="workouts">Workouts Logged</option></select></label><div id="teamLeaderboard"></div></div><div class="card"><h2>Team Feed</h2><div id="teamFeed"></div></div></div>
 <div class="card">
   <h2>Team Shout-Outs</h2>
   <p class="muted">No comments or direct messages — only positive reactions and shout-outs from teammates, coaches, and parents.</p>
@@ -378,7 +378,15 @@
   <button id="joinTeamProgram" class="primary hidden" type="button">Join Team Program</button>
 </div>
 </section>
-<section id="league" class="screen"><div class="card league-hero"><p class="eyebrow dark">League Home</p><h2>Northbrook Little League</h2><p>26 Teams · 312 Athletes · Week 7</p></div><div class="grid two"><div class="card"><h2>Current Seasonal Drop</h2><div class="drop-card"><div class="drop-badge">LIVE</div><h3>Summer Tournament Drop</h3><p>Limited jersey skin, championship badge, team banner, and Home Run Derby boss battle.</p><div class="meter large"><div style="width:68%"></div></div><p><strong>Community Goal:</strong> 68% complete</p></div></div><div class="card"><h2>League Leaderboard</h2><table class="table"><thead><tr><th>Team</th><th>Participation</th><th>Improvement</th><th>Team XP</th></tr></thead><tbody><tr><td>Glenview Cubs</td><td>91%</td><td>+18%</td><td>20,410</td></tr><tr><td>Winnetka Warriors</td><td>87%</td><td>+16%</td><td>19,602</td></tr><tr><td>Northbrook Spartans</td><td>83%</td><td>+21%</td><td>18,442</td></tr><tr><td>Deerfield Demons</td><td>80%</td><td>+14%</td><td>17,905</td></tr></tbody></table></div></div><div class="card"><h2>Upcoming Drops</h2><div class="drop-grid"><div class="drop-tile"><strong>All-Star Week</strong><span>Jul 20</span></div><div class="drop-tile"><strong>Home Run Derby</strong><span>Aug 2</span></div><div class="drop-tile"><strong>Fall Ball</strong><span>Sep 1</span></div><div class="drop-tile"><strong>Winter Work</strong><span>Nov 15</span></div></div></div></section>
+<section id="league" class="screen">
+<div class="card league-hero hidden" id="leagueHeroCard"><p class="eyebrow dark">League Home</p><h2 id="leagueName">Your League</h2><p id="leagueMeta" class="muted"></p></div>
+<div class="card hidden" id="leagueEmptyCard"><p class="eyebrow dark">League Home</p><h2>No League Yet</h2><p class="muted">Once your coach joins a league from Coach Tools, your league standings will show up here.</p></div>
+<div class="grid two">
+<div class="card"><h2>Current Seasonal Drop</h2><div class="drop-card"><div class="drop-badge">LIVE</div><h3>Summer Tournament Drop</h3><p>Limited jersey skin, championship badge, team banner, and Home Run Derby boss battle.</p><div class="meter large"><div style="width:68%"></div></div><p><strong>Community Goal:</strong> 68% complete</p></div></div>
+<div class="card hidden" id="leagueLeaderboardCard"><h2>League Leaderboard</h2><table class="table"><thead><tr><th>Team</th><th>Athletes</th><th>Team XP</th></tr></thead><tbody id="leagueLeaderboardBody"></tbody></table></div>
+</div>
+<div class="card"><h2>Upcoming Drops</h2><div class="drop-grid"><div class="drop-tile"><strong>All-Star Week</strong><span>Jul 20</span></div><div class="drop-tile"><strong>Home Run Derby</strong><span>Aug 2</span></div><div class="drop-tile"><strong>Fall Ball</strong><span>Sep 1</span></div><div class="drop-tile"><strong>Winter Work</strong><span>Nov 15</span></div></div></div>
+</section>
 <section id="arcade" class="screen"><div class="card arcade-hero"><p class="eyebrow dark">Baseball Arcade</p><h2>Play Short. Train Smart.</h2><p>Game XP is capped at 25 per day so workouts remain the main path to advancement.</p><div class="grid stats"><div class="stat"><span>Today’s Game XP</span><strong id="gameXPToday">0</strong><small>of 25</small></div><div class="stat"><span>Web Gem Best Time</span><strong id="reactionBest">—</strong><small>ms</small></div><div class="stat"><span>Strike Zone Best</span><strong id="strikeBest">0</strong><small>points</small></div><div class="stat"><span>Home Run Hero Best</span><strong id="homerBest">0</strong><small>points</small></div><div class="stat"><span>Clutch Catch Best</span><strong id="clutchBest">0</strong><small>points</small></div></div></div><div class="arcade-grid"><div class="card game-card"><h2>Web Gem</h2><p>Tap the baseball as soon as it appears — keep the streak alive.</p><div id="reactionGame" class="game-stage"><button id="startReaction" class="primary">Start Round</button><button id="reactionBall" class="reaction-ball hidden">⚾</button><p id="reactionResult"></p></div></div><div class="card game-card"><h2>Strike Zone Challenge</h2><p id="strikePrompt">Tap Start to begin.</p><button id="startStrike" class="primary">Start Challenge</button><div id="strikeZone" class="strike-zone"><button data-zone="1">1</button><button data-zone="2">2</button><button data-zone="3">3</button><button data-zone="4">4</button><button data-zone="5">5</button><button data-zone="6">6</button><button data-zone="7">7</button><button data-zone="8">8</button><button data-zone="9">9</button></div><p id="strikeResult"></p></div><div class="card game-card"><h2>Home Run Hero</h2><p>Tap SWING when the ball reaches the hitting zone.</p><div class="timing-track"><div id="timingBall">⚾</div><div class="hit-zone"></div></div><button id="startHomer" class="primary">Start Pitch</button><button id="swingButton">SWING</button><p id="homerResult"></p></div><div class="card game-card"><h2>Clutch Catch</h2><p>Tap the baseball before it gets away — avoid the decoys!</p><div id="clutchGame" class="game-stage clutch-stage"><button id="startClutch" class="primary" type="button">Start Round</button><div id="clutchArena" class="clutch-arena"></div><p id="clutchLives"></p><p id="clutchResult"></p></div></div></div><div class="card spin-card"><p class="eyebrow dark">Bonus XP</p><h2>🎡 Daily Prize Wheel</h2><p class="muted">One free spin every day — prize wheel XP is separate from the daily arcade game cap. Answer today's trivia correctly for a bonus spin.</p><div class="wheel-wrap"><div class="wheel-pointer">▼</div><div id="wheelInner" class="wheel-inner"></div></div><button id="spinButton" class="primary" type="button">Spin The Wheel</button><p id="spinResult" class="spin-result"></p><p id="spinStatus" class="muted"></p></div><div class="card trivia-card"><p class="eyebrow dark" id="triviaCategory">Trivia</p><h2>⚾ Daily Trivia</h2><p id="triviaQuestion" class="trivia-question"></p><div id="triviaChoices" class="trivia-choices"></div><p id="triviaResult" class="trivia-result"></p></div><div class="card"><h2>Team Arcade Leaderboard</h2><div id="arcadeLeaderboard"></div></div></section>
 <section id="library" class="screen">
 <div class="card" id="programBuilderCard">
@@ -435,24 +443,40 @@
       <button id="saveCoachGrades" class="primary wide" type="button">Save Coach Grades</button>
     </div>
   </div>
-  <div class="card">
+  <div class="card" data-coach-only>
     <p class="eyebrow dark">Coach Tools</p>
     <h2>Team Setup</h2>
-    <p class="muted">Set your team's name and logo, then share the join code below with your athletes.</p>
-    <div class="form-grid">
-      <label class="wide">Coach / parent code<input id="teamSetupCode" type="password" placeholder="Required"></label>
+    <p class="muted">Create your team, then share the join code below with your athletes' parents.</p>
+    <div class="form-grid" id="teamSetupCreateFields">
       <label class="wide">Team name<input id="teamNameInput" type="text" placeholder="e.g. Riverside Raptors"></label>
+      <button id="saveTeamSetup" class="primary wide" type="button">Create Team + Generate Join Code</button>
+    </div>
+    <div id="teamSetupExisting" class="hidden">
+      <p>Team: <strong id="teamSetupName"></strong> &middot; Join code: <strong id="teamSetupJoinCode"></strong></p>
       <label class="wide">Team logo (optional)<input id="teamLogoUpload" type="file" accept="image/*"></label>
-      <button id="saveTeamSetup" class="primary wide" type="button">Save Team + Generate Join Code</button>
     </div>
     <p id="teamSetupStatus" class="muted"></p>
   </div>
-  <div class="card">
+  <div class="card hidden" id="leagueJoinCard" data-coach-only>
+    <p class="eyebrow dark">Coach Tools</p>
+    <h2>Join a League</h2>
+    <p class="muted">Enter a league join code to attach your team — instant, no approval needed.</p>
+    <div class="form-grid">
+      <label class="wide">League join code<input id="leagueJoinCodeInput" type="text" placeholder="Enter league code"></label>
+      <button id="joinLeagueBtn" class="primary wide" type="button">Join League</button>
+    </div>
+    <p id="leagueJoinStatus" class="muted"></p>
+  </div>
+  <div class="card hidden" id="pendingRequestsCard" data-coach-only>
+    <p class="eyebrow dark">Coach Tools</p>
+    <h2>Pending Team Join Requests</h2>
+    <div id="pendingRequestsList"></div>
+  </div>
+  <div class="card" data-coach-only>
     <p class="eyebrow dark">Coach Tools</p>
     <h2>Build the Team Program</h2>
-    <p class="muted">Admin roles aren't fully built out yet, so this reuses the Coach/Parent Corner code to confirm it's a coach or parent making the change.</p>
+    <p class="muted">Pick activities for your team's assigned program.</p>
     <div class="form-grid">
-      <label class="wide">Coach / parent code<input id="coachCode" type="password" placeholder="Required"></label>
       <label class="wide">Program title<input id="teamProgramTitle" type="text" placeholder="e.g. Riverside Raptors Baseball Training Program"></label>
       <label class="wide">Pick activities for the program<select id="teamProgramActivities" multiple size="10"></select></label>
       <label class="wide">Instructions for the team (optional)<input id="teamProgramInstructions" type="text" placeholder="e.g. Please attempt to complete this program 2x per week"></label>
