@@ -15,8 +15,15 @@ group by athlete_id;
 -- workout/combine/quest rows. This is the chosen alternative to giving
 -- coaches direct SELECT on athletes/combine_tests/daily_check_ins.
 -- It runs as the view owner (postgres) so it can read across tables a coach
--- has no direct grant on; access to the VIEW itself is still gated by the
--- policy below.
+-- has no direct grant on.
+--
+-- Postgres does NOT support `CREATE POLICY` on a view (RLS policies only
+-- attach to real tables) — that was tried and correctly rejected. Instead,
+-- this view is left with NO grant to authenticated/anon/public at all, and
+-- access is gated entirely through the get_team_roster() function below,
+-- which checks authorization first and only then reads from the view. The
+-- view itself is just a shared query definition, never queried directly by
+-- a client.
 create view team_roster_view
 with (security_invoker = false) as
 select
@@ -36,17 +43,36 @@ left join (
 ) d on d.athlete_id = a.id;
 
 alter view team_roster_view owner to postgres;
-grant select on team_roster_view to authenticated;
+revoke all on team_roster_view from public, anon, authenticated;
 
-create policy team_roster_view_access on team_roster_view for select using (
-  team_id in (select id from teams where coach_profile_id = auth.uid())
-  or athlete_id in (select id from athletes where parent_profile_id = auth.uid())
-);
--- NOTE: if `create policy ... on team_roster_view` errors on this project's
--- Postgres version (RLS-on-views support varies), the fallback is a
--- SECURITY DEFINER function get_team_roster(p_team_id uuid) that checks
--- coach_profile_id = auth.uid() internally before returning rows. Confirm
--- which is needed while testing this migration, before Phase C depends on it.
+create or replace function get_team_roster(p_team_id uuid)
+returns table(
+  team_id uuid,
+  athlete_id uuid,
+  display_name text,
+  total_xp numeric,
+  workout_count bigint,
+  last_workout_date date,
+  status text
+)
+language plpgsql security definer set search_path = public as $$
+begin
+  if not (
+    exists (select 1 from teams where id = p_team_id and coach_profile_id = auth.uid())
+    or exists (
+      select 1 from team_members tm
+      join athletes a on a.id = tm.athlete_id
+      where tm.team_id = p_team_id and a.parent_profile_id = auth.uid()
+    )
+  ) then
+    raise exception 'not authorized for this team roster';
+  end if;
+  return query select v.team_id, v.athlete_id, v.display_name, v.total_xp, v.workout_count, v.last_workout_date, v.status
+    from team_roster_view v where v.team_id = p_team_id;
+end $$;
+
+revoke all on function get_team_roster(uuid) from public;
+grant execute on function get_team_roster(uuid) to authenticated;
 
 create view team_xp_totals as
 select
