@@ -9,8 +9,16 @@
 
 -- Team join: creates a PENDING team_members row. Not instant — a coach must
 -- approve/decline via decide_team_join() below.
+-- NOTE: RETURNS TABLE column names must NOT match any column name used
+-- inside the function body — PL/pgSQL turns them into variables in scope
+-- for the whole function, and Postgres can't disambiguate an unqualified
+-- column reference (most commonly inside ON CONFLICT (...) target lists)
+-- from the same-named variable. Confirmed live: this broke
+-- request_team_join's `on conflict (team_id, athlete_id)` with "column
+-- reference team_id is ambiguous". Both functions below are prefixed
+-- result_* to avoid this whole class of bug.
 create or replace function request_team_join(p_athlete_id uuid, p_join_code text)
-returns table(team_id uuid, team_name text, status text)
+returns table(result_team_id uuid, result_team_name text, result_status text)
 language plpgsql security definer set search_path = public as $$
 declare v_team teams%rowtype;
 begin
@@ -31,7 +39,7 @@ end $$;
 -- League join: instant attach, no approval step. Coach-only (attaches their
 -- own team to a league they didn't necessarily create).
 create or replace function join_league(p_team_id uuid, p_join_code text)
-returns table(league_id uuid, league_name text)
+returns table(result_league_id uuid, result_league_name text)
 language plpgsql security definer set search_path = public as $$
 declare v_league leagues%rowtype;
 begin

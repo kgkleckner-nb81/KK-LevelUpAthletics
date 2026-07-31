@@ -1976,8 +1976,8 @@ async function joinLeagueAction(){
   if(!code){if($('#leagueJoinStatus'))$('#leagueJoinStatus').textContent='Enter a league code.';return}
   try{
     const result=await joinLeagueForTeam(coachTeam.id,code);
-    coachTeam.league_id=result?.league_id;
-    if($('#leagueJoinStatus')) $('#leagueJoinStatus').textContent=`Joined "${result?.league_name||'the league'}"!`;
+    coachTeam.league_id=result?.result_league_id;
+    if($('#leagueJoinStatus')) $('#leagueJoinStatus').textContent=`Joined "${result?.result_league_name||'the league'}"!`;
     $('#leagueJoinCodeInput').value='';
     if(activeAthlete) await refreshTeamMembershipUI();
   }catch(err){
