@@ -93,17 +93,29 @@ async function verifyApprovalPinRemote(pin){
 
 async function listAthletes(parentProfileId){
   const {data,error}=await supabase.from('athletes').select('*')
-    .eq('parent_profile_id',parentProfileId).order('created_at');
+    .eq('parent_profile_id',parentProfileId).is('archived_at',null).order('created_at');
   if(error) throw error;
   return data||[];
 }
 
-async function createAthlete(parentProfileId,displayName){
+async function createAthlete(parentProfileId,displayName,age){
   const {data,error}=await supabase.from('athletes')
-    .insert({parent_profile_id:parentProfileId,display_name:displayName})
+    .insert({parent_profile_id:parentProfileId,display_name:displayName,age:age||null})
     .select().single();
   if(error) throw error;
   return data;
+}
+
+// Frictionless, same as creation — age isn't a PIN-gated field.
+async function updateAthleteAge(athleteId,age){
+  const {error}=await supabase.from('athletes').update({age}).eq('id',athleteId);
+  if(error) throw error;
+}
+
+// PIN-gated soft delete — see 0010_athlete_age_and_archive.sql.
+async function archiveAthleteRemote(athleteId,pin){
+  const {error}=await supabase.rpc('archive_athlete',{p_athlete_id:athleteId,p_pin:pin});
+  if(error) throw error;
 }
 
 function getStoredActiveAthleteId(){

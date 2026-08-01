@@ -849,6 +849,7 @@ function renderPlayerCardHero(){
   if($('#statusAthleteName')) $('#statusAthleteName').textContent=name.toUpperCase();
   if($('#playerCardName')) $('#playerCardName').textContent=name;
   if($('#playerCardTeam')) $('#playerCardTeam').textContent=(athleteTeamMembership&&athleteTeamMembership.status==='approved'&&athleteTeamMembership.teams&&athleteTeamMembership.teams.name)||'Free Agent';
+  if($('#playerCardAge')) $('#playerCardAge').textContent=(activeAthlete&&activeAthlete.age)||'—';
   [...performanceAxisOrder,'consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
     if(!bar) return;
@@ -923,6 +924,19 @@ document.addEventListener('click',e=>{
   const row=e.target.closest('.workout-row');
   if(row) showWorkoutDetail(+row.dataset.workoutIndex);
   if(e.target.id==='closeWorkoutDetail' || e.target.id==='workoutDetailModal') $('#workoutDetailModal').classList.add('hidden');
+  if(e.target.id==='playerCardAge'){
+    if(!activeAthlete) return;
+    const val=prompt('Enter age:',activeAthlete.age||'');
+    if(val===null) return;
+    const age=parseInt(val,10);
+    if(!Number.isInteger(age)||age<1||age>25){alert('Enter a whole number between 1 and 25.');return}
+    updateAthleteAge(activeAthlete.id,age).then(()=>{
+      activeAthlete.age=age;
+      const idx=currentAthletes.findIndex(a=>a.id===activeAthlete.id);
+      if(idx>=0) currentAthletes[idx].age=age;
+      renderPlayerCardHero();
+    }).catch(err=>alert('Could not save age: '+(err.message||err)));
+  }
 });
 
 function table(h,rows){if(!rows.length)return'<p class="muted">No entries yet.</p>';return`<table class="table"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
@@ -2626,6 +2640,33 @@ async function selectAthlete(athleteId){
   await refreshAthleteState();
   await refreshTeamMembershipUI();
 }
+// Soft delete (archive_athlete RPC) — the athlete's workout/combine/reward
+// history stays intact server-side, just hidden from the switcher going
+// forward (listAthletes filters archived_at IS NULL). PIN-gated since it's
+// a consequential account-management action, even though it's reversible
+// in the database (there's just no "unarchive" UI yet).
+async function removeActiveAthlete(){
+  if(!activeAthlete) return;
+  const name=activeAthlete.display_name;
+  if(!confirm(`Remove "${name}" from your athlete list? Their history is kept, but you won't be able to switch to them here anymore.`)) return;
+  const pin=await showPinModal('remove this athlete');
+  if(!pin) return;
+  try{
+    await archiveAthleteRemote(activeAthlete.id,pin);
+  }catch(err){
+    alert('Could not remove athlete: '+(err.message||'unknown error'));
+    return;
+  }
+  currentAthletes=currentAthletes.filter(a=>a.id!==activeAthlete.id);
+  activeAthlete=null;
+  if(!currentAthletes.length){
+    updateAuthUI();
+    showAddAthleteModal();
+    return;
+  }
+  renderAthleteSwitcher();
+  await selectAthlete(currentAthletes[0].id);
+}
 function updateAuthUI(){
   const signedIn=!!currentSession;
   if($('#signInBtn'))$('#signInBtn').classList.toggle('hidden',signedIn);
@@ -2636,7 +2677,8 @@ function renderAthleteSwitcher(){
   const sel=$('#athleteSwitcher');
   if(!sel) return;
   sel.innerHTML=currentAthletes.map(a=>`<option value="${a.id}">${a.display_name}</option>`).join('')
-    +'<option value="__add__">+ Add Athlete</option>';
+    +'<option value="__add__">+ Add Athlete</option>'
+    +(currentAthletes.length?'<option value="__remove__">🗑 Remove This Athlete</option>':'');
   if(activeAthlete) sel.value=activeAthlete.id;
 }
 function showAuthModal(step){
@@ -2778,8 +2820,10 @@ function initAuthUI(){
   if($('#saveNewAthleteBtn'))$('#saveNewAthleteBtn').onclick=async()=>{
     const name=$('#newAthleteName').value.trim();
     if(!name){$('#addAthleteStatus').textContent='Enter a name.';return}
+    const ageVal=$('#newAthleteAge').value.trim();
+    const age=ageVal?parseInt(ageVal,10):null;
     try{
-      const a=await createAthlete(currentProfile.id,name);
+      const a=await createAthlete(currentProfile.id,name,age);
       currentAthletes.push(a);
       hideAddAthleteModal();
       renderAthleteSwitcher();
@@ -2792,6 +2836,11 @@ function initAuthUI(){
     if(e.target.value==='__add__'){
       renderAthleteSwitcher();
       showAddAthleteModal();
+      return;
+    }
+    if(e.target.value==='__remove__'){
+      renderAthleteSwitcher();
+      await removeActiveAthlete();
       return;
     }
     await selectAthlete(e.target.value);
