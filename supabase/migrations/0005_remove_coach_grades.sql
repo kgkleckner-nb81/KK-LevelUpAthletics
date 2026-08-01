@@ -40,7 +40,7 @@ create or replace function submit_combine_test(
 ) returns table(id uuid, status text) language plpgsql security definer set search_path = public as $$
 declare v_id uuid; v_verified boolean := false;
 begin
-  if not exists (select 1 from athletes where id = p_athlete_id and parent_profile_id = auth.uid()) then
+  if not exists (select 1 from athletes where athletes.id = p_athlete_id and parent_profile_id = auth.uid()) then
     raise exception 'not authorized for this athlete';
   end if;
   if p_pin is not null and verify_approval_pin(p_pin) then v_verified := true; end if;
