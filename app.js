@@ -13,7 +13,32 @@ let currentProfile=null;
 let currentAthletes=[];
 let activeAthlete=null;
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
-function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+// Arcade gameplay state (spins-used-today, trivia-answered-today, daily
+// game XP cap, best scores, rain tokens) is local-only (Arcade was
+// deliberately kept out of the Supabase schema) but IS per-athlete — two
+// siblings signed into the same parent account on the same device must not
+// share "already spun today." Stored under its own per-athlete localStorage
+// key and swapped in/out on selectAthlete(), separate from the rest of
+// `state`, which stays one shared blob per browser (workout-builder
+// programs etc. are fine to share across siblings on one device).
+const ARCADE_LOCAL_FIELDS=['arcadeScores','arcadeMetrics','gameScores','gameXP','rainTokens','arcadeDaily'];
+function arcadeStorageKey(athleteId){return KEY+'.arcade.'+athleteId}
+function loadArcadeStateFor(athleteId){
+  try{
+    const raw=localStorage.getItem(arcadeStorageKey(athleteId));
+    return raw?JSON.parse(raw):null;
+  }catch{return null}
+}
+function saveArcadeStateFor(athleteId){
+  if(!athleteId) return;
+  const snap={};
+  ARCADE_LOCAL_FIELDS.forEach(k=>snap[k]=state[k]);
+  localStorage.setItem(arcadeStorageKey(athleteId),JSON.stringify(snap));
+}
+function save(){
+  localStorage.setItem(KEY,JSON.stringify(state));
+  if(activeAthlete) saveArcadeStateFor(activeAthlete.id);
+}
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const metricNames={pushups:'Push-ups',squats:'Squats',plank:'Plank seconds',crunches:'Sit Ups',broadJumps:'Broad jumps',shuffleTouches:'Lateral shuffle touches',skaterJumps:'Skater jumps',sprints:'Sprints'};
 const combineNames={maxPushups:'Max push-ups',squat60:'Squats in 60 sec',plankMax:'Longest plank',broadJumpIn:'Broad jump',sprintSec:'20-yard sprint'};
@@ -2670,9 +2695,14 @@ async function refreshAthleteState(){
 async function selectAthlete(athleteId){
   const a=currentAthletes.find(x=>x.id===athleteId);
   if(!a) return;
+  if(activeAthlete&&activeAthlete.id!==a.id) saveArcadeStateFor(activeAthlete.id);
   activeAthlete=a;
   setStoredActiveAthleteId(a.id);
   state.athleteName=a.display_name;
+  const arcadeSnap=loadArcadeStateFor(a.id);
+  ARCADE_LOCAL_FIELDS.forEach(k=>{
+    state[k]=arcadeSnap&&arcadeSnap[k]!==undefined?arcadeSnap[k]:JSON.parse(JSON.stringify(defaults[k]));
+  });
   await refreshAthleteState();
   await refreshTeamMembershipUI();
 }
