@@ -120,8 +120,12 @@ function setStoredActiveAthleteId(athleteId){
 // parent-awarded bonus XP has no dedicated table (it's just xp_ledger
 // source='bonus' entries, which have no natural "list my bonus history"
 // read need beyond the derived total already covered by athlete_xp_totals).
+// state.spinLog, unlike bonuses, IS read back here (not local-only) —
+// award_spin_xp (0008_spin_xp_server_side.sql) writes real xp_ledger rows
+// now, so the spin history has to come from the server too or a reload
+// would show a balance that doesn't match what was actually earned.
 async function loadAthleteState(athleteId){
-  const [dailyRes, gearInvRes, gearEqRes, gearPurchRes, xpTotalRes, attrPtsRes, combineRes, questRes, rewardRes, checkpointRes, bonusRes]=await Promise.all([
+  const [dailyRes, gearInvRes, gearEqRes, gearPurchRes, xpTotalRes, attrPtsRes, combineRes, questRes, rewardRes, checkpointRes, bonusRes, spinRes]=await Promise.all([
     supabase.from('daily_check_ins').select('*').eq('athlete_id',athleteId).order('date'),
     supabase.from('gear_inventory').select('*').eq('athlete_id',athleteId),
     supabase.from('gear_equipped').select('*').eq('athlete_id',athleteId).maybeSingle(),
@@ -132,9 +136,10 @@ async function loadAthleteState(athleteId){
     supabase.from('quest_completions').select('*, quests(name,type,xp_value)').eq('athlete_id',athleteId).order('completed_at'),
     supabase.from('reward_claims').select('*, rewards(name,xp_cost,tier)').eq('athlete_id',athleteId).order('claimed_at'),
     supabase.from('combine_checkpoints').select('*').eq('athlete_id',athleteId).order('created_at'),
-    supabase.from('xp_ledger').select('*').eq('athlete_id',athleteId).eq('source','bonus').order('created_at')
+    supabase.from('xp_ledger').select('*').eq('athlete_id',athleteId).eq('source','bonus').order('created_at'),
+    supabase.from('xp_ledger').select('*').eq('athlete_id',athleteId).eq('source','spin').order('created_at')
   ]);
-  [dailyRes,gearInvRes,gearEqRes,gearPurchRes,xpTotalRes,attrPtsRes,combineRes,questRes,rewardRes,checkpointRes,bonusRes].forEach(r=>{if(r.error) throw r.error});
+  [dailyRes,gearInvRes,gearEqRes,gearPurchRes,xpTotalRes,attrPtsRes,combineRes,questRes,rewardRes,checkpointRes,bonusRes,spinRes].forEach(r=>{if(r.error) throw r.error});
 
   const daily=(dailyRes.data||[]).map(row=>({
     date:row.date,
@@ -208,7 +213,12 @@ async function loadAthleteState(athleteId){
     };
   });
 
-  return {daily,inventory,equipped,gearPurchases,totalXP,attributePoints,combine,quests,claimedRewards,combineCheckpoints,bonuses};
+  const spinLog=(spinRes.data||[]).map(row=>({
+    date:(row.created_at||'').slice(0,10),
+    xp:row.amount
+  }));
+
+  return {daily,inventory,equipped,gearPurchases,totalXP,attributePoints,combine,quests,claimedRewards,combineCheckpoints,bonuses,spinLog};
 }
 
 // ---------------- Daily check-in (frictionless, Phase B) ----------------
@@ -254,6 +264,12 @@ async function completeQuestRemote(athleteId,questId,notes,pin){
 
 async function awardBonusXPRemote(athleteId,bonusType,xp,reason,pin){
   const {error}=await supabase.rpc('award_bonus_xp',{p_athlete_id:athleteId,p_bonus_type:bonusType,p_xp:xp,p_reason:reason,p_pin:pin});
+  if(error) throw error;
+}
+
+// Not PIN-gated — matches the existing frictionless Prize Wheel spin flow.
+async function awardSpinXpRemote(athleteId,xp){
+  const {error}=await supabase.rpc('award_spin_xp',{p_athlete_id:athleteId,p_xp:xp});
   if(error) throw error;
 }
 

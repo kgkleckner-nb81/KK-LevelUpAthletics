@@ -297,7 +297,7 @@ $('#exerciseSelect').onchange=renderCharts;$('#combineMetricSelect').onchange=re
 // (draft training programs, Arcade scores/session state). Exporting or
 // resetting `state` wholesale would touch fields that get silently
 // overwritten by the next refreshAthleteState() call anyway.
-const LOCAL_ONLY_FIELDS=['programs','activeProgramId','draftProgram','presetsSeeded','arcadeScores','arcadeMetrics','gameScores','gameXP','rainTokens','spinLog','arcadeDaily'];
+const LOCAL_ONLY_FIELDS=['programs','activeProgramId','draftProgram','presetsSeeded','arcadeScores','arcadeMetrics','gameScores','gameXP','rainTokens','arcadeDaily'];
 $('#exportData').onclick=()=>{
   const localState={};
   LOCAL_ONLY_FIELDS.forEach(k=>{localState[k]=state[k]});
@@ -469,16 +469,12 @@ function ratings(){
   return{...axisScores,consistency,overall};
 }
 function streak(){const dates=[...new Set(state.daily.map(x=>x.date).filter(Boolean))].sort().reverse();if(!dates.length)return 0;let s=0,d=new Date();for(let i=0;i<365;i++){const iso=d.toISOString().slice(0,10);if(dates.includes(iso)){s++;d.setDate(d.getDate()-1)}else if(i===0)d.setDate(d.getDate()-1);else break}return s}
-function spinXP(){return (state.spinLog||[]).reduce((a,x)=>a+(+x.xp||0),0)}
-// Phase D: combine/quest/bonus XP now also comes from the server
+// Phase D: combine/quest/bonus/spin XP all come from the server now
 // (state.totalXP, via xp_ledger), same as daily-check-in/mission/team-bonus
-// did after Phase B — so this is state.totalXP plus ONLY the one source
-// that's deliberately staying local forever: Arcade spin XP (spinXP()),
-// since Arcade is explicitly out of scope for the Supabase migration.
-// Do NOT sum verified-combine count, quest XP, or bonus XP back in here —
-// those amounts are already inside state.totalXP now, and re-adding them
-// would double-count every combine/quest/bonus XP award.
-function xp(){return (state.totalXP||0)+spinXP()}
+// did after Phase B. Do NOT sum verified-combine count, quest XP, bonus
+// XP, or spin XP back in here — those amounts are already inside
+// state.totalXP, and re-adding them would double-count every award.
+function xp(){return state.totalXP||0}
 // Round 5 item 9: tier is now stateful (state.currentTierIndex), advanced
 // only by evaluatePromotion() at a verified-Combine save — not a pure
 // function of the current rating, so it doesn't flicker as raw numbers
@@ -2507,14 +2503,24 @@ function spinWheel(){
   if(delta<=0) delta+=360;
   wheelRotation+=6*360+delta;
   wheelEl.style.transform=`rotate(${wheelRotation}deg)`;
-  const onDone=()=>{
+  const onDone=async()=>{
     wheelEl.removeEventListener('transitionend',onDone);
-    wheelSpinning=false;
     state.arcadeDaily.spinsUsed+=1;
-    state.spinLog=state.spinLog||[];
-    state.spinLog.push({date:todayISO(),xp:val});
     save();
-    if($('#spinResult')) $('#spinResult').textContent=`🎉 You landed on +${val} XP!`;
+    if(!activeAthlete){
+      wheelSpinning=false;
+      if($('#spinResult')) $('#spinResult').textContent='Sign in and select an athlete to spin.';
+      renderArcadeExtras();
+      return;
+    }
+    try{
+      await awardSpinXpRemote(activeAthlete.id,val);
+      await refreshAthleteState();
+      if($('#spinResult')) $('#spinResult').textContent=`🎉 You landed on +${val} XP!`;
+    }catch(err){
+      if($('#spinResult')) $('#spinResult').textContent='Could not save spin: '+(err.message||err);
+    }
+    wheelSpinning=false;
     renderArcadeExtras();
     render();
   };
