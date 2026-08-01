@@ -72,7 +72,7 @@ begin
   ) then
     raise exception 'not authorized for this team roster';
   end if;
-  return query select v.team_id, v.athlete_id, v.display_name, v.total_xp, v.workout_count, v.last_workout_date, v.status
+  return query select v.team_id, v.athlete_id, v.display_name, v.total_xp::numeric, v.workout_count, v.last_workout_date, v.status
     from team_roster_view v where v.team_id = p_team_id;
 end $$;
 

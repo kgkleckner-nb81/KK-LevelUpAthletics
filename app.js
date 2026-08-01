@@ -1999,13 +1999,8 @@ async function refreshTeamMembershipUI(){
       const rankIndex=ranked.findIndex(t=>t.team_id===teamId);
       currentTeamRank=rankIndex>=0?rankIndex+1:null;
       currentTeamRankTotal=ranked.length;
-      // TEMP DEBUG (remove once the team-stats-showing-0 issue is confirmed
-      // fixed): prints exactly what was fetched, right on the page, since
-      // this session's browser devtools weren't giving usable output.
-      if(statusEl) statusEl.textContent=`[debug] teamId=${teamId} totals=${JSON.stringify(totals)} roster=${roster.length} rows`;
     }else{
       currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
-      if(statusEl) statusEl.textContent=`[debug] not approved — membership status: ${athleteTeamMembership?athleteTeamMembership.status:'none found'}`;
     }
   }catch(err){
     currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
