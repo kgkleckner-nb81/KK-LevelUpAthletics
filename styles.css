@@ -992,6 +992,8 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .player-card-badge strong{display:block;font-family:var(--display);font-size:18px}
 .player-card-badge.overall strong{color:var(--creamsicle-dark)}
 .player-card-badge.callup strong{font-size:16px}
+.editable-badge{cursor:pointer}
+.editable-badge:hover{text-decoration:underline}
 .player-card-cta{margin-top:8px;width:100%;font-size:14px;padding:11px 16px}
 .player-card-ratings{margin-top:24px;padding-top:20px;border-top:2px dashed var(--ink)}
 .player-card-ratings h3{margin:0 0 14px;font-family:var(--accent);text-transform:uppercase;letter-spacing:.1em;font-size:13px;color:var(--muted)}
