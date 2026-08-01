@@ -69,15 +69,20 @@ end $$;
 
 -- ---------- PIN verification (step-up confirmation, separate from login) ----------
 
+-- search_path includes "extensions" because Supabase installs pgcrypto
+-- there by default, not in public — set search_path=public alone (the
+-- pattern used everywhere else in this project) hides gen_salt()/crypt()
+-- from these two functions specifically. Confirmed live: this broke PIN
+-- setup with "function gen_salt(unknown) does not exist".
 create or replace function set_approval_pin(p_pin text)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
   if p_pin !~ '^[0-9]{4,6}$' then raise exception 'PIN must be 4-6 digits'; end if;
   update profiles set approval_pin_hash = crypt(p_pin, gen_salt('bf')) where id = auth.uid();
 end $$;
 
 create or replace function verify_approval_pin(p_pin text)
-returns boolean language plpgsql security definer set search_path = public as $$
+returns boolean language plpgsql security definer set search_path = public, extensions as $$
 declare v_hash text;
 begin
   select approval_pin_hash into v_hash from profiles where id = auth.uid();

@@ -13,8 +13,11 @@ revoke select (approval_pin_hash) on profiles from authenticated;
 -- Changing an existing PIN requires proving you know the old one first —
 -- set_approval_pin() (0004_functions.sql) is "first time setup," not
 -- "replace," so it doesn't ask.
+-- search_path includes "extensions" — see the matching note on
+-- set_approval_pin/verify_approval_pin in 0004_functions.sql; crypt()
+-- lives there in a default Supabase project, not in public.
 create or replace function change_approval_pin(p_old_pin text, p_new_pin text)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not verify_approval_pin(p_old_pin) then
     raise exception 'incorrect current PIN';
