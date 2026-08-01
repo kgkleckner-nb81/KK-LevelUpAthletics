@@ -82,6 +82,12 @@ function switchScreen(id){
   $$('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
   window.scrollTo({top:0,behavior:'smooth'});
   render();
+  // Team membership/program data is cached (athleteTeamMembership,
+  // currentTeamProgram) and only refetched at sign-in/athlete-select/join
+  // actions — stale if a coach approval or program save happened elsewhere
+  // in the same session without a reload. Refetch on landing on any screen
+  // that displays it, so it can't silently show stale data.
+  if(['team','clubhouse','daily'].includes(id)&&typeof refreshTeamMembershipUI==='function'&&activeAthlete) refreshTeamMembershipUI();
   // League HQ needs its own fetch (league standings aren't part of the
   // athlete-state refresh) — only on navigating there, not on every render().
   if(id==='league'&&typeof renderLeagueHQ==='function') renderLeagueHQ();
