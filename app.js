@@ -103,6 +103,11 @@ function switchScreen(id){
   // League HQ needs its own fetch (league standings aren't part of the
   // athlete-state refresh) — only on navigating there, not on every render().
   if(id==='league'&&typeof renderLeagueHQ==='function') renderLeagueHQ();
+  // Same staleness class as team membership above: pending join requests
+  // are only fetched at sign-in or right after the coach's own actions, so
+  // a request submitted by a second athlete mid-session stayed invisible
+  // until a full reload. Refetch on landing on Coach/Parent Corner too.
+  if(id==='parent'&&coachTeam&&typeof renderPendingTeamRequests==='function') renderPendingTeamRequests();
 }
 function enterMode(mode){
   if(mode==='home') switchScreen('home');
