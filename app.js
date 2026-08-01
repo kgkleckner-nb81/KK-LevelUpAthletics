@@ -1994,6 +1994,7 @@ async function saveTeamSetup(){
     catch(err){ lastErr=err; if(!/duplicate key|unique/i.test(err.message||'')) break; }
   }
   if(!created){alert('Could not save team: '+(lastErr?.message||'unknown error'));return}
+  coachTeams.push(created);
   coachTeam=created;
   $('#teamNameInput').value='';
   if($('#teamSetupStatus')) $('#teamSetupStatus').textContent=`Saved "${created.name}". Join code: ${created.join_code}`;
@@ -2016,18 +2017,28 @@ async function handleTeamLogoUpload(file){
   };
   r.readAsDataURL(file);
 }
+// A coach can run more than one team — createFields stays available even
+// once coachTeam is set (button relabels to "+ Create Another Team"), and
+// coachTeamSwitcher (shown only once there are 2+) picks which one every
+// other Coach Tools card (pending requests, team program, league join)
+// operates on.
 function renderTeamSetupPanel(){
   const createFields=$('#teamSetupCreateFields'), existing=$('#teamSetupExisting');
   if(!createFields) return;
+  if($('#saveTeamSetup')) $('#saveTeamSetup').textContent=coachTeam?'+ Create Another Team':'Create Team + Generate Join Code';
   if(coachTeam){
-    createFields.classList.add('hidden');
     if(existing){
       existing.classList.remove('hidden');
       $('#teamSetupName').textContent=coachTeam.name;
       $('#teamSetupJoinCode').textContent=coachTeam.join_code;
     }
+    const switcherWrap=$('#coachTeamSwitcherWrap'), switcher=$('#coachTeamSwitcher');
+    if(switcherWrap&&switcher){
+      switcherWrap.classList.toggle('hidden',coachTeams.length<2);
+      switcher.innerHTML=coachTeams.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+      switcher.value=coachTeam.id;
+    }
   }else{
-    createFields.classList.remove('hidden');
     if(existing) existing.classList.add('hidden');
   }
 }
@@ -2060,20 +2071,32 @@ async function decideTeamJoinAction(teamMemberId,approve){
   }
 }
 // ---- Coach team context (loaded once per sign-in, not athlete-scoped) ----
+// coachTeams holds every team this profile coaches (a profile can own more
+// than one — the RLS/RPC layer never capped this, only the old UI did);
+// coachTeam is whichever one is currently selected in Coach Tools.
+let coachTeams=[];
 let coachTeam=null;
 async function refreshCoachTeamContext(){
   if(!currentProfile||!currentProfile.is_coach){
-    coachTeam=null; renderCoachOnlyVisibility();
+    coachTeams=[]; coachTeam=null; renderCoachOnlyVisibility();
     return;
   }
-  const teams=await loadCoachTeams(currentProfile.id);
-  coachTeam=teams[0]||null;
+  coachTeams=await loadCoachTeams(currentProfile.id);
+  if(!coachTeam||!coachTeams.some(t=>t.id===coachTeam.id)) coachTeam=coachTeams[0]||null;
   renderCoachOnlyVisibility();
   renderTeamSetupPanel();
   if(coachTeam){
     await renderPendingTeamRequests();
     await refreshTeamProgramBuilderFields();
   }
+}
+async function switchCoachTeam(teamId){
+  const t=coachTeams.find(x=>x.id===teamId);
+  if(!t) return;
+  coachTeam=t;
+  renderTeamSetupPanel();
+  await renderPendingTeamRequests();
+  await refreshTeamProgramBuilderFields();
 }
 function renderCoachOnlyVisibility(){
   const isCoach=!!(currentProfile&&currentProfile.is_coach);
@@ -2604,6 +2627,7 @@ if($('#goalChips'))$('#goalChips').onclick=e=>{const btn=e.target.closest('.goal
 if($('#addShoutout'))$('#addShoutout').onclick=addShoutout;
 if($('#saveTeamProgram'))$('#saveTeamProgram').onclick=saveTeamProgram;
 if($('#saveTeamSetup'))$('#saveTeamSetup').onclick=saveTeamSetup;
+if($('#coachTeamSwitcher'))$('#coachTeamSwitcher').onchange=e=>switchCoachTeam(e.target.value);
 if($('#joinTeamIdentityBtn'))$('#joinTeamIdentityBtn').onclick=joinTeamIdentity;
 if($('#teamLogoUpload'))$('#teamLogoUpload').onchange=e=>handleTeamLogoUpload(e.target.files[0]);
 if($('#joinTeamProgram'))$('#joinTeamProgram').onclick=joinTeamProgram;
@@ -2768,6 +2792,7 @@ function afterSignedOut(){
   currentProfile=null;
   currentAthletes=[];
   activeAthlete=null;
+  coachTeams=[];
   coachTeam=null;
   athleteTeamMembership=null;
   currentTeamXpTotals=null;
