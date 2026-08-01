@@ -230,12 +230,11 @@
   <div class="card">
     <h2>Combine Testing — Parent Verified</h2>
     <p class="muted">We recommend running a full combine test every 6-8 weeks to track real progress without overtesting.</p>
-    <p class="muted">Results are saved as pending until a parent enters the sign-off code.</p>
+    <p class="muted">Results are saved as pending until you confirm with your PIN.</p>
     <form id="combineForm" class="form-grid">
       <label>Week<input type="number" name="week" min="1" max="12" required></label>
       <label class="wide">Testing which program?<select id="combineProgramSelect" name="combineProgram"></select></label>
       <div id="combineProgramFields" style="display:contents"></div>
-      <label class="wide">Parent code<input type="password" name="parentCode" placeholder="Required for verified result"></label>
       <button class="primary wide" type="submit">Save Combine Test</button>
     </form>
   </div>
@@ -255,9 +254,6 @@
     <form id="questForm" class="form-grid">
       <label>Quest or battle
         <select name="questId" id="questSelect"></select>
-      </label>
-      <label>Parent code
-        <input type="password" name="parentCode" placeholder="Required">
       </label>
       <label class="wide">Notes
         <input type="text" name="notes" placeholder="Example: beat the Fastball Monster after dinner">
@@ -395,11 +391,18 @@
 <section id="parent" class="screen">
   <div class="grid two">
     <div class="card">
-      <h2>Parent Settings</h2>
-      <p class="muted">Default parent code is <strong>SPARTAN9</strong>. Change it below.</p>
-      <label>New parent code<input id="newParentCode" type="password" placeholder="Enter new code"></label>
-      <button class="primary" id="saveParentCode">Save Parent Code</button>
-      <p id="codeStatus"></p>
+      <h2>Approval PIN</h2>
+      <p class="muted">A short PIN, separate from your login. You'll be asked for it whenever you approve a combine test, award XP, or claim a reward — even though you're already signed in — so a kid using your device can't approve things on their own.</p>
+      <div id="pinSetupCreateFields" class="form-grid">
+        <label class="wide">New PIN (4-6 digits)<input id="newPinInput" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="4-6 digits"></label>
+        <button id="savePinBtn" class="primary wide" type="button">Set PIN</button>
+      </div>
+      <div id="pinChangeFields" class="form-grid hidden">
+        <label class="wide">Current PIN<input id="oldPinInput" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="Current PIN"></label>
+        <label class="wide">New PIN<input id="newPinInput2" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="4-6 digits"></label>
+        <button id="changePinBtn" class="primary wide" type="button">Change PIN</button>
+      </div>
+      <p id="pinSetupStatus" class="muted"></p>
     </div>
     <div class="card">
       <h2>Parent Bonus XP</h2>
@@ -415,15 +418,13 @@
             <option value="Coach's Boost">Coach's Boost (+100 XP)</option>
           </select>
         </label>
-        <label>Parent code<input type="password" name="parentCode" placeholder="Required"></label>
         <label class="wide">Reason<input type="text" name="reason" placeholder="Example: great hustle at practice"></label>
         <button class="primary wide" type="submit">Award Parent Bonus XP</button>
       </form>
     </div>
     <div class="card">
       <h2>Review Pending Combine Tests</h2>
-      <p class="muted">Use the parent code to approve any pending combine tests.</p>
-      <label>Parent code<input id="reviewCode" type="password"></label>
+      <p class="muted">Enter your PIN to approve any pending combine tests.</p>
       <button class="primary" id="approvePending">Approve Pending Tests</button>
       <div id="pendingList"></div>
     </div>
@@ -470,10 +471,11 @@
     <p id="teamProgramStatus" class="muted"></p>
   </div>
   <div class="card">
-    <h2>Backup / Reset</h2>
-    <button id="exportData">Download Backup</button>
-    <label class="file">Import Backup<input type="file" id="importData" accept="application/json"></label>
-    <button class="danger" id="resetData">Reset All Data</button>
+    <h2>Local Device Settings</h2>
+    <p class="muted">Your workouts, combine tests, quests, rewards, gear, and team are saved to your account, not this device — signing in anywhere brings them with you. This only covers device-local extras: draft training programs and Arcade high scores.</p>
+    <button id="exportData">Download Local Backup</button>
+    <label class="file">Import Local Backup<input type="file" id="importData" accept="application/json"></label>
+    <button class="danger" id="resetData">Reset Local Device Settings</button>
   </div>
 </section>
 </main>
@@ -520,6 +522,17 @@
     <label>Athlete's name<input id="newAthleteName" type="text" placeholder="e.g. Ethan"></label>
     <button id="saveNewAthleteBtn" class="primary" type="button">Add Athlete</button>
     <p id="addAthleteStatus" class="muted"></p>
+  </div>
+</div>
+
+<div id="pinModal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closePinModal" class="modal-close" type="button">×</button>
+    <h2>Confirm PIN</h2>
+    <p class="muted" id="pinModalLabel"></p>
+    <label>PIN<input id="pinModalInput" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="4-6 digit PIN"></label>
+    <button id="pinModalSubmit" class="primary wide" type="button">Confirm</button>
+    <p id="pinModalStatus" class="muted"></p>
   </div>
 </div>
 

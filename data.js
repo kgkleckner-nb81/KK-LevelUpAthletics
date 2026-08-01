@@ -41,8 +41,14 @@ function onAuthChange(cb){
 
 // ---------------- Profile ----------------
 
+// approval_pin_hash is column-locked (0006_pin_hardening.sql) — never
+// selectable by the client, hashed or not. Both queries below list columns
+// explicitly rather than `select('*')`, which would otherwise error trying
+// to include a column the client has no privilege to read.
+const PROFILE_COLUMNS='id, display_name, is_parent, is_coach, created_at';
+
 async function fetchProfile(userId){
-  const {data,error}=await supabase.from('profiles').select('*').eq('id',userId).maybeSingle();
+  const {data,error}=await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id',userId).maybeSingle();
   if(error) throw error;
   return data;
 }
@@ -50,9 +56,37 @@ async function fetchProfile(userId){
 async function createProfile(userId,displayName,isParent,isCoach){
   const {data,error}=await supabase.from('profiles')
     .insert({id:userId,display_name:displayName,is_parent:isParent,is_coach:isCoach})
-    .select().single();
+    .select(PROFILE_COLUMNS).single();
   if(error) throw error;
   return data;
+}
+
+async function hasApprovalPin(){
+  const {data,error}=await supabase.rpc('has_approval_pin');
+  if(error) throw error;
+  return !!data;
+}
+
+async function setApprovalPinRemote(pin){
+  const {error}=await supabase.rpc('set_approval_pin',{p_pin:pin});
+  if(error) throw error;
+}
+
+async function changeApprovalPinRemote(oldPin,newPin){
+  const {error}=await supabase.rpc('change_approval_pin',{p_old_pin:oldPin,p_new_pin:newPin});
+  if(error) throw error;
+}
+
+// Client-side pre-check only — used for actions that don't otherwise carry
+// an xp_ledger side effect (team setup/program edits), where RLS already
+// restricts the write to the real coach and the PIN is purely the "kid on
+// an already-logged-in device" mitigation. Every XP-granting action instead
+// has its PIN checked INSIDE its own SECURITY DEFINER function server-side
+// — this pre-check is not a substitute for that pattern.
+async function verifyApprovalPinRemote(pin){
+  const {data,error}=await supabase.rpc('verify_approval_pin',{p_pin:pin});
+  if(error) throw error;
+  return !!data;
 }
 
 // ---------------- Athletes ----------------
@@ -80,23 +114,27 @@ function setStoredActiveAthleteId(athleteId){
 }
 
 // ---------------- Athlete state (read side) ----------------
-// Fetches every table already migrated in Phase B and maps each into the
-// exact shape app.js's `state` object already uses, so existing render/
-// rating functions can read it unchanged. Fields NOT covered here
-// (state.combine, state.quests, state.bonuses, state.claimedRewards,
-// state.team, state.teamProgram) are intentionally left alone — their
-// write paths are still local-only until Phase C/D migrate them, so there
-// is nothing to fetch for them yet.
+// Fetches every migrated table and maps each into the exact shape app.js's
+// `state` object already uses, so existing render/rating functions can
+// read it unchanged. state.bonuses stays local-only even after Phase D —
+// parent-awarded bonus XP has no dedicated table (it's just xp_ledger
+// source='bonus' entries, which have no natural "list my bonus history"
+// read need beyond the derived total already covered by athlete_xp_totals).
 async function loadAthleteState(athleteId){
-  const [dailyRes, gearInvRes, gearEqRes, gearPurchRes, xpTotalRes, attrPtsRes]=await Promise.all([
+  const [dailyRes, gearInvRes, gearEqRes, gearPurchRes, xpTotalRes, attrPtsRes, combineRes, questRes, rewardRes, checkpointRes, bonusRes]=await Promise.all([
     supabase.from('daily_check_ins').select('*').eq('athlete_id',athleteId).order('date'),
     supabase.from('gear_inventory').select('*').eq('athlete_id',athleteId),
     supabase.from('gear_equipped').select('*').eq('athlete_id',athleteId).maybeSingle(),
     supabase.from('gear_purchases').select('*').eq('athlete_id',athleteId),
     supabase.from('athlete_xp_totals').select('*').eq('athlete_id',athleteId).maybeSingle(),
-    supabase.from('attribute_points_ledger').select('attribute,points').eq('athlete_id',athleteId).is('checkpoint_id',null)
+    supabase.from('attribute_points_ledger').select('attribute,points').eq('athlete_id',athleteId).is('checkpoint_id',null),
+    supabase.from('combine_tests').select('*').eq('athlete_id',athleteId).order('created_at'),
+    supabase.from('quest_completions').select('*, quests(name,type,xp_value)').eq('athlete_id',athleteId).order('completed_at'),
+    supabase.from('reward_claims').select('*, rewards(name,xp_cost,tier)').eq('athlete_id',athleteId).order('claimed_at'),
+    supabase.from('combine_checkpoints').select('*').eq('athlete_id',athleteId).order('created_at'),
+    supabase.from('xp_ledger').select('*').eq('athlete_id',athleteId).eq('source','bonus').order('created_at')
   ]);
-  [dailyRes,gearInvRes,gearEqRes,gearPurchRes,xpTotalRes,attrPtsRes].forEach(r=>{if(r.error) throw r.error});
+  [dailyRes,gearInvRes,gearEqRes,gearPurchRes,xpTotalRes,attrPtsRes,combineRes,questRes,rewardRes,checkpointRes,bonusRes].forEach(r=>{if(r.error) throw r.error});
 
   const daily=(dailyRes.data||[]).map(row=>({
     date:row.date,
@@ -125,7 +163,52 @@ async function loadAthleteState(athleteId){
     attributePoints[r.attribute]=(attributePoints[r.attribute]||0)+r.points;
   });
 
-  return {daily,inventory,equipped,gearPurchases,totalXP,attributePoints};
+  const combine=(combineRes.data||[]).map(row=>({
+    id:row.id,
+    week:row.week,
+    verified:row.status==='verified',
+    status:row.status==='verified'?'Parent Verified':'Pending Parent Review',
+    programId:row.program_id,
+    programName:row.program_name,
+    customCombine:(row.metrics&&row.metrics.customCombine)||[]
+  }));
+
+  const quests=(questRes.data||[]).map(row=>({
+    id:row.quest_id,
+    title:row.quests?row.quests.name:row.quest_id,
+    type:row.quests&&row.quests.type==='battle'?'Boss Battle':'Quest',
+    xp:row.quests?row.quests.xp_value:0,
+    notes:row.notes||'',
+    date:(row.completed_at||'').slice(0,10)
+  }));
+
+  const claimedRewards=(rewardRes.data||[]).map(row=>({
+    milestoneXP:row.rewards?row.rewards.xp_cost:0,
+    title:row.rewards?row.rewards.name:'Reward',
+    dateClaimed:(row.claimed_at||'').slice(0,10),
+    approvedBy:'Parent'
+  }));
+
+  const combineCheckpoints=(checkpointRes.data||[]).map(row=>({
+    date:(row.created_at||'').slice(0,10),
+    overall:row.overall_rating
+  }));
+
+  // xp_ledger.note is stored as "<bonus type>: <reason>" (award_bonus_xp,
+  // 0004_functions.sql) — split back apart for display. This is a read-only
+  // history view; the real total already lives in athlete_xp_totals, not
+  // recomputed from this array (see xp() in app.js).
+  const bonuses=(bonusRes.data||[]).map(row=>{
+    const sep=(row.note||'').indexOf(': ');
+    return {
+      date:(row.created_at||'').slice(0,10),
+      type:sep>=0?row.note.slice(0,sep):(row.note||'Bonus'),
+      xp:row.amount,
+      reason:sep>=0?row.note.slice(sep+2):''
+    };
+  });
+
+  return {daily,inventory,equipped,gearPurchases,totalXP,attributePoints,combine,quests,claimedRewards,combineCheckpoints,bonuses};
 }
 
 // ---------------- Daily check-in (frictionless, Phase B) ----------------
@@ -137,6 +220,58 @@ async function submitDailyCheckIn(athleteId,date,programType,programId,programNa
   });
   if(error) throw error;
   return data;
+}
+
+// ---------------- Combine testing (Phase D) ----------------
+
+async function submitCombineTestRemote(athleteId,week,programId,programName,customCombine,pin){
+  const {data,error}=await supabase.rpc('submit_combine_test',{
+    p_athlete_id:athleteId,p_week:week,p_program_id:programId,p_program_name:programName,
+    p_metrics:{customCombine},p_pin:pin
+  });
+  if(error) throw error;
+  return data && data[0];
+}
+
+async function verifyCombineTestRemote(combineTestId,pin){
+  const {error}=await supabase.rpc('verify_combine_test',{p_combine_test_id:combineTestId,p_pin:pin});
+  if(error) throw error;
+}
+
+async function recordCombineCheckpointRemote(athleteId,combineTestId,overallRating){
+  const {error}=await supabase.rpc('record_combine_checkpoint',{
+    p_athlete_id:athleteId,p_combine_test_id:combineTestId,p_overall_rating:overallRating
+  });
+  if(error) throw error;
+}
+
+// ---------------- Quests / bonus XP / rewards (Phase D) ----------------
+
+async function completeQuestRemote(athleteId,questId,notes,pin){
+  const {error}=await supabase.rpc('complete_quest',{p_athlete_id:athleteId,p_quest_id:questId,p_notes:notes,p_pin:pin});
+  if(error) throw error;
+}
+
+async function awardBonusXPRemote(athleteId,bonusType,xp,reason,pin){
+  const {error}=await supabase.rpc('award_bonus_xp',{p_athlete_id:athleteId,p_bonus_type:bonusType,p_xp:xp,p_reason:reason,p_pin:pin});
+  if(error) throw error;
+}
+
+// rewards.id is a server-generated uuid, unlike quests/gear_items which keep
+// the app's literal string ids — the client's static rewardMilestones
+// catalog only knows a reward by its xp threshold/title, so this fetches
+// the real id by matching name once per claim rather than caching a
+// possibly-stale catalog across a session.
+async function findRewardIdByTitle(title){
+  const {data,error}=await supabase.from('rewards').select('id').eq('name',title).maybeSingle();
+  if(error) throw error;
+  if(!data) throw new Error(`Reward "${title}" not found in the catalog — has it been seeded in Supabase?`);
+  return data.id;
+}
+
+async function claimRewardRemote(athleteId,rewardId,pin){
+  const {error}=await supabase.rpc('claim_reward',{p_athlete_id:athleteId,p_reward_id:rewardId,p_pin:pin});
+  if(error) throw error;
 }
 
 // ---------------- Gear Locker (frictionless, Phase B) ----------------

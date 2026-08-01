@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,parentCode:'SPARTAN9',spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0},attributePoints:{}};
+const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0},attributePoints:{}};
 let state=load();
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -19,7 +19,6 @@ const quests=[
   {id:'spartan-trial',type:'Boss Battle',icon:'⚔️',title:'Spartan Trial',desc:'Reach 60+ overall and complete a verified combine.',xp:125},
   {id:'brewers-callup',type:'Boss Battle',icon:'🔵',title:'Brewers Call-Up',desc:'Reach Brewers Prospect tier.',xp:175}
 ];
-function questXP(){return (state.quests||[]).reduce((a,x)=>a+(+x.xp||0),0)}
 
 // Tier labels reuse the same common/uncommon/rare/legendary "prize-giveaway
 // hierarchy" language as the Arcade wheel's weighted tiers, just applied to
@@ -44,8 +43,6 @@ const bonusXPValues={
   // explicit, visible, one-off award instead of a hidden multiplier.
   "Coach's Boost":100
 };
-function bonusXP(){return (state.bonuses||[]).reduce((a,x)=>a+(+x.xp||0),0)}
-
 
 // Round 5: sport-agnostic, non-trademarked six-tier ladder. Actual promotion
 // between tiers is gated (see evaluatePromotion()) rather than being a pure
@@ -158,33 +155,44 @@ $('#dailyForm').onsubmit=async e=>{
   renderDailyCustomFields();
   render();
 };
-$('#combineForm').onsubmit=e=>{
+$('#combineForm').onsubmit=async e=>{
   e.preventDefault();
+  if(!activeAthlete){alert('Sign in and select an athlete before submitting a combine test.');return}
   const d=Object.fromEntries(new FormData(e.target).entries());
-  const ok=d.parentCode===state.parentCode;
-  delete d.parentCode;
-  d.verified=ok;
-  d.status=ok?'Parent Verified':'Pending Parent Review';
+  const week=d.week;
   const chosen=combineProgramOptions().find(o=>o.id===d.combineProgram);
-  delete d.combineProgram;
-  d.programId=chosen?chosen.id:null;
-  d.programName=chosen?chosen.name:null;
-  d.customCombine=[];
+  const customCombine=[];
   (chosen?chosen.activities:[]).forEach(a=>{
     const value=collectMetricValue(`combineProgram_${a.id}_${a.metric.key}`,d,a);
-    if(value!=null) d.customCombine.push({name:a.name,values:{[a.metric.key]:value}});
+    if(value!=null) customCombine.push({name:a.name,values:{[a.metric.key]:value}});
   });
-  state.combine.push(d);
-  state.combine.sort((a,b)=>(+a.week||0)-(+b.week||0));
-  // Item 9: promotion is only re-evaluated when a VERIFIED Combine is saved
-  // (not on every render), and only verified results ever become checkpoints
-  // — a pending/unverified test can't confirm a tier.
-  if(ok){
-    recordCombineCheckpoint();
-    evaluatePromotion();
+  const pin=await showPinModal('verify this combine test now — or close this without a PIN to save it as pending for later approval');
+  let result;
+  try{
+    result=await submitCombineTestRemote(activeAthlete.id,week,chosen?chosen.id:null,chosen?chosen.name:null,customCombine,pin);
+  }catch(err){
+    alert('Could not save combine test: '+(err.message||'unknown error'));
+    return;
   }
-  save();
-  alert(ok?'Combine test saved and parent verified.':'Saved as pending. Parent can approve in Coach/Parent Corner.');
+  await refreshAthleteState();
+  // Item 9: promotion is only re-evaluated when a VERIFIED Combine is saved
+  // (not on every render), and only verified results ever become
+  // checkpoints — a pending/unverified test can't confirm a tier. The
+  // checkpoint's rating snapshot is computed here, client-side, with the
+  // just-verified test already reflected in state — see
+  // record_combine_checkpoint's SQL comment for why this isn't done
+  // server-side.
+  if(result.status==='verified'){
+    try{
+      await recordCombineCheckpointRemote(activeAthlete.id,result.id,ratings().overall);
+      await refreshAthleteState();
+    }catch(err){
+      console.error('Could not record combine checkpoint',err);
+    }
+    evaluatePromotion();
+    save();
+  }
+  alert(result.status==='verified'?'Combine test saved and verified.':'Saved as pending. Approve it later from Coach/Parent Corner.');
   e.target.reset();
   render();
 };
@@ -228,16 +236,106 @@ $('#teamProgramLogForm').onsubmit=async e=>{
   renderTeamProgramLogFields();
   render();
 };
-$('#questForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());if(d.parentCode!==state.parentCode){alert('Incorrect parent code. Quest XP not awarded.');return}const q=quests.find(x=>x.id===d.questId);if(!q){alert('Select a quest.');return}if(questCompletedThisWeek(q.id)){alert(`${q.title} was already completed this week. It resets next Monday.`);return}state.quests=state.quests||[];state.quests.push({id:q.id,title:q.title,type:q.type,xp:q.xp,notes:d.notes||'',date:new Date().toISOString().slice(0,10)});save();alert(`${q.title} complete! +${q.xp} XP awarded.`);e.target.reset();render()};
+$('#questForm').onsubmit=async e=>{
+  e.preventDefault();
+  if(!activeAthlete){alert('Sign in and select an athlete first.');return}
+  const d=Object.fromEntries(new FormData(e.target).entries());
+  const q=quests.find(x=>x.id===d.questId);
+  if(!q){alert('Select a quest.');return}
+  if(questCompletedThisWeek(q.id)){alert(`${q.title} was already completed this week. It resets next Monday.`);return}
+  const pin=await showPinModal('approve this quest/battle and award XP');
+  if(!pin) return;
+  try{
+    await completeQuestRemote(activeAthlete.id,q.id,d.notes||'',pin);
+  }catch(err){
+    alert('Could not award quest XP: '+(err.message||'unknown error'));
+    return;
+  }
+  await refreshAthleteState();
+  alert(`${q.title} complete! +${q.xp} XP awarded.`);
+  e.target.reset();
+  render();
+};
 
-$('#saveParentCode').onclick=()=>{const c=$('#newParentCode').value.trim();if(c.length<4){$('#codeStatus').textContent='Use at least 4 characters.';return}state.parentCode=c;save();$('#newParentCode').value='';$('#codeStatus').textContent='Parent code updated.'};
-$('#approvePending').onclick=()=>{if($('#reviewCode').value!==state.parentCode){alert('Incorrect parent code.');return}state.combine.forEach(x=>{if(!x.verified){x.verified=true;x.status='Parent Verified'}});save();$('#reviewCode').value='';render()};
-$('#bonusForm').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries());if(d.parentCode!==state.parentCode){alert('Incorrect parent code. Bonus XP not awarded.');return}const xpValue=bonusXPValues[d.bonusType]||0;state.bonuses=state.bonuses||[];state.bonuses.push({date:new Date().toISOString().slice(0,10),type:d.bonusType,xp:xpValue,reason:d.reason||''});save();alert(`${d.bonusType} awarded! +${xpValue} XP.`);e.target.reset();render()};
+$('#approvePending').onclick=async()=>{
+  if(!activeAthlete){alert('Sign in and select an athlete first.');return}
+  const pending=(state.combine||[]).filter(x=>!x.verified);
+  if(!pending.length){alert('No pending combine tests.');return}
+  const pin=await showPinModal('approve all pending combine tests');
+  if(!pin) return;
+  try{
+    for(const entry of pending) await verifyCombineTestRemote(entry.id,pin);
+  }catch(err){
+    alert('Could not approve pending tests: '+(err.message||'unknown error'));
+  }
+  await refreshAthleteState();
+  render();
+};
+$('#bonusForm').onsubmit=async e=>{
+  e.preventDefault();
+  if(!activeAthlete){alert('Sign in and select an athlete first.');return}
+  const d=Object.fromEntries(new FormData(e.target).entries());
+  const xpValue=bonusXPValues[d.bonusType]||0;
+  const pin=await showPinModal('award this bonus XP');
+  if(!pin) return;
+  try{
+    await awardBonusXPRemote(activeAthlete.id,d.bonusType,xpValue,d.reason||'',pin);
+  }catch(err){
+    alert('Could not award bonus XP: '+(err.message||'unknown error'));
+    return;
+  }
+  await refreshAthleteState();
+  alert(`${d.bonusType} awarded! +${xpValue} XP.`);
+  e.target.reset();
+  render();
+};
 
 $('#exerciseSelect').onchange=renderCharts;$('#combineMetricSelect').onchange=renderCharts;
-$('#exportData').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ethans-baseball-hq-backup.json';a.click()};
-$('#importData').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{state={...defaults,...JSON.parse(r.result)};save();render()}catch{alert('Could not import file')}};r.readAsText(f)};
-$('#resetData').onclick=()=>{if(confirm('Reset all saved data on this device?')){state={...defaults,daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[]};save();render()}};
+// Phase D: athlete data (workouts, combine tests, quests, rewards, gear,
+// team) lives in Supabase now, not this device's localStorage blob — so
+// Backup/Reset only covers the fields that are genuinely still local-only
+// (draft training programs, Arcade scores/session state). Exporting or
+// resetting `state` wholesale would touch fields that get silently
+// overwritten by the next refreshAthleteState() call anyway.
+const LOCAL_ONLY_FIELDS=['programs','activeProgramId','draftProgram','presetsSeeded','arcadeScores','arcadeMetrics','gameScores','gameXP','rainTokens','spinLog','arcadeDaily'];
+$('#exportData').onclick=()=>{
+  const localState={};
+  LOCAL_ONLY_FIELDS.forEach(k=>{localState[k]=state[k]});
+  const blob=new Blob([JSON.stringify(localState,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='level-up-athletics-local-backup.json';
+  a.click();
+};
+$('#importData').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const imported=JSON.parse(r.result);
+      LOCAL_ONLY_FIELDS.forEach(k=>{if(imported[k]!==undefined) state[k]=imported[k]});
+      save();
+      render();
+    }catch{alert('Could not import file')}
+  };
+  r.readAsText(f);
+};
+$('#resetData').onclick=()=>{
+  if(!confirm('Reset local device settings (draft training programs, Arcade scores)? This does not affect anything saved to your account.')) return;
+  state.programs=[];
+  state.activeProgramId=null;
+  state.draftProgram=null;
+  state.presetsSeeded=false;
+  state.arcadeScores={homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}};
+  state.arcadeMetrics={homeRunHero:0,webGem:0,clutchCatch:0};
+  state.gameScores={reaction:null,strike:0,homer:0};
+  state.gameXP={date:'',xp:0};
+  state.rainTokens=1;
+  state.spinLog=[];
+  state.arcadeDaily={date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null};
+  save();
+  render();
+};
 
 function max(arr){return Math.max(0,...arr.map(x=>+x||0))}
 function minPos(arr){const v=arr.map(Number).filter(x=>x>0);return v.length?Math.min(...v):0}
@@ -372,12 +470,15 @@ function ratings(){
 }
 function streak(){const dates=[...new Set(state.daily.map(x=>x.date).filter(Boolean))].sort().reverse();if(!dates.length)return 0;let s=0,d=new Date();for(let i=0;i<365;i++){const iso=d.toISOString().slice(0,10);if(dates.includes(iso)){s++;d.setDate(d.getDate()-1)}else if(i===0)d.setDate(d.getDate()-1);else break}return s}
 function spinXP(){return (state.spinLog||[]).reduce((a,x)=>a+(+x.xp||0),0)}
-// Phase B: daily-check-in/mission/team-bonus XP now comes from the server
-// (state.totalXP, via xp_ledger) instead of state.daily.length*25 — those
-// write paths are migrated. Combine/quest/bonus/reward XP still come from
-// local state until Phase D migrates their approval flows too, so this is
-// a deliberate hybrid, not a full switch to state.totalXP alone.
-function xp(){return (state.totalXP||0)+state.combine.filter(x=>x.verified).length*75+questXP()+bonusXP()+spinXP()}
+// Phase D: combine/quest/bonus XP now also comes from the server
+// (state.totalXP, via xp_ledger), same as daily-check-in/mission/team-bonus
+// did after Phase B — so this is state.totalXP plus ONLY the one source
+// that's deliberately staying local forever: Arcade spin XP (spinXP()),
+// since Arcade is explicitly out of scope for the Supabase migration.
+// Do NOT sum verified-combine count, quest XP, or bonus XP back in here —
+// those amounts are already inside state.totalXP now, and re-adding them
+// would double-count every combine/quest/bonus XP award.
+function xp(){return (state.totalXP||0)+spinXP()}
 // Round 5 item 9: tier is now stateful (state.currentTierIndex), advanced
 // only by evaluatePromotion() at a verified-Combine save — not a pure
 // function of the current rating, so it doesn't flicker as raw numbers
@@ -439,20 +540,11 @@ function combineConfirmed(gateType,threshold){
     default:return false;
   }
 }
-// Snapshots the CURRENT overall rating against this verified Combine so
-// later gate checks (especially Legend's "both mid and end") can look back
-// at what the rating actually was at that specific checkpoint, not just
-// what it is now.
-function recordCombineCheckpoint(){
-  state.combineCheckpoints=state.combineCheckpoints||[];
-  state.combineCheckpoints.push({date:todayISO(),overall:ratings().overall});
-  // Round 13 item 5: completion (state.attributePoints) is a rolling window
-  // since the last checkpoint, not a lifetime tally — reset it here, after
-  // this checkpoint's rating snapshot above has already used the pre-reset
-  // value, so a strong first month doesn't permanently pad every axis's
-  // completion score for the rest of the athlete's time in the app.
-  state.attributePoints={};
-}
+// Checkpoint recording (snapshotting the current overall rating against a
+// verified Combine, and resetting the attributePoints rolling window) now
+// happens server-side via recordCombineCheckpointRemote() in data.js,
+// called right after a combine test is verified — see combineForm's
+// submit handler.
 // Advances at most one tier per unmet gate, but loops so a strong athlete
 // who clears multiple tiers' gates in one checkpoint isn't artificially
 // held back to a single step.
@@ -569,15 +661,20 @@ function xpEvents(){
 function totalGearXPSpent(){return (state.gearPurchases||[]).reduce((a,p)=>a+(+p.xpCost||0),0)}
 function totalXPSpent(){return (state.claimedRewards||[]).reduce((a,r)=>a+(+r.milestoneXP||0),0)+totalGearXPSpent()}
 function availableBalance(){return xp()-totalXPSpent()}
-function claimReward(xpCost,title){
+async function claimReward(xpCost,title){
+  if(!activeAthlete){alert('Sign in and select an athlete before claiming a reward.');return}
   const balance=availableBalance();
   if(balance<xpCost){alert(`Not enough balance to claim ${title}. You need ${xpCost} XP and have ${balance}.`);return}
-  const code=prompt(`Enter parent code to approve claiming "${title}" (-${xpCost} XP):`);
-  if(code===null) return;
-  if(code!==state.parentCode){alert('Incorrect parent code. Reward not claimed.');return}
-  state.claimedRewards=state.claimedRewards||[];
-  state.claimedRewards.push({milestoneXP:xpCost,title,dateClaimed:todayISO(),approvedBy:'Parent'});
-  save();
+  const pin=await showPinModal(`approve claiming "${title}" (-${xpCost} XP)`);
+  if(!pin) return;
+  try{
+    const rewardId=await findRewardIdByTitle(title);
+    await claimRewardRemote(activeAthlete.id,rewardId,pin);
+  }catch(err){
+    alert('Could not claim reward: '+(err.message||'unknown error'));
+    return;
+  }
+  await refreshAthleteState();
   alert(`${title} claimed! -${xpCost} XP.`);
   render();
 }
@@ -1865,6 +1962,11 @@ async function saveTeamSetup(){
   if(!currentProfile){alert('Sign in first.');return}
   const name=$('#teamNameInput').value.trim();
   if(!name){alert('Enter a team name.');return}
+  const pin=await showPinModal('save your team setup');
+  if(!pin) return;
+  let pinOk=false;
+  try{ pinOk=await verifyApprovalPinRemote(pin); }catch(err){ /* treat as failed */ }
+  if(!pinOk){alert('Incorrect PIN.');return}
   let created=null,lastErr=null;
   for(let attempt=0;attempt<5&&!created;attempt++){
     try{ created=await createTeam(currentProfile.id,name,generateTeamJoinCode()); }
@@ -1993,6 +2095,11 @@ async function saveTeamProgram(){
   if(!chosen.length){alert('Pick at least one activity for the program.');return}
   const title=$('#teamProgramTitle').value.trim()||`${coachTeam.name} Baseball Training Program`;
   const instructions=($('#teamProgramInstructions')?.value||'').trim();
+  const pin=await showPinModal('save this team program');
+  if(!pin) return;
+  let pinOk=false;
+  try{ pinOk=await verifyApprovalPinRemote(pin); }catch(err){ /* treat as failed */ }
+  if(!pinOk){alert('Incorrect PIN.');return}
   try{
     await saveTeamProgramRemote(coachTeam.id,title,chosen,instructions,currentProfile.id);
   }catch(err){
@@ -2539,6 +2646,46 @@ function showAddAthleteModal(){
 }
 function hideAddAthleteModal(){$('#addAthleteModal').classList.add('hidden')}
 
+// ---- PIN step-up (Phase D) ----
+// Shared confirmation modal used by every approval-gated action (combine
+// verification, quest/bonus approval, reward claims, coach roster/program
+// edits). Returns the entered PIN, or null if the user closed the modal
+// without confirming — callers should treat null as "cancelled," not
+// re-prompt. The PIN itself is only ever checked server-side (RPCs call
+// verify_approval_pin internally) — this modal just collects it.
+function showPinModal(actionLabel){
+  return new Promise(resolve=>{
+    const modal=$('#pinModal'), input=$('#pinModalInput'), submitBtn=$('#pinModalSubmit'), closeBtn=$('#closePinModal');
+    $('#pinModalLabel').textContent=`Enter your PIN to ${actionLabel}.`;
+    input.value='';
+    $('#pinModalStatus').textContent='';
+    modal.classList.remove('hidden');
+    input.focus();
+    let done=false;
+    const finish=val=>{
+      if(done) return;
+      done=true;
+      modal.classList.add('hidden');
+      submitBtn.onclick=null; closeBtn.onclick=null; input.onkeydown=null;
+      resolve(val);
+    };
+    submitBtn.onclick=()=>{
+      const v=input.value.trim();
+      if(!/^[0-9]{4,6}$/.test(v)){$('#pinModalStatus').textContent='Enter a 4-6 digit PIN.';return}
+      finish(v);
+    };
+    closeBtn.onclick=()=>finish(null);
+    input.onkeydown=e=>{if(e.key==='Enter') submitBtn.click();};
+  });
+}
+async function refreshPinSetupPanel(){
+  if(!currentProfile) return;
+  let has=false;
+  try{ has=await hasApprovalPin(); }catch(err){ /* leave has=false, show the create form */ }
+  $('#pinSetupCreateFields').classList.toggle('hidden',has);
+  $('#pinChangeFields').classList.toggle('hidden',!has);
+}
+
 async function afterSignedIn(session){
   currentSession=session;
   const profile=await fetchProfile(session.user.id);
@@ -2548,6 +2695,7 @@ async function afterSignedIn(session){
   }
   currentProfile=profile;
   hideAuthModal();
+  await refreshPinSetupPanel();
   await refreshCoachTeamContext();
   currentAthletes=await listAthletes(profile.id);
   updateAuthUI();
@@ -2576,6 +2724,8 @@ function afterSignedOut(){
   updateAuthUI();
   renderCoachOnlyVisibility();
   renderTeamIdentity();
+  $('#pinSetupCreateFields').classList.remove('hidden');
+  $('#pinChangeFields').classList.add('hidden');
 }
 function initAuthUI(){
   onSupabaseReady(async()=>{
@@ -2608,6 +2758,7 @@ function initAuthUI(){
     try{
       currentProfile=await createProfile(currentSession.user.id,name,isParent,isCoach);
       hideAuthModal();
+      await refreshPinSetupPanel();
       await refreshCoachTeamContext();
       currentAthletes=await listAthletes(currentProfile.id);
       updateAuthUI();
@@ -2645,6 +2796,30 @@ function initAuthUI(){
     if(!approveId&&!declineId) return;
     await decideTeamJoinAction(approveId||declineId,!!approveId);
   });
+  if($('#savePinBtn'))$('#savePinBtn').onclick=async()=>{
+    const pin=$('#newPinInput').value.trim();
+    if(!/^[0-9]{4,6}$/.test(pin)){$('#pinSetupStatus').textContent='Enter a 4-6 digit PIN.';return}
+    try{
+      await setApprovalPinRemote(pin);
+      $('#newPinInput').value='';
+      $('#pinSetupStatus').textContent='PIN set.';
+      await refreshPinSetupPanel();
+    }catch(err){
+      $('#pinSetupStatus').textContent=err.message||'Could not set PIN.';
+    }
+  };
+  if($('#changePinBtn'))$('#changePinBtn').onclick=async()=>{
+    const oldPin=$('#oldPinInput').value.trim(), newPin=$('#newPinInput2').value.trim();
+    if(!/^[0-9]{4,6}$/.test(newPin)){$('#pinSetupStatus').textContent='Enter a 4-6 digit new PIN.';return}
+    try{
+      await changeApprovalPinRemote(oldPin,newPin);
+      $('#oldPinInput').value='';
+      $('#newPinInput2').value='';
+      $('#pinSetupStatus').textContent='PIN changed.';
+    }catch(err){
+      $('#pinSetupStatus').textContent=err.message||'Could not change PIN.';
+    }
+  };
 }
 initAuthUI();
 
