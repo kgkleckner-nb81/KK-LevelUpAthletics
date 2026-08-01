@@ -1,6 +1,17 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
 const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},gameXP:{date:'',xp:0},rainTokens:1,spinLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0},attributePoints:{}};
 let state=load();
+// account-layer equivalent of `state` — WHO is signed in and WHICH athlete
+// is selected, not athlete data itself (see refreshAthleteState()). Declared
+// here, at the very top, because render()/renderPlayerCardHero() read
+// activeAthlete and the first boot-time render() call happens well before
+// the old Phase B section further down — a `let` there left activeAthlete
+// in the temporal dead zone at that first call and crashed the whole boot
+// script silently.
+let currentSession=null;
+let currentProfile=null;
+let currentAthletes=[];
+let activeAthlete=null;
 function load(){try{return {...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return defaults}}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -881,7 +892,7 @@ function initPlayerCardRotation(){
   });
   const dots=[...dotsWrap.querySelectorAll('span')];
   const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const ROTATE_MS=reduceMotion?12000:3500;
+  const ROTATE_MS=reduceMotion?12000:1800;
   let current=0;
   let paused=false;
   setInterval(()=>{
@@ -2614,17 +2625,13 @@ renderDailyCustomFields();
 renderCombineProgramPicker();
 
 // ---- Supabase auth, profile, and athlete switcher (Phase B) ----
-// currentSession/currentProfile/currentAthletes/activeAthlete are the
-// account-layer equivalent of `state` — they describe WHO is signed in and
-// WHICH athlete is selected, not athlete data itself. Once an athlete is
-// selected, refreshAthleteState() overlays that athlete's Supabase data
-// onto the existing `state` object so every render()/ratings() call below
-// keeps working unchanged.
-let currentSession=null;
-let currentProfile=null;
-let currentAthletes=[];
-let activeAthlete=null;
-
+// currentSession/currentProfile/currentAthletes/activeAthlete are declared
+// at the top of the file (with `state`), not here — render()/renderPlayerCardHero()
+// read activeAthlete, and the very first boot-time render() call happens
+// before this point in the file, so a `let` here would leave activeAthlete
+// in the temporal dead zone at that first call and crash the whole boot
+// script. Confirmed live: this exact crash silently broke sign-in wiring,
+// PIN setup, and everything else after the crash point until caught.
 async function refreshAthleteState(){
   if(!activeAthlete) return;
   const remote=await loadAthleteState(activeAthlete.id);
