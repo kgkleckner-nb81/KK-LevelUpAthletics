@@ -359,7 +359,7 @@ async function loadLeagueForTeam(teamId,leagueId){
   if(!leagueId) return {league:null,standings:[]};
   const [leagueRes,standingsRes]=await Promise.all([
     supabase.from('leagues').select('*').eq('id',leagueId).maybeSingle(),
-    supabase.from('league_team_totals').select('*').eq('league_id',leagueId).order('team_xp',{ascending:false})
+    supabase.rpc('get_league_team_totals',{p_league_id:leagueId})
   ]);
   if(leagueRes.error) throw leagueRes.error;
   if(standingsRes.error) throw standingsRes.error;
@@ -407,14 +407,18 @@ async function loadTeamRoster(teamId){
   return data||[];
 }
 
+// Read through get_team_xp_totals/get_all_team_xp_totals_ranked (SECURITY
+// DEFINER RPCs), not a direct select on the team_xp_totals view — see
+// 0011_fix_team_totals_rls.sql for why the direct view read wasn't
+// reliably readable as `authenticated`.
 async function loadTeamXpTotals(teamId){
-  const {data,error}=await supabase.from('team_xp_totals').select('*').eq('team_id',teamId).maybeSingle();
+  const {data,error}=await supabase.rpc('get_team_xp_totals',{p_team_id:teamId});
   if(error) throw error;
-  return data;
+  return (data&&data[0])||null;
 }
 
 async function loadAllTeamXpTotalsRanked(){
-  const {data,error}=await supabase.from('team_xp_totals').select('*').order('team_xp',{ascending:false});
+  const {data,error}=await supabase.rpc('get_all_team_xp_totals_ranked');
   if(error) throw error;
   return data||[];
 }
