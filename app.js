@@ -1971,22 +1971,40 @@ function renderTeamIdentity(){
 // Async: fetches the active athlete's membership + (if approved) roster/
 // totals/rank, caches them, then repaints. Called on athlete select and
 // after a join request — NOT from the general render() chain.
+// Visible on-page status (not just console) — this data layer has been hard
+// to diagnose remotely (RLS-on-view surprises, silent hangs), so any
+// failure here is surfaced directly in the Team HQ card instead of only
+// failing silently to "0". A 10s timeout turns a hung request into a
+// readable message instead of an indefinite blank stat.
+function withTimeout(promise,ms,label){
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error(`${label} timed out after ${ms/1000}s`)),ms))
+  ]);
+}
 async function refreshTeamMembershipUI(){
   if(!activeAthlete) return;
-  athleteTeamMembership=await getAthleteTeamMembership(activeAthlete.id);
-  const approved=athleteTeamMembership&&athleteTeamMembership.status==='approved';
-  if(approved){
-    const teamId=athleteTeamMembership.teams.id;
-    const [totals,ranked,roster]=await Promise.all([
-      loadTeamXpTotals(teamId), loadAllTeamXpTotalsRanked(), loadTeamRoster(teamId)
-    ]);
-    currentTeamXpTotals=totals;
-    currentTeamRoster=roster;
-    const rankIndex=ranked.findIndex(t=>t.team_id===teamId);
-    currentTeamRank=rankIndex>=0?rankIndex+1:null;
-    currentTeamRankTotal=ranked.length;
-  }else{
+  const statusEl=$('#teamStatsStatus');
+  if(statusEl) statusEl.textContent='';
+  try{
+    athleteTeamMembership=await withTimeout(getAthleteTeamMembership(activeAthlete.id),10000,'Loading team membership');
+    const approved=athleteTeamMembership&&athleteTeamMembership.status==='approved';
+    if(approved){
+      const teamId=athleteTeamMembership.teams.id;
+      const [totals,ranked,roster]=await withTimeout(Promise.all([
+        loadTeamXpTotals(teamId), loadAllTeamXpTotalsRanked(), loadTeamRoster(teamId)
+      ]),10000,'Loading team stats');
+      currentTeamXpTotals=totals;
+      currentTeamRoster=roster;
+      const rankIndex=ranked.findIndex(t=>t.team_id===teamId);
+      currentTeamRank=rankIndex>=0?rankIndex+1:null;
+      currentTeamRankTotal=ranked.length;
+    }else{
+      currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
+    }
+  }catch(err){
     currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
+    if(statusEl) statusEl.textContent='Could not load team stats: '+(err&&err.message?err.message:String(err));
   }
   renderTeamIdentity();
   renderLeaderboard();
