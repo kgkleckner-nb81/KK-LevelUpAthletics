@@ -273,7 +273,7 @@ begin
     into v_balance from athlete_xp_totals where athlete_id = p_athlete_id;
   if v_balance < v_cost then raise exception 'insufficient balance'; end if;
   insert into gear_inventory(athlete_id, gear_item_id, acquired_via) values (p_athlete_id, p_gear_item_id, 'purchase');
-  insert into gear_purchases(athlete_id, gear_item_id, xp_cost) values (p_athlete_id, v_cost);
+  insert into gear_purchases(athlete_id, gear_item_id, xp_cost) values (p_athlete_id, p_gear_item_id, v_cost);
 end $$;
 
 -- Daily Mission — not PIN-gated. The 50/50 XP-vs-item roll happens
