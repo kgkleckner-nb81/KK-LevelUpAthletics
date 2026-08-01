@@ -78,10 +78,10 @@ create policy daily_parent_all on daily_check_ins for all
   with check (athlete_id in (select id from athletes where parent_profile_id = auth.uid()));
 
 -- combine_tests: parent can select and insert as 'pending' only. There is
--- NO update policy at all — verifying, flipping status, and editing
--- coach_grades are exclusively done through verify_combine_test() /
--- update_coach_grades() (0004_functions.sql), because verification is what
--- triggers an xp_ledger insert and must not be a bare client-side toggle.
+-- NO update policy at all — verifying and flipping status are exclusively
+-- done through verify_combine_test() (0004_functions.sql), because
+-- verification is what triggers an xp_ledger insert and must not be a bare
+-- client-side toggle.
 create policy combine_parent_select on combine_tests for select using (
   athlete_id in (select id from athletes where parent_profile_id = auth.uid())
 );

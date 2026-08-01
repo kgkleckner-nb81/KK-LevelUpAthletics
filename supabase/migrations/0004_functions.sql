@@ -128,10 +128,12 @@ end $$;
 -- Combine test submission: client always inserts as 'pending' directly (RLS
 -- allows it). If a correct PIN is supplied in the same call, this function
 -- verifies it immediately — mirrors the current app's single-step "enter
--- code inline while submitting" flow.
+-- code inline while submitting" flow. No coach-grade input — see
+-- record_combine_checkpoint's note below for why, and how tier-promotion
+-- rating snapshots work instead.
 create or replace function submit_combine_test(
   p_athlete_id uuid, p_week text, p_program_id text, p_program_name text,
-  p_metrics jsonb, p_coach_grades jsonb, p_pin text
+  p_metrics jsonb, p_pin text
 ) returns table(id uuid, status text) language plpgsql security definer set search_path = public as $$
 declare v_id uuid; v_verified boolean := false;
 begin
@@ -139,23 +141,21 @@ begin
     raise exception 'not authorized for this athlete';
   end if;
   if p_pin is not null and verify_approval_pin(p_pin) then v_verified := true; end if;
-  insert into combine_tests(athlete_id, week, program_id, program_name, metrics, coach_grades, status, verified_by, verified_at)
-  values (p_athlete_id, p_week, p_program_id, p_program_name,
-          p_metrics, case when v_verified then p_coach_grades else '{}'::jsonb end,
+  insert into combine_tests(athlete_id, week, program_id, program_name, metrics, status, verified_by, verified_at)
+  values (p_athlete_id, p_week, p_program_id, p_program_name, p_metrics,
           case when v_verified then 'verified' else 'pending' end,
           case when v_verified then auth.uid() else null end,
           case when v_verified then now() else null end)
   returning combine_tests.id into v_id;
   if v_verified then
     insert into xp_ledger(athlete_id, source, amount, note, ref_id) values (p_athlete_id, 'combine_verified', 75, p_program_name, v_id);
-    perform record_combine_checkpoint(p_athlete_id, v_id);
   end if;
   return query select v_id, case when v_verified then 'verified' else 'pending' end;
 end $$;
 
 -- Coach/parent verifies a previously-pending combine test (single-row
 -- approval, and the bulk "approve all pending" flow calls this in a loop).
-create or replace function verify_combine_test(p_combine_test_id uuid, p_coach_grades jsonb, p_pin text)
+create or replace function verify_combine_test(p_combine_test_id uuid, p_pin text)
 returns void language plpgsql security definer set search_path = public as $$
 declare v_athlete_id uuid; v_program_name text;
 begin
@@ -164,50 +164,39 @@ begin
     where id = p_combine_test_id and status = 'pending'
     and athlete_id in (select id from athletes where parent_profile_id = auth.uid());
   if v_athlete_id is null then raise exception 'not authorized or test not pending'; end if;
-  update combine_tests set status = 'verified', verified_by = auth.uid(), verified_at = now(),
-    coach_grades = coalesce(p_coach_grades, coach_grades)
+  update combine_tests set status = 'verified', verified_by = auth.uid(), verified_at = now()
     where id = p_combine_test_id;
   insert into xp_ledger(athlete_id, source, amount, note, ref_id)
   values (v_athlete_id, 'combine_verified', 75, v_program_name, p_combine_test_id)
   on conflict (source, ref_id) do nothing;
-  perform record_combine_checkpoint(v_athlete_id, p_combine_test_id);
 end $$;
 
--- Coach-grade update on an already-verified test — no XP side effect, still
--- PIN-gated since it feeds the rating engine.
-create or replace function update_coach_grades(p_combine_test_id uuid, p_coach_grades jsonb, p_pin text)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  if not verify_approval_pin(p_pin) then raise exception 'incorrect PIN'; end if;
-  update combine_tests set coach_grades = p_coach_grades
-    where id = p_combine_test_id and status = 'verified'
-    and athlete_id in (select id from athletes where parent_profile_id = auth.uid());
-  if not found then raise exception 'not authorized or test not verified'; end if;
-end $$;
-
--- Snapshot current overall rating, then tag all prior unattached
--- attribute_points_ledger rows with this checkpoint id, so future
--- completion-score queries (WHERE checkpoint_id IS NULL) only see points
--- earned since this moment. Mirrors the current app's
--- recordCombineCheckpoint(), which resets state.attributePoints to {}.
+-- Snapshots a CLIENT-COMPUTED overall rating against this verified Combine,
+-- then tags all prior unattached attribute_points_ledger rows with this
+-- checkpoint id so future completion-score queries (WHERE checkpoint_id IS
+-- NULL) only see points earned since this moment. Mirrors the current
+-- app's recordCombineCheckpoint(), which resets state.attributePoints to {}.
 --
--- compute_overall_rating() is a full port of the Round 13 rating engine and
--- is intentionally stubbed here — it ships for real in Phase D, alongside a
--- parity test against the live JS implementation. Do not rely on the
--- overall_rating value stored by this stub for anything user-facing before
--- Phase D lands.
-create or replace function compute_overall_rating(p_athlete_id uuid)
-returns int language sql as $$
-  select 0;
-$$;
-
-create or replace function record_combine_checkpoint(p_athlete_id uuid, p_combine_test_id uuid)
+-- The rating is computed by the client (the same ratings() function that
+-- paints the Player Card) and passed in, not recomputed here — that's how
+-- this already worked before the Supabase migration (checkpoints were
+-- always a client-side snapshot), and replicating the full rating engine
+-- server-side would be large, high-risk, and only close a low-stakes gap
+-- (no money/credentials involved) for a family/team-scale app. Client
+-- calls this right after refreshing state and computing ratings().overall
+-- with the newly-verified test already included.
+create or replace function record_combine_checkpoint(p_athlete_id uuid, p_combine_test_id uuid, p_overall_rating int)
 returns uuid language plpgsql security definer set search_path = public as $$
-declare v_checkpoint_id uuid; v_rating int;
+declare v_checkpoint_id uuid;
 begin
-  v_rating := compute_overall_rating(p_athlete_id);
+  if not exists (select 1 from athletes where id = p_athlete_id and parent_profile_id = auth.uid()) then
+    raise exception 'not authorized for this athlete';
+  end if;
+  if not exists (select 1 from combine_tests where id = p_combine_test_id and athlete_id = p_athlete_id and status = 'verified') then
+    raise exception 'combine test not found or not verified';
+  end if;
   insert into combine_checkpoints(athlete_id, combine_test_id, overall_rating)
-  values (p_athlete_id, p_combine_test_id, v_rating) returning id into v_checkpoint_id;
+  values (p_athlete_id, p_combine_test_id, p_overall_rating) returning id into v_checkpoint_id;
   update attribute_points_ledger set checkpoint_id = v_checkpoint_id
     where athlete_id = p_athlete_id and checkpoint_id is null;
   return v_checkpoint_id;
@@ -315,11 +304,9 @@ revoke all on function decide_team_join(uuid, boolean) from public;
 revoke all on function set_approval_pin(text) from public;
 revoke all on function verify_approval_pin(text) from public;
 revoke all on function log_daily_check_in(uuid, date, text, text, text, jsonb, jsonb) from public;
-revoke all on function submit_combine_test(uuid, text, text, text, jsonb, jsonb, text) from public;
-revoke all on function verify_combine_test(uuid, jsonb, text) from public;
-revoke all on function update_coach_grades(uuid, jsonb, text) from public;
-revoke all on function record_combine_checkpoint(uuid, uuid) from public;
-revoke all on function compute_overall_rating(uuid) from public;
+revoke all on function submit_combine_test(uuid, text, text, text, jsonb, text) from public;
+revoke all on function verify_combine_test(uuid, text) from public;
+revoke all on function record_combine_checkpoint(uuid, uuid, int) from public;
 revoke all on function complete_quest(uuid, text, text, text) from public;
 revoke all on function award_bonus_xp(uuid, text, int, text, text) from public;
 revoke all on function claim_reward(uuid, uuid, text) from public;
@@ -332,11 +319,9 @@ grant execute on function decide_team_join(uuid, boolean) to authenticated;
 grant execute on function set_approval_pin(text) to authenticated;
 grant execute on function verify_approval_pin(text) to authenticated;
 grant execute on function log_daily_check_in(uuid, date, text, text, text, jsonb, jsonb) to authenticated;
-grant execute on function submit_combine_test(uuid, text, text, text, jsonb, jsonb, text) to authenticated;
-grant execute on function verify_combine_test(uuid, jsonb, text) to authenticated;
-grant execute on function update_coach_grades(uuid, jsonb, text) to authenticated;
-grant execute on function record_combine_checkpoint(uuid, uuid) to authenticated;
-grant execute on function compute_overall_rating(uuid) to authenticated;
+grant execute on function submit_combine_test(uuid, text, text, text, jsonb, text) to authenticated;
+grant execute on function verify_combine_test(uuid, text) to authenticated;
+grant execute on function record_combine_checkpoint(uuid, uuid, int) to authenticated;
 grant execute on function complete_quest(uuid, text, text, text) to authenticated;
 grant execute on function award_bonus_xp(uuid, text, int, text, text) to authenticated;
 grant execute on function claim_reward(uuid, uuid, text) to authenticated;

@@ -88,7 +88,6 @@ create table combine_tests (
   program_id text,
   program_name text,
   metrics jsonb not null default '{}',       -- raw benchmark values + customCombine[]
-  coach_grades jsonb not null default '{}',  -- {strength:8,speed:7,...} keyed by performanceAxisOrder
   status text not null check (status in ('pending','verified')) default 'pending',
   verified_by uuid references profiles(id),
   verified_at timestamptz,

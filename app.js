@@ -38,7 +38,11 @@ const bonusXPValues={
   'Sportsmanship Bonus':50,
   'Helping Teammate Bonus':50,
   'Coach Compliment Bonus':100,
-  'Parent Wild Card':75
+  'Parent Wild Card':75,
+  // Replaces the old per-axis 1-10 coach grade that used to feed the rating
+  // math invisibly — a coach recognizing real performance/effort is now an
+  // explicit, visible, one-off award instead of a hidden multiplier.
+  "Coach's Boost":100
 };
 function bonusXP(){return (state.bonuses||[]).reduce((a,x)=>a+(+x.xp||0),0)}
 
@@ -170,18 +174,6 @@ $('#combineForm').onsubmit=e=>{
     const value=collectMetricValue(`combineProgram_${a.id}_${a.metric.key}`,d,a);
     if(value!=null) d.customCombine.push({name:a.name,values:{[a.metric.key]:value}});
   });
-  // Round 13 item 10 — coach grade fields are gated the same way the test
-  // result itself is: only stored on a verified (parent-code-correct) save.
-  const coachGrades={};
-  performanceAxisOrder.forEach(ax=>{
-    const raw=d['grade_'+ax];
-    delete d['grade_'+ax];
-    if(ok&&raw!=null&&raw!==''){
-      const n=+raw;
-      if(n>=1&&n<=10) coachGrades[ax]=n;
-    }
-  });
-  if(Object.keys(coachGrades).length) d.coachGrades=coachGrades;
   state.combine.push(d);
   state.combine.sort((a,b)=>(+a.week||0)-(+b.week||0));
   // Item 9: promotion is only re-evaluated when a VERIFIED Combine is saved
@@ -315,12 +307,19 @@ const axisStatNames={strength:[['Push-ups','pushups'],['Squats','squats']],speed
 // completion component. Balance+Coordination both feed bodyControl,
 // matching categoryAxisMap's many-to-one mapping below.
 const axisAttributeMap={strength:['Strength'],speed:['Speed'],quickness:['Quickness'],jumpPower:['Jump'],core:['Core'],bodyControl:['Balance','Coordination']};
-// Round 13 item 6: three-input blend per axis, replacing Round 5's
-// Combine+capped-Daily two-input model. Combine dominant, completion
-// capped small (pure logging volume can't substitute for performance),
-// coach grade a real but non-dominant third. Treat as tunable, same
-// framing Round 5 used for its own weights.
-const AXIS_COMBINE_WEIGHT=0.60, AXIS_COMPLETION_WEIGHT=0.12, AXIS_COACH_WEIGHT=0.28;
+// Round 13 originally blended a third, optional coach-grade (1-10) input in
+// here at ~28% weight. Removed per a later product decision: it was opaque
+// (the Player Card deliberately never explains its own math, so a parent
+// had no way to see why a grade moved a number), added a per-test chore for
+// coaches, and baked subjective judgment invisibly into a number presented
+// as objective performance. A coach's input is now the explicit, visible
+// "Coach's Boost" bonus (Parent Bonus XP form) instead — same pattern as
+// every other bonus type, not a hidden multiplier.
+// These two weights are exactly what a missing coach grade already
+// redistributed onto in the old 3-input formula (0.60/0.72, 0.12/0.72) —
+// so removing the third input changes no existing rating's math, it just
+// makes the always-true case the only case.
+const AXIS_COMBINE_WEIGHT=5/6, AXIS_COMPLETION_WEIGHT=1/6;
 // Points of (post-checkpoint-reset) attributePoints needed for full
 // completion credit — tunable starting point, same spirit as the bench
 // tiers above.
@@ -341,32 +340,10 @@ function completionScore(axis){
   const pct=Math.min(1,pts/COMPLETION_CAP_POINTS);
   return 50+pct*49;
 }
-// Item 11: linear 1-10 -> ~40-99, consistent with score()'s own floor/cap.
-function normalizeCoachGrade(g){return 40+((g-1)/9)*(99-40)}
-// Latest coach grade entered for this axis, across every verified Combine
-// record that has one — "latest", not "best", matching latestVerifiedCombineValue.
-function latestCoachGrade(axis){
-  const withGrade=state.combine.filter(x=>x.verified&&x.coachGrades&&x.coachGrades[axis]!=null);
-  if(!withGrade.length) return null;
-  return withGrade[withGrade.length-1].coachGrades[axis];
-}
-// Item 12: a missing coach grade doesn't score as zero — its ~28% share is
-// redistributed proportionally onto Combine + completion instead.
 function axisScore(axis){
   const combineComp=combineComponentScore(axis);
   const completionComp=completionScore(axis);
-  const rawGrade=latestCoachGrade(axis);
-  let wCombine=AXIS_COMBINE_WEIGHT,wCompletion=AXIS_COMPLETION_WEIGHT,wCoach=AXIS_COACH_WEIGHT;
-  let coachComp=0;
-  if(rawGrade==null){
-    const remaining=wCombine+wCompletion;
-    wCombine+=wCoach*(wCombine/remaining);
-    wCompletion+=wCoach*(wCompletion/remaining);
-    wCoach=0;
-  }else{
-    coachComp=normalizeCoachGrade(rawGrade);
-  }
-  return Math.round(combineComp*wCombine+completionComp*wCompletion+coachComp*wCoach);
+  return Math.round(combineComp*AXIS_COMBINE_WEIGHT+completionComp*AXIS_COMPLETION_WEIGHT);
 }
 // Item 2/8: Teamwork Skill Lab completions don't get their own axis — they
 // nudge Consistency instead, capped the same "small, non-dominant" way the
@@ -570,7 +547,7 @@ const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
 $('#pendingList').innerHTML=table(['Week','Program','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.programName||'—',a.status]));
-$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderPlayerCardHero();renderCoachReport();renderTeamEdition();renderCombineProgramPicker();renderCoachGradeUpdatePanel();renderCharts()}
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderPlayerCardHero();renderCoachReport();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
 
 
 function xpEvents(){
@@ -1753,33 +1730,6 @@ function renderCombineProgramFields(){
     ?chosen.activities.map(a=>metricInputHTML(`combineProgram_${a.id}_${a.metric.key}`,a.name,a.metric)).join('')
     :'<p class="muted">No activities in this program yet.</p>';
 }
-// Round 13 items 10-12: shared field markup for both the Combine Testing
-// form (grade entered alongside a new test) and the Coach/Parent Corner
-// update panel (grade edited anytime, independent of a new submission).
-function coachGradeFieldsHTML(prefix,existing){
-  return performanceAxisOrder.map(ax=>`<label>${axisLabels[ax]} (1-10)<input type="number" min="1" max="10" step="1" name="${prefix}${ax}" value="${existing&&existing[ax]!=null?existing[ax]:''}"></label>`).join('');
-}
-function verifiedCombineOptions(){
-  const opts=[];
-  state.combine.forEach((entry,i)=>{if(entry.verified) opts.push({index:i,label:`Week ${entry.week} — ${entry.programName||'Combine Test'}`})});
-  return opts;
-}
-function renderCoachGradeUpdatePanel(){
-  const sel=$('#coachGradeCombineSelect');
-  if(!sel) return;
-  const opts=verifiedCombineOptions();
-  const current=sel.value;
-  sel.innerHTML=opts.length?opts.map(o=>`<option value="${o.index}">${o.label}</option>`).join(''):'<option value="">No verified Combine tests yet</option>';
-  if(opts.some(o=>String(o.index)===current)) sel.value=current;
-  renderCoachGradeUpdateFields();
-}
-function renderCoachGradeUpdateFields(){
-  const sel=$('#coachGradeCombineSelect');
-  const fields=$('#coachGradeUpdateFields');
-  if(!sel||!fields) return;
-  const entry=state.combine[+sel.value];
-  fields.innerHTML=coachGradeFieldsHTML('update_',entry&&entry.coachGrades);
-}
 document.addEventListener('click',e=>{
   const addSetBtn=e.target.closest('.add-set-btn');
   if(addSetBtn){
@@ -1796,25 +1746,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
   if(e.target.id==='dailyProgramSelect'){state.activeProgramId=e.target.value;save();renderDailyCustomFields()}
   if(e.target.id==='combineProgramSelect') renderCombineProgramFields();
-  if(e.target.id==='coachGradeCombineSelect') renderCoachGradeUpdateFields();
 });
-if($('#saveCoachGrades'))$('#saveCoachGrades').onclick=()=>{
-  const code=$('#coachGradeCode').value;
-  if(code!==state.parentCode){alert('Incorrect parent code.');return}
-  const entry=state.combine[+$('#coachGradeCombineSelect').value];
-  if(!entry){alert('Select a verified Combine test first.');return}
-  const grades={};
-  performanceAxisOrder.forEach(ax=>{
-    const el=document.querySelector(`[name="update_${ax}"]`);
-    const v=el?el.value:'';
-    if(v!==''){const n=+v;if(n>=1&&n<=10) grades[ax]=n;}
-  });
-  entry.coachGrades=grades;
-  save();
-  $('#coachGradeCode').value='';
-  alert('Coach grades saved.');
-  render();
-};
 document.addEventListener('click',e=>{
   const addBtn=e.target.closest('.add-exercise-btn');
   if(addBtn && !addBtn.disabled) addActivityToDraft(addBtn.dataset.exercise);
@@ -2553,8 +2485,6 @@ initPlayerCardRotation();
 renderDailyProgramPicker();
 renderDailyCustomFields();
 renderCombineProgramPicker();
-if($('#coachGradeFields'))$('#coachGradeFields').innerHTML=coachGradeFieldsHTML('grade_');
-renderCoachGradeUpdatePanel();
 
 // ---- Supabase auth, profile, and athlete switcher (Phase B) ----
 // currentSession/currentProfile/currentAthletes/activeAthlete are the
