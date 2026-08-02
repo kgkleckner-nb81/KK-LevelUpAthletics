@@ -967,6 +967,45 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .gear-equip-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .gear-equip-row>span{min-width:100px;font-weight:700;font-family:var(--accent)}
 .gear-equip-options{display:flex;gap:6px;flex-wrap:wrap}
+
+/* "Under Construction" overlay — feature-flagged purely by the
+   data-under-construction attribute on the .card itself. To bring a
+   section back online later, flip that attribute to "false" (or just
+   delete it) on its markup — no CSS or JS to touch. .card already has
+   position:relative, so the overlay just needs to fill it. */
+.card[data-under-construction="true"]{overflow:hidden}
+.under-construction-overlay{display:none}
+.card[data-under-construction="true"] .under-construction-overlay{
+  display:flex;
+  position:absolute;
+  inset:0;
+  align-items:center;
+  justify-content:center;
+  background:rgba(22,22,22,.55);
+  z-index:5;
+  pointer-events:auto;
+}
+.under-construction-banner{
+  position:absolute;
+  top:26px;
+  left:-70px;
+  width:280px;
+  padding:8px 0;
+  background:var(--creamsicle);
+  color:var(--ink);
+  font-family:var(--accent);
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-size:14px;
+  text-align:center;
+  transform:rotate(-38deg);
+  box-shadow:var(--shadow-sm);
+  border:2px solid var(--ink);
+}
+@media(max-width:480px){
+  .under-construction-banner{width:220px;left:-55px;top:20px;font-size:12px}
+}
 .gear-equip-btn{padding:6px 12px;font-size:13px}
 .gear-equip-btn.active{background:var(--neon-blue);color:var(--ink)}
 
