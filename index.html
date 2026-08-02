@@ -18,10 +18,9 @@
   <link rel="stylesheet" href="styles.css"/>
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-    window.supabase = createClient(
-      'https://nnujbsvljquzxziivknb.supabase.co',
-      'sb_publishable_twOy8ZwTP00ZDqgJMVdCnw_HM7yL2gO'
-    );
+    window.SUPABASE_URL = 'https://nnujbsvljquzxziivknb.supabase.co';
+    window.SUPABASE_ANON_KEY = 'sb_publishable_twOy8ZwTP00ZDqgJMVdCnw_HM7yL2gO';
+    window.supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
     window.dispatchEvent(new Event('supabase-ready'));
   </script>
 </head>

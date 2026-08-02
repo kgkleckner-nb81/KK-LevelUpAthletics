@@ -46,26 +46,35 @@ function onAuthChange(cb){
 // build — see supabase/functions/*/index.ts for their source and the
 // deploy notes at the top of each.
 
-// supabase.functions.invoke() wraps any non-2xx Edge Function response in a
+// Calls an Edge Function with a plain fetch() rather than
+// supabase.functions.invoke() — invoke() wraps any non-2xx response in a
 // generic FunctionsHttpError ("Edge Function returned a non-2xx status
-// code") — it does NOT surface the actual JSON body our functions return
-// (e.g. {error:"Sign in first."}). error.context is the raw Response;
-// read it back out so real failures are visible instead of that generic
-// message.
-async function extractFunctionErrorMessage(error){
-  try{
-    if(error&&error.context&&typeof error.context.json==='function'){
-      const body=await error.context.json();
-      if(body&&body.error) return body.error;
-    }
-  }catch(e){ /* fall through */ }
-  return (error&&error.message)||'Something went wrong.';
+// code") and, at least on the version pinned here, its `error.context`
+// Response body had already been consumed internally by the time we tried
+// to re-read it for the real message, so every failure surfaced as that
+// same unhelpful generic text no matter what our function actually
+// returned. A direct fetch() gives full, guaranteed-once control over
+// reading the body, so real errors (e.g. "Sign in first.") show up as-is.
+async function callEdgeFunction(name,body){
+  const {data:{session}}=await supabase.auth.getSession();
+  const accessToken=(session&&session.access_token)||SUPABASE_ANON_KEY;
+  const res=await fetch(`${SUPABASE_URL}/functions/v1/${name}`,{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':`Bearer ${accessToken}`,
+      'apikey':SUPABASE_ANON_KEY,
+    },
+    body:JSON.stringify(body||{}),
+  });
+  let json=null;
+  try{ json=await res.json(); }catch(e){ /* non-JSON or empty body */ }
+  if(!res.ok) throw new Error((json&&json.error)||`Request failed (${res.status}).`);
+  return json||{};
 }
 
 async function mintDeviceToken(deviceLabel){
-  const {data,error}=await supabase.functions.invoke('mint-device-token',{body:{device_label:deviceLabel||null}});
-  if(error) throw new Error(await extractFunctionErrorMessage(error));
-  if(data&&data.error) throw new Error(data.error);
+  const data=await callEdgeFunction('mint-device-token',{device_label:deviceLabel||null});
   return data.token;
 }
 
@@ -75,9 +84,7 @@ async function mintDeviceToken(deviceLabel){
 // Supabase's own verifyOtp() rather than accepting a session directly from
 // the Edge Function — see redeem-device-token/index.ts for why.
 async function redeemDeviceToken(token){
-  const {data,error}=await supabase.functions.invoke('redeem-device-token',{body:{token}});
-  if(error) throw new Error(await extractFunctionErrorMessage(error));
-  if(data&&data.error) throw new Error(data.error);
+  const data=await callEdgeFunction('redeem-device-token',{token});
   const {error:verifyErr}=await supabase.auth.verifyOtp({token_hash:data.hashed_token,type:'email'});
   if(verifyErr) throw verifyErr;
 }
