@@ -45,7 +45,7 @@ function onAuthChange(cb){
 // selectable by the client, hashed or not. Both queries below list columns
 // explicitly rather than `select('*')`, which would otherwise error trying
 // to include a column the client has no privilege to read.
-const PROFILE_COLUMNS='id, display_name, is_parent, is_coach, created_at';
+const PROFILE_COLUMNS='id, display_name, is_parent, is_coach, coach_approved, created_at';
 
 async function fetchProfile(userId){
   const {data,error}=await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id',userId).maybeSingle();

@@ -2071,8 +2071,15 @@ async function handleTeamLogoUpload(file){
 // other Coach Tools card (pending requests, team program, league join)
 // operates on.
 function renderTeamSetupPanel(){
-  const createFields=$('#teamSetupCreateFields'), existing=$('#teamSetupExisting');
+  const createFields=$('#teamSetupCreateFields'), existing=$('#teamSetupExisting'), pending=$('#teamSetupPendingApproval');
   if(!createFields) return;
+  const approved=!!(currentProfile&&currentProfile.coach_approved);
+  if(pending) pending.classList.toggle('hidden',approved);
+  createFields.classList.toggle('hidden',!approved);
+  if(!approved){
+    if(existing) existing.classList.add('hidden');
+    return;
+  }
   if($('#saveTeamSetup')) $('#saveTeamSetup').textContent=coachTeam?'+ Create Another Team':'Create Team + Generate Join Code';
   if(coachTeam){
     if(existing){
