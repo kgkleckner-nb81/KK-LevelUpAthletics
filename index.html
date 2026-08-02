@@ -345,7 +345,7 @@
 
 
 <section id="team" class="screen">
-<div class="card team-hero hidden" id="teamHeroCard"><div><p class="eyebrow dark">Team HQ</p><h2 id="teamHeroName">Your Team</h2><p id="teamHeroMeta" class="muted"></p></div><div id="teamHeroLogo"></div></div>
+<div class="card team-hero hidden" id="teamHeroCard"><div><p class="eyebrow dark">Team HQ</p><h2 id="teamHeroName">Your Team</h2><p id="teamHeroMeta" class="muted"></p><button class="danger" id="leaveTeamBtn" type="button">Leave Team</button></div><div id="teamHeroLogo"></div></div>
 <div class="grid stats hidden" id="teamStatsGrid"><div class="stat"><span>Team XP</span><strong id="teamStatXP">—</strong><small>points</small></div><div class="stat"><span>Weekly Completion</span><strong id="teamStatCompletion">—</strong><small>team</small></div><div class="stat"><span>Roster Size</span><strong id="teamStatRoster">—</strong><small>athletes</small></div><div class="stat"><span>Team Rank</span><strong id="teamStatRank">—</strong><small id="teamStatRankOf"></small></div></div>
 <p id="teamStatsStatus" class="muted"></p>
 <div class="grid two hidden" id="teamBoardsGrid"><div class="card"><h2>Team Leaderboards</h2><label>Sort by<select id="leaderboardMetric"><option value="xp">Total XP</option><option value="workouts">Workouts Logged</option></select></label><div id="teamLeaderboard"></div></div><div class="card"><h2>Team Feed</h2><div id="teamFeed"></div></div></div>
@@ -466,6 +466,11 @@
     <p class="eyebrow dark">Coach Tools</p>
     <h2>Pending Team Join Requests</h2>
     <div id="pendingRequestsList"></div>
+  </div>
+  <div class="card hidden" id="teamRosterCard" data-coach-only>
+    <p class="eyebrow dark">Coach Tools</p>
+    <h2>Team Roster</h2>
+    <div id="teamRosterList"></div>
   </div>
   <div class="card" data-coach-only>
     <p class="eyebrow dark">Coach Tools</p>

@@ -381,6 +381,11 @@ async function requestTeamJoinForAthlete(athleteId,joinCode){
   if(error) throw error;
 }
 
+async function leaveTeamRemote(athleteId,pin){
+  const {error}=await supabase.rpc('leave_team',{p_athlete_id:athleteId,p_pin:pin});
+  if(error) throw error;
+}
+
 // ---------------- Pending join requests (coach side, Phase C) ----------------
 
 async function loadPendingRequestsForTeam(teamId){
@@ -393,6 +398,11 @@ async function loadPendingRequestsForTeam(teamId){
 
 async function decideTeamJoinRemote(teamMemberId,approve){
   const {error}=await supabase.rpc('decide_team_join',{p_team_member_id:teamMemberId,p_approve:approve});
+  if(error) throw error;
+}
+
+async function removeTeamMemberRemote(teamId,athleteId){
+  const {error}=await supabase.rpc('remove_team_member',{p_team_id:teamId,p_athlete_id:athleteId});
   if(error) throw error;
 }
 

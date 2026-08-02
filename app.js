@@ -1950,7 +1950,7 @@ function renderTeamIdentity(){
       if($('#teamJoinStatus')) $('#teamJoinStatus').textContent=`Request sent to "${m.teams?.name||'the team'}" — waiting for coach approval.`;
     }else{
       if(formFields) formFields.classList.remove('hidden');
-      if($('#teamJoinStatus')) $('#teamJoinStatus').textContent=m&&m.status==='declined'?'Your last request was declined. You can try again.':'';
+      if($('#teamJoinStatus')) $('#teamJoinStatus').textContent=m&&m.status==='declined'?'Your last request was declined. You can try again.':m&&m.status==='left'?`You left "${m.teams?.name||'your last team'}". You can join a new team below.`:'';
     }
   }
   const pathLogo=$('#pathCardTeamLogo');
@@ -2114,8 +2114,45 @@ async function decideTeamJoinAction(teamMemberId,approve){
   try{
     await decideTeamJoinRemote(teamMemberId,approve);
     await renderPendingTeamRequests();
+    await renderTeamRoster();
   }catch(err){
     alert('Could not update request: '+(err.message||'unknown error'));
+  }
+}
+// Coach's roster management list — sourced from the same narrowed
+// get_team_roster() RPC the athlete-side leaderboard uses (name + aggregate
+// XP/participation only), filtered to currently-approved members.
+async function renderTeamRoster(){
+  const list=$('#teamRosterList');
+  if(!list||!coachTeam) return;
+  const rows=(await loadTeamRoster(coachTeam.id)).filter(r=>r.status==='approved');
+  list.innerHTML=rows.length?rows.map(r=>`<div class="pending-request-row"><span>${r.display_name}</span><button class="danger" data-remove="${r.athlete_id}" data-name="${r.display_name}" type="button">Remove</button></div>`).join(''):'<p class="muted">No athletes on the roster yet.</p>';
+}
+// Sets team_members.status to 'left' — a soft removal, same tier as
+// archiving an athlete. Nothing else (XP, workouts, combine tests, rewards,
+// gear) is touched: none of it is scoped by team in this schema, so there's
+// nothing to wipe.
+async function removeTeamMemberAction(athleteId,name){
+  if(!coachTeam) return;
+  if(!confirm(`Remove "${name}" from the team roster? Their workout history and XP are kept — they can be re-invited with the join code anytime.`)) return;
+  try{
+    await removeTeamMemberRemote(coachTeam.id,athleteId);
+    await renderTeamRoster();
+  }catch(err){
+    alert('Could not remove athlete: '+(err.message||'unknown error'));
+  }
+}
+async function leaveTeamAction(){
+  if(!activeAthlete) return;
+  const teamName=(athleteTeamMembership&&athleteTeamMembership.teams&&athleteTeamMembership.teams.name)||'this team';
+  if(!confirm(`Leave "${teamName}"? Your workout history and XP are kept — you can rejoin with a join code anytime.`)) return;
+  const pin=await showPinModal('leave your team');
+  if(!pin) return;
+  try{
+    await leaveTeamRemote(activeAthlete.id,pin);
+    await refreshTeamMembershipUI();
+  }catch(err){
+    alert('Could not leave team: '+(err.message||'unknown error'));
   }
 }
 // ---- Coach team context (loaded once per sign-in, not athlete-scoped) ----
@@ -2135,6 +2172,7 @@ async function refreshCoachTeamContext(){
   renderTeamSetupPanel();
   if(coachTeam){
     await renderPendingTeamRequests();
+    await renderTeamRoster();
     await refreshTeamProgramBuilderFields();
   }
 }
@@ -2144,6 +2182,7 @@ async function switchCoachTeam(teamId){
   coachTeam=t;
   renderTeamSetupPanel();
   await renderPendingTeamRequests();
+  await renderTeamRoster();
   await refreshTeamProgramBuilderFields();
 }
 function renderCoachOnlyVisibility(){
@@ -2151,6 +2190,7 @@ function renderCoachOnlyVisibility(){
   $$('[data-coach-only]').forEach(el=>el.classList.toggle('hidden',!isCoach));
   if($('#leagueJoinCard')) $('#leagueJoinCard').classList.toggle('hidden',!isCoach||!coachTeam);
   if($('#pendingRequestsCard')) $('#pendingRequestsCard').classList.toggle('hidden',!isCoach||!coachTeam);
+  if($('#teamRosterCard')) $('#teamRosterCard').classList.toggle('hidden',!isCoach||!coachTeam);
 }
 
 // ---- Team Program (Phase C) ----
@@ -2936,6 +2976,12 @@ function initAuthUI(){
     if(!approveId&&!declineId) return;
     await decideTeamJoinAction(approveId||declineId,!!approveId);
   });
+  if($('#teamRosterList'))$('#teamRosterList').addEventListener('click',async e=>{
+    const athleteId=e.target.dataset.remove;
+    if(!athleteId) return;
+    await removeTeamMemberAction(athleteId,e.target.dataset.name||'this athlete');
+  });
+  if($('#leaveTeamBtn'))$('#leaveTeamBtn').onclick=leaveTeamAction;
   if($('#savePinBtn'))$('#savePinBtn').onclick=async()=>{
     const pin=$('#newPinInput').value.trim();
     if(!/^[0-9]{4,6}$/.test(pin)){$('#pinSetupStatus').textContent='Enter a 4-6 digit PIN.';return}
