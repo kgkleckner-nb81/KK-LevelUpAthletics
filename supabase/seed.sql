@@ -27,10 +27,10 @@ insert into rewards (name, xp_cost, tier)
 select v.name, v.xp_cost, v.tier
 from (values
   ('Ice Cream Single',        250,  'Common'),
-  ('New Baseball Bonus',      500,  'Common'),
-  ('Batting Cage Trip',       750,  'Uncommon'),
+  ('Batting Cage Trip',       500,  'Common'),
+  ('New Baseball Bonus',      750,  'Uncommon'),
   ('Baseball Store Visit',    1000, 'Uncommon'),
-  ('Brewers Bonus',           1500, 'Rare'),
+  ('"The Show" Award',        1500, 'Rare'),
   ('All-Star Outing',         2000, 'Rare'),
   ('MVP Surprise',            3000, 'Legendary')
 ) as v(name, xp_cost, tier)

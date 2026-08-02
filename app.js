@@ -61,10 +61,10 @@ const quests=[
 // reward spacing instead of wheel wedge size.
 const rewardMilestones=[
   {xp:250,title:'Ice Cream Single',icon:'🍦',desc:'Small surprise reward.',tier:'Common'},
-  {xp:500,title:'New Baseball Bonus',icon:'⚾',desc:'New baseball, eye black, or small gear item.',tier:'Common'},
-  {xp:750,title:'Batting Cage Trip',icon:'🥎',desc:'Parent-approved cage session or dad pitching session.',tier:'Uncommon'},
+  {xp:500,title:'Batting Cage Trip',icon:'🥎',desc:'Parent-approved cage session or dad pitching session.',tier:'Common'},
+  {xp:750,title:'New Baseball Bonus',icon:'⚾',desc:'New baseball, eye black, or small gear item.',tier:'Uncommon'},
   {xp:1000,title:'Baseball Store Visit',icon:'🧢',desc:'Trip to pick a small baseball item.',tier:'Uncommon'},
-  {xp:1500,title:'Brewers Bonus',icon:'🔵',desc:'Brewers-themed surprise.',tier:'Rare'},
+  {xp:1500,title:'"The Show" Award',icon:'🔵',desc:'Favorite team themed surprise.',tier:'Rare'},
   {xp:2000,title:'All-Star Outing',icon:'🏟️',desc:'Special baseball outing idea.',tier:'Rare'},
   {xp:3000,title:'MVP Surprise',icon:'🏆',desc:'Big end-of-season reward.',tier:'Legendary'}
 ];
