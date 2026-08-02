@@ -91,7 +91,10 @@ async function mintDeviceToken(deviceLabel){
 // the Edge Function — see redeem-device-token/index.ts for why.
 async function redeemDeviceToken(token){
   const data=await callEdgeFunction('redeem-device-token',{token});
-  const {error:verifyErr}=await supabase.auth.verifyOtp({token_hash:data.hashed_token,type:'email'});
+  // type must match how redeem-device-token generated the link
+  // (admin.generateLink({type:'magiclink', ...})) — verifyOtp rejects the
+  // hashed_token if the type here doesn't match what it was issued as.
+  const {error:verifyErr}=await supabase.auth.verifyOtp({token_hash:data.hashed_token,type:'magiclink'});
   if(verifyErr) throw verifyErr;
 }
 

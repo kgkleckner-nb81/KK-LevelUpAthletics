@@ -2968,7 +2968,14 @@ async function tryRedeemDeviceLoginToken(){
   try{
     await redeemDeviceToken(token);
   }catch(err){
-    console.warn('Device login link could not be used:',err&&err.message?err.message:err);
+    const msg=err&&err.message?err.message:String(err);
+    console.warn('Device login link could not be used:',msg);
+    // Surface this in the UI, not just the console — an iPad has no easy
+    // way to see console output, and silently falling back to "Sign In"
+    // with no explanation makes a real failure indistinguishable from
+    // "nothing happened."
+    showAuthModal('email');
+    if($('#authEmailStatus')) $('#authEmailStatus').textContent='Could not sign in from this device link: '+msg;
   }finally{
     // Strip the token from this tab's visible URL/history after use. This
     // does NOT affect the installed Home Screen icon's own launch target —
