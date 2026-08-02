@@ -46,9 +46,25 @@ function onAuthChange(cb){
 // build — see supabase/functions/*/index.ts for their source and the
 // deploy notes at the top of each.
 
+// supabase.functions.invoke() wraps any non-2xx Edge Function response in a
+// generic FunctionsHttpError ("Edge Function returned a non-2xx status
+// code") — it does NOT surface the actual JSON body our functions return
+// (e.g. {error:"Sign in first."}). error.context is the raw Response;
+// read it back out so real failures are visible instead of that generic
+// message.
+async function extractFunctionErrorMessage(error){
+  try{
+    if(error&&error.context&&typeof error.context.json==='function'){
+      const body=await error.context.json();
+      if(body&&body.error) return body.error;
+    }
+  }catch(e){ /* fall through */ }
+  return (error&&error.message)||'Something went wrong.';
+}
+
 async function mintDeviceToken(deviceLabel){
   const {data,error}=await supabase.functions.invoke('mint-device-token',{body:{device_label:deviceLabel||null}});
-  if(error) throw error;
+  if(error) throw new Error(await extractFunctionErrorMessage(error));
   if(data&&data.error) throw new Error(data.error);
   return data.token;
 }
@@ -60,7 +76,7 @@ async function mintDeviceToken(deviceLabel){
 // the Edge Function — see redeem-device-token/index.ts for why.
 async function redeemDeviceToken(token){
   const {data,error}=await supabase.functions.invoke('redeem-device-token',{body:{token}});
-  if(error) throw error;
+  if(error) throw new Error(await extractFunctionErrorMessage(error));
   if(data&&data.error) throw new Error(data.error);
   const {error:verifyErr}=await supabase.auth.verifyOtp({token_hash:data.hashed_token,type:'email'});
   if(verifyErr) throw verifyErr;
