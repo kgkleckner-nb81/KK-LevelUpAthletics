@@ -26,8 +26,14 @@ async function sendMagicLink(email){
   if(error) throw error;
 }
 
+// scope:'local' clears this device's session unconditionally, without
+// requiring a successful round-trip to revoke it server-side first. The
+// default scope tries the server call first — if that session is already
+// broken (expired/invalid refresh token, stale after being stuck a long
+// time), the server call can fail and the whole signOut() rejects, leaving
+// the UI stuck showing "Sign Out" with no way to actually clear it.
 async function signOutUser(){
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({scope:'local'});
 }
 
 async function getCurrentSession(){

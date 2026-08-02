@@ -2991,7 +2991,17 @@ function initAuthUI(){
     if(existing) afterSignedIn(existing);
   });
   if($('#signInBtn'))$('#signInBtn').onclick=()=>showAuthModal('email');
-  if($('#signOutBtn'))$('#signOutBtn').onclick=()=>signOutUser();
+  if($('#signOutBtn'))$('#signOutBtn').onclick=async()=>{
+    try{
+      await signOutUser();
+    }catch(err){
+      // Belt-and-suspenders: even if the sign-out call itself throws for
+      // some unexpected reason, force the UI back to signed-out rather
+      // than leaving it stuck showing "Sign Out" with a dead session.
+      console.warn('Sign out did not complete cleanly:',err&&err.message?err.message:err);
+      afterSignedOut();
+    }
+  };
   if($('#closeAuthModal'))$('#closeAuthModal').onclick=hideAuthModal;
   if($('#sendMagicLinkBtn'))$('#sendMagicLinkBtn').onclick=async()=>{
     const email=$('#authEmailInput').value.trim();
