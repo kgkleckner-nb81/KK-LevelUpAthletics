@@ -4,6 +4,17 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Level Up Athletics</title>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
+  <link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32"/>
+  <meta name="theme-color" content="#FF9A45"/>
+  <!-- iOS "Add to Home Screen" reads these meta tags directly (it does not
+       use the manifest above for install behavior the way Android/Chrome
+       does) — this is what gives the installed icon standalone/no-Safari-
+       chrome behavior on iOS. -->
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Level Up"/>
   <link rel="stylesheet" href="styles.css"/>
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
@@ -492,6 +503,12 @@
     <label class="file">Import Local Backup<input type="file" id="importData" accept="application/json"></label>
     <button class="danger" id="resetData">Reset Local Device Settings</button>
   </div>
+  <div class="card">
+    <h2>Your Devices</h2>
+    <p class="muted">Add this account to an iPad or phone's Home Screen for a durable sign-in that doesn't depend on Safari or re-clicking an email link every time.</p>
+    <button id="openHomeScreenSetupBtn" class="primary" type="button">Add to Home Screen</button>
+    <div id="myDevicesList"></div>
+  </div>
   </div>
 </section>
 </main>
@@ -526,6 +543,26 @@
       <label class="checkbox-row"><input id="authIsCoach" type="checkbox"> I'm a coach</label>
       <button id="saveProfileBtn" class="primary" type="button">Continue</button>
       <p id="authProfileStatus" class="muted"></p>
+    </div>
+  </div>
+</div>
+
+<div id="homeScreenModal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closeHomeScreenModal" class="modal-close" type="button">×</button>
+    <div id="homeScreenStepIntro">
+      <h2>Add to Home Screen</h2>
+      <p class="muted">Set up a durable sign-in for this device so the installed icon never gets stuck on a login screen. Do this from the device you want to install on — e.g. open this page in Safari on the iPad itself.</p>
+      <label>Name this device (optional)<input id="homeScreenDeviceLabel" type="text" placeholder="e.g. Ethan's iPad"></label>
+      <button id="createHomeScreenLinkBtn" class="primary wide" type="button">Create Home Screen Link</button>
+      <p id="homeScreenStatus" class="muted"></p>
+      <button id="skipHomeScreenBtn" class="link-btn" type="button">Skip for now</button>
+    </div>
+    <div id="homeScreenStepReady" class="hidden">
+      <h2>Ready to Add</h2>
+      <p class="muted">This page's address now includes your device link. On iPad/iPhone: tap the <strong>Share</strong> button in Safari, then <strong>Add to Home Screen</strong> — do it from this page so the link is included. The new icon will open signed in automatically from now on.</p>
+      <p class="muted">On a desktop browser, you can just close this — the device link only matters for the Home Screen install.</p>
+      <button id="doneHomeScreenBtn" class="primary wide" type="button">Done</button>
     </div>
   </div>
 </div>

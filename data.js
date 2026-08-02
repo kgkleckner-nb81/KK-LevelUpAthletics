@@ -39,6 +39,46 @@ function onAuthChange(cb){
   supabase.auth.onAuthStateChange((event,session)=>cb(event,session));
 }
 
+// ---------------- Home Screen device tokens ----------------
+// Backs the installed-icon login flow (see index.html's ?login= handling
+// in app.js's tryRedeemDeviceLoginToken). Both Edge Functions are deployed
+// separately in the Supabase Dashboard, not part of this static site's
+// build — see supabase/functions/*/index.ts for their source and the
+// deploy notes at the top of each.
+
+async function mintDeviceToken(deviceLabel){
+  const {data,error}=await supabase.functions.invoke('mint-device-token',{body:{device_label:deviceLabel||null}});
+  if(error) throw error;
+  if(data&&data.error) throw new Error(data.error);
+  return data.token;
+}
+
+// Exchanges a device token for a real session. Never called with an
+// existing session in mind — safe to call while fully signed out, which is
+// the normal case for a freshly-opened Home Screen icon. Routes through
+// Supabase's own verifyOtp() rather than accepting a session directly from
+// the Edge Function — see redeem-device-token/index.ts for why.
+async function redeemDeviceToken(token){
+  const {data,error}=await supabase.functions.invoke('redeem-device-token',{body:{token}});
+  if(error) throw error;
+  if(data&&data.error) throw new Error(data.error);
+  const {error:verifyErr}=await supabase.auth.verifyOtp({token_hash:data.hashed_token,type:'email'});
+  if(verifyErr) throw verifyErr;
+}
+
+async function loadMyDevices(){
+  const {data,error}=await supabase.from('device_tokens')
+    .select('id, device_label, created_at, last_used_at, expires_at, revoked_at')
+    .is('revoked_at',null).order('created_at',{ascending:false});
+  if(error) throw error;
+  return data||[];
+}
+
+async function revokeDeviceTokenRemote(id){
+  const {error}=await supabase.rpc('revoke_device_token',{p_token_id:id});
+  if(error) throw error;
+}
+
 // ---------------- Profile ----------------
 
 // approval_pin_hash is column-locked (0006_pin_hardening.sql) — never

@@ -209,6 +209,21 @@ button:hover,.tab:hover{
   border-color:var(--ink);
 }
 
+.link-btn{
+  border:none;
+  background:none;
+  box-shadow:none;
+  color:var(--muted);
+  text-decoration:underline;
+  padding:8px 4px;
+  font-weight:600;
+}
+.link-btn:hover{
+  transform:none;
+  box-shadow:none;
+  color:var(--ink);
+}
+
 select{
   color:var(--ink);
   background:var(--paper);

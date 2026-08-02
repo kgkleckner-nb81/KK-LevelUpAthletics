@@ -2825,6 +2825,51 @@ function showAddAthleteModal(){
 }
 function hideAddAthleteModal(){$('#addAthleteModal').classList.add('hidden')}
 
+// ---- Home Screen device setup ----
+// One-time (per browser) prompt after sign-in to mint a device token and
+// bake it into this tab's own URL via replaceState, so "Add to Home
+// Screen" (which iOS captures from the current address bar, not from the
+// web manifest) picks up a URL that can sign the installed icon back in on
+// its own — see tryRedeemDeviceLoginToken() and
+// supabase/functions/*-device-token/index.ts for the rest of the flow.
+const HOME_SCREEN_DISMISS_KEY='lua.homeScreenPromptDismissed';
+function showHomeScreenModal(){
+  $('#homeScreenModal').classList.remove('hidden');
+  $('#homeScreenStepIntro').classList.remove('hidden');
+  $('#homeScreenStepReady').classList.add('hidden');
+  $('#homeScreenDeviceLabel').value='';
+  $('#homeScreenStatus').textContent='';
+}
+function hideHomeScreenModal(){$('#homeScreenModal').classList.add('hidden')}
+async function maybePromptHomeScreenSetup(){
+  if(localStorage.getItem(HOME_SCREEN_DISMISS_KEY)) return;
+  try{
+    const devices=await loadMyDevices();
+    if(!devices.length) showHomeScreenModal();
+  }catch(err){ /* non-critical — skip the prompt rather than block sign-in */ }
+}
+async function renderMyDevices(){
+  const list=$('#myDevicesList');
+  if(!list||!currentProfile) return;
+  let devices=[];
+  try{ devices=await loadMyDevices(); }
+  catch(err){ list.innerHTML='<p class="muted">Could not load devices.</p>'; return; }
+  list.innerHTML=devices.length?devices.map(d=>{
+    const label=d.device_label||'Unnamed device';
+    const last=d.last_used_at?`Last used ${new Date(d.last_used_at).toLocaleDateString()}`:'Never opened yet';
+    return `<div class="pending-request-row"><span>${label} — <span class="muted">${last}</span></span><button class="danger" data-revoke-device="${d.id}" type="button">Remove this device</button></div>`;
+  }).join(''):'<p class="muted">No devices added yet.</p>';
+}
+async function removeDeviceAction(id){
+  if(!confirm('Remove this device? It will no longer be able to sign in from its Home Screen icon — you can always add it again later.')) return;
+  try{
+    await revokeDeviceTokenRemote(id);
+    await renderMyDevices();
+  }catch(err){
+    alert('Could not remove device: '+(err.message||'unknown error'));
+  }
+}
+
 // ---- PIN step-up (Phase D) ----
 // Shared confirmation modal used by every approval-gated action (combine
 // verification, quest/bonus approval, reward claims, coach roster/program
@@ -2876,6 +2921,7 @@ async function afterSignedIn(session){
   hideAuthModal();
   await refreshPinSetupPanel();
   await refreshCoachTeamContext();
+  await renderMyDevices();
   currentAthletes=await listAthletes(profile.id);
   updateAuthUI();
   if(!currentAthletes.length){
@@ -2886,6 +2932,7 @@ async function afterSignedIn(session){
   const storedId=getStoredActiveAthleteId();
   const initial=currentAthletes.find(a=>a.id===storedId)||currentAthletes[0];
   await selectAthlete(initial.id);
+  await maybePromptHomeScreenSetup();
 }
 function afterSignedOut(){
   currentSession=null;
@@ -2907,12 +2954,39 @@ function afterSignedOut(){
   $('#pinSetupCreateFields').classList.remove('hidden');
   $('#pinChangeFields').classList.add('hidden');
 }
+// Runs on every boot where the URL has ?login=<token> — covers both the
+// first time this exact URL is opened in Safari (right after "Add to Home
+// Screen") and every later open from the installed icon. Safe to call with
+// no existing session (the normal case for a fresh icon) or with one
+// already present (just renews the device token's expiry either way — see
+// redeem-device-token/index.ts). Registered onAuthChange picks up the
+// resulting SIGNED_IN event the same as a magic-link sign-in would.
+async function tryRedeemDeviceLoginToken(){
+  const params=new URLSearchParams(window.location.search);
+  const token=params.get('login');
+  if(!token) return;
+  try{
+    await redeemDeviceToken(token);
+  }catch(err){
+    console.warn('Device login link could not be used:',err&&err.message?err.message:err);
+  }finally{
+    // Strip the token from this tab's visible URL/history after use. This
+    // does NOT affect the installed Home Screen icon's own launch target —
+    // iOS captured that URL (token included) at "Add to Home Screen" time,
+    // independent of any later history changes here — it only reduces how
+    // long the raw token sits visible in this particular tab.
+    const url=new URL(window.location.href);
+    url.searchParams.delete('login');
+    window.history.replaceState({},'',url.toString());
+  }
+}
 function initAuthUI(){
   onSupabaseReady(async()=>{
     onAuthChange((event,session)=>{
       if(session) afterSignedIn(session);
       else afterSignedOut();
     });
+    await tryRedeemDeviceLoginToken();
     const existing=await getCurrentSession();
     if(existing) afterSignedIn(existing);
   });
@@ -2977,6 +3051,37 @@ function initAuthUI(){
     }
     await selectAthlete(e.target.value);
   };
+  if($('#openHomeScreenSetupBtn'))$('#openHomeScreenSetupBtn').onclick=showHomeScreenModal;
+  if($('#closeHomeScreenModal'))$('#closeHomeScreenModal').onclick=()=>{
+    localStorage.setItem(HOME_SCREEN_DISMISS_KEY,'1');
+    hideHomeScreenModal();
+  };
+  if($('#skipHomeScreenBtn'))$('#skipHomeScreenBtn').onclick=()=>{
+    localStorage.setItem(HOME_SCREEN_DISMISS_KEY,'1');
+    hideHomeScreenModal();
+  };
+  if($('#doneHomeScreenBtn'))$('#doneHomeScreenBtn').onclick=hideHomeScreenModal;
+  if($('#createHomeScreenLinkBtn'))$('#createHomeScreenLinkBtn').onclick=async()=>{
+    const label=$('#homeScreenDeviceLabel').value.trim();
+    $('#homeScreenStatus').textContent='Creating your device link...';
+    try{
+      const token=await mintDeviceToken(label);
+      const url=new URL(window.location.href);
+      url.search='';
+      url.searchParams.set('login',token);
+      window.history.replaceState({},'',url.toString());
+      $('#homeScreenStepIntro').classList.add('hidden');
+      $('#homeScreenStepReady').classList.remove('hidden');
+      await renderMyDevices();
+    }catch(err){
+      $('#homeScreenStatus').textContent=err.message||'Could not create device link. Try again.';
+    }
+  };
+  if($('#myDevicesList'))$('#myDevicesList').addEventListener('click',async e=>{
+    const id=e.target.dataset.revokeDevice;
+    if(!id) return;
+    await removeDeviceAction(id);
+  });
   if($('#joinLeagueBtn'))$('#joinLeagueBtn').onclick=joinLeagueAction;
   if($('#pendingRequestsList'))$('#pendingRequestsList').addEventListener('click',async e=>{
     const approveId=e.target.dataset.approve, declineId=e.target.dataset.decline;
