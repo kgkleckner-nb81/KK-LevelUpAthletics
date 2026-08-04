@@ -45,12 +45,15 @@ function onAuthChange(cb){
   supabase.auth.onAuthStateChange((event,session)=>cb(event,session));
 }
 
-// ---------------- Home Screen device tokens ----------------
-// Backs the installed-icon login flow (see index.html's ?login= handling
-// in app.js's tryRedeemDeviceLoginToken). Both Edge Functions are deployed
-// separately in the Supabase Dashboard, not part of this static site's
-// build — see supabase/functions/*/index.ts for their source and the
-// deploy notes at the top of each.
+// ---------------- Home Screen device pairing ----------------
+// A parent's already-signed-in device requests a short pairing code
+// (mint-device-token); the athlete's freshly-added Home Screen icon, with
+// no session of its own yet, redeems that code once (redeem-pairing-code)
+// to sign itself in. After that one-time pairing, the icon just has a
+// normal persistent Supabase session — the same mechanism any browser tab
+// relies on — so there's nothing fragile left in day-to-day use. See
+// supabase/functions/*/index.ts and 0016_pairing_code.sql for the rest of
+// the design and why this replaced an earlier URL-token approach.
 
 // Calls an Edge Function with a plain fetch() rather than
 // supabase.functions.invoke() — invoke() wraps any non-2xx response in a
@@ -79,23 +82,36 @@ async function callEdgeFunction(name,body){
   return json||{};
 }
 
-async function mintDeviceToken(deviceLabel){
+// Called from the parent's own already-signed-in device.
+async function requestDevicePairingCode(deviceLabel){
   const data=await callEdgeFunction('mint-device-token',{device_label:deviceLabel||null});
-  return data.token;
+  return data.code;
 }
 
-// Exchanges a device token for a real session. Never called with an
-// existing session in mind — safe to call while fully signed out, which is
-// the normal case for a freshly-opened Home Screen icon. Routes through
-// Supabase's own verifyOtp() rather than accepting a session directly from
-// the Edge Function — see redeem-device-token/index.ts for why.
-async function redeemDeviceToken(token){
-  const data=await callEdgeFunction('redeem-device-token',{token});
-  // type must match how redeem-device-token generated the link
+// Called from the athlete's device (no session yet) with the code the
+// parent read off their own screen. Routes through Supabase's own
+// verifyOtp() rather than accepting a session directly from the Edge
+// Function — see redeem-pairing-code/index.ts for why. Returns the
+// device_tokens row id (not a secret) so the caller can store it locally
+// and use it with touchDeviceToken() going forward.
+async function redeemPairingCode(code){
+  const data=await callEdgeFunction('redeem-pairing-code',{code});
+  // type must match how redeem-pairing-code generated the link
   // (admin.generateLink({type:'magiclink', ...})) — verifyOtp rejects the
   // hashed_token if the type here doesn't match what it was issued as.
   const {error:verifyErr}=await supabase.auth.verifyOtp({token_hash:data.hashed_token,type:'magiclink'});
   if(verifyErr) throw verifyErr;
+  return data.device_token_id;
+}
+
+// Called periodically by an already-paired device using its own normal
+// session (no separate secret needed) to keep its device_tokens row's
+// expiry sliding forward, and to detect revocation — the RPC throws if the
+// row is gone or revoked, which the caller treats as "sign this device
+// out."
+async function touchDeviceToken(deviceTokenId){
+  const {error}=await supabase.rpc('touch_device_token',{p_device_token_id:deviceTokenId});
+  if(error) throw error;
 }
 
 async function loadMyDevices(){

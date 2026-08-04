@@ -533,6 +533,12 @@
       <label>Email<input id="authEmailInput" type="email" placeholder="you@example.com"></label>
       <button id="sendMagicLinkBtn" class="primary" type="button">Send Magic Link</button>
       <p id="authEmailStatus" class="muted"></p>
+      <p class="muted">Setting up an athlete's device? <button id="showDeviceCodeFieldBtn" class="link-btn" type="button">Enter a device code instead</button></p>
+      <div id="deviceCodeFields" class="hidden">
+        <label>Device code<input id="deviceCodeInput" type="text" placeholder="e.g. 7K4P-9QXR" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false"></label>
+        <button id="submitDeviceCodeBtn" class="primary wide" type="button">Sign In With Code</button>
+        <p id="deviceCodeStatus" class="muted"></p>
+      </div>
     </div>
     <div id="authStepProfile" class="hidden">
       <h2>Set Up Your Account</h2>
@@ -551,16 +557,16 @@
     <button id="closeHomeScreenModal" class="modal-close" type="button">×</button>
     <div id="homeScreenStepIntro">
       <h2>Add to Home Screen</h2>
-      <p class="muted">Set up a durable sign-in for this device so the installed icon never gets stuck on a login screen. Do this from the device you want to install on — e.g. open this page in Safari on the iPad itself.</p>
+      <p class="muted">Set up a durable sign-in for an athlete's device (like an iPad) so the installed icon never gets stuck on a login screen. This device (the one you're on now) generates a short code — you'll type that code once on the athlete's device.</p>
       <label>Name this device (optional)<input id="homeScreenDeviceLabel" type="text" placeholder="e.g. Ethan's iPad"></label>
-      <button id="createHomeScreenLinkBtn" class="primary wide" type="button">Create Home Screen Link</button>
+      <button id="createHomeScreenLinkBtn" class="primary wide" type="button">Get Device Code</button>
       <p id="homeScreenStatus" class="muted"></p>
       <button id="skipHomeScreenBtn" class="link-btn" type="button">Skip for now</button>
     </div>
     <div id="homeScreenStepReady" class="hidden">
-      <h2>Ready to Add</h2>
-      <p class="muted">This page's address now includes your device link. On iPad/iPhone: tap the <strong>Share</strong> button in Safari, then <strong>Add to Home Screen</strong> — do it from this page so the link is included. The new icon will open signed in automatically from now on.</p>
-      <p class="muted">On a desktop browser, you can just close this — the device link only matters for the Home Screen install.</p>
+      <h2>Your Device Code</h2>
+      <p class="device-code-display" id="homeScreenCodeDisplay"></p>
+      <p class="muted">On the athlete's device: add this site to the Home Screen (Safari's Share button → Add to Home Screen) if you haven't already, open the new icon, tap "Enter a device code instead" on the sign-in screen, and type this code. Expires in 15 minutes.</p>
       <button id="doneHomeScreenBtn" class="primary wide" type="button">Done</button>
     </div>
   </div>

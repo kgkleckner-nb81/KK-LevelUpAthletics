@@ -2816,6 +2816,9 @@ function showAuthModal(step){
   $('#authModal').classList.remove('hidden');
   $('#authStepEmail').classList.toggle('hidden',step==='profile');
   $('#authStepProfile').classList.toggle('hidden',step!=='profile');
+  if($('#deviceCodeFields')) $('#deviceCodeFields').classList.add('hidden');
+  if($('#deviceCodeInput')) $('#deviceCodeInput').value='';
+  if($('#deviceCodeStatus')) $('#deviceCodeStatus').textContent='';
 }
 function hideAuthModal(){$('#authModal').classList.add('hidden')}
 function showAddAthleteModal(){
@@ -2825,14 +2828,16 @@ function showAddAthleteModal(){
 }
 function hideAddAthleteModal(){$('#addAthleteModal').classList.add('hidden')}
 
-// ---- Home Screen device setup ----
-// One-time (per browser) prompt after sign-in to mint a device token and
-// bake it into this tab's own URL via replaceState, so "Add to Home
-// Screen" (which iOS captures from the current address bar, not from the
-// web manifest) picks up a URL that can sign the installed icon back in on
-// its own — see tryRedeemDeviceLoginToken() and
-// supabase/functions/*-device-token/index.ts for the rest of the flow.
+// ---- Home Screen device pairing ----
+// One-time (per browser) prompt after sign-in to generate a short pairing
+// code (like pairing a smart TV) — displayed here on the parent's own
+// device, then typed once on the athlete's freshly-added Home Screen icon
+// via the "Enter a device code instead" option in the sign-in modal. See
+// pairDeviceWithCode() below and supabase/functions/*/index.ts for the
+// rest of the flow, and 0016_pairing_code.sql for why this replaced an
+// earlier URL-token approach that iOS didn't reliably honor.
 const HOME_SCREEN_DISMISS_KEY='lua.homeScreenPromptDismissed';
+const DEVICE_TOKEN_ID_KEY='lua.deviceTokenId';
 function showHomeScreenModal(){
   $('#homeScreenModal').classList.remove('hidden');
   $('#homeScreenStepIntro').classList.remove('hidden');
@@ -2917,6 +2922,7 @@ async function afterSignedIn(session){
     showAuthModal('profile');
     return;
   }
+  if(await touchPairedDeviceOnBoot()) return;
   currentProfile=profile;
   hideAuthModal();
   await refreshPinSetupPanel();
@@ -2954,37 +2960,44 @@ function afterSignedOut(){
   $('#pinSetupCreateFields').classList.remove('hidden');
   $('#pinChangeFields').classList.add('hidden');
 }
-// Runs on every boot where the URL has ?login=<token> — covers both the
-// first time this exact URL is opened in Safari (right after "Add to Home
-// Screen") and every later open from the installed icon. Safe to call with
-// no existing session (the normal case for a fresh icon) or with one
-// already present (just renews the device token's expiry either way — see
-// redeem-device-token/index.ts). Registered onAuthChange picks up the
-// resulting SIGNED_IN event the same as a magic-link sign-in would.
-async function tryRedeemDeviceLoginToken(){
-  const params=new URLSearchParams(window.location.search);
-  const token=params.get('login');
-  if(!token) return;
+// Called from the sign-in modal's "Enter a device code instead" field —
+// the athlete's freshly-added, not-yet-signed-in Home Screen icon. Signs
+// in via the same public verifyOtp() path a magic link uses, and stashes
+// the (non-secret) device_tokens row id locally so this device can keep
+// its pairing alive going forward — see touchPairedDeviceOnBoot() below.
+async function submitDeviceCodeAction(){
+  const code=$('#deviceCodeInput').value.trim();
+  if(!code){$('#deviceCodeStatus').textContent='Enter the device code.';return}
+  $('#deviceCodeStatus').textContent='Signing in...';
   try{
-    await redeemDeviceToken(token);
+    const deviceTokenId=await redeemPairingCode(code);
+    localStorage.setItem(DEVICE_TOKEN_ID_KEY,deviceTokenId);
+    $('#deviceCodeStatus').textContent='';
   }catch(err){
-    const msg=err&&err.message?err.message:String(err);
-    console.warn('Device login link could not be used:',msg);
-    // Surface this in the UI, not just the console — an iPad has no easy
-    // way to see console output, and silently falling back to "Sign In"
-    // with no explanation makes a real failure indistinguishable from
-    // "nothing happened."
-    showAuthModal('email');
-    if($('#authEmailStatus')) $('#authEmailStatus').textContent='Could not sign in from this device link: '+msg;
-  }finally{
-    // Strip the token from this tab's visible URL/history after use. This
-    // does NOT affect the installed Home Screen icon's own launch target —
-    // iOS captured that URL (token included) at "Add to Home Screen" time,
-    // independent of any later history changes here — it only reduces how
-    // long the raw token sits visible in this particular tab.
-    const url=new URL(window.location.href);
-    url.searchParams.delete('login');
-    window.history.replaceState({},'',url.toString());
+    $('#deviceCodeStatus').textContent=err.message||'Could not sign in with that code.';
+  }
+}
+// Runs after every sign-in (fresh or restored) on a device that previously
+// paired via a code. Uses this device's own ordinary session — no
+// separate secret needed — to keep its device_tokens row's expiry sliding
+// forward while actively used, and to detect if it's been revoked from
+// the "Your Devices" list. Best-effort: network hiccups are ignored, only
+// a definitive "revoked" response forces a sign-out.
+// Returns true if this forced a sign-out (device was revoked) — callers
+// should stop their own sign-in flow immediately when that happens rather
+// than continuing to set up UI for a session that's about to be torn down.
+async function touchPairedDeviceOnBoot(){
+  const deviceTokenId=localStorage.getItem(DEVICE_TOKEN_ID_KEY);
+  if(!deviceTokenId) return false;
+  try{
+    await touchDeviceToken(deviceTokenId);
+    return false;
+  }catch(err){
+    console.warn('This device\'s pairing is no longer valid — signing out:',err&&err.message?err.message:err);
+    localStorage.removeItem(DEVICE_TOKEN_ID_KEY);
+    try{ await signOutUser(); }catch(e){ /* signOutUser already falls back to local clear */ }
+    afterSignedOut();
+    return true;
   }
 }
 function initAuthUI(){
@@ -2993,7 +3006,6 @@ function initAuthUI(){
       if(session) afterSignedIn(session);
       else afterSignedOut();
     });
-    await tryRedeemDeviceLoginToken();
     const existing=await getCurrentSession();
     if(existing) afterSignedIn(existing);
   });
@@ -3080,18 +3092,16 @@ function initAuthUI(){
   if($('#doneHomeScreenBtn'))$('#doneHomeScreenBtn').onclick=hideHomeScreenModal;
   if($('#createHomeScreenLinkBtn'))$('#createHomeScreenLinkBtn').onclick=async()=>{
     const label=$('#homeScreenDeviceLabel').value.trim();
-    $('#homeScreenStatus').textContent='Creating your device link...';
+    $('#homeScreenStatus').textContent='Generating your code...';
     try{
-      const token=await mintDeviceToken(label);
-      const url=new URL(window.location.href);
-      url.search='';
-      url.searchParams.set('login',token);
-      window.history.replaceState({},'',url.toString());
+      const code=await requestDevicePairingCode(label);
+      const formatted=code.length===8?code.slice(0,4)+'-'+code.slice(4):code;
+      $('#homeScreenCodeDisplay').textContent=formatted;
       $('#homeScreenStepIntro').classList.add('hidden');
       $('#homeScreenStepReady').classList.remove('hidden');
       await renderMyDevices();
     }catch(err){
-      $('#homeScreenStatus').textContent=err.message||'Could not create device link. Try again.';
+      $('#homeScreenStatus').textContent=err.message||'Could not create a device code. Try again.';
     }
   };
   if($('#myDevicesList'))$('#myDevicesList').addEventListener('click',async e=>{
@@ -3099,6 +3109,12 @@ function initAuthUI(){
     if(!id) return;
     await removeDeviceAction(id);
   });
+  if($('#showDeviceCodeFieldBtn'))$('#showDeviceCodeFieldBtn').onclick=()=>{
+    $('#deviceCodeFields').classList.remove('hidden');
+    $('#deviceCodeInput').focus();
+  };
+  if($('#submitDeviceCodeBtn'))$('#submitDeviceCodeBtn').onclick=submitDeviceCodeAction;
+  if($('#deviceCodeInput'))$('#deviceCodeInput').onkeydown=e=>{if(e.key==='Enter')submitDeviceCodeAction();};
   if($('#joinLeagueBtn'))$('#joinLeagueBtn').onclick=joinLeagueAction;
   if($('#pendingRequestsList'))$('#pendingRequestsList').addEventListener('click',async e=>{
     const approveId=e.target.dataset.approve, declineId=e.target.dataset.decline;

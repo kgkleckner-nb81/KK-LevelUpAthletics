@@ -224,6 +224,19 @@ button:hover,.tab:hover{
   color:var(--ink);
 }
 
+.device-code-display{
+  font-family:var(--accent);
+  font-size:36px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-align:center;
+  background:var(--cream);
+  border:2px solid var(--ink);
+  border-radius:14px;
+  padding:16px;
+  margin:12px 0;
+}
+
 select{
   color:var(--ink);
   background:var(--paper);

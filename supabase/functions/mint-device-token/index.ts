@@ -1,21 +1,19 @@
 // Level Up Athletics — mint-device-token
 //
-// Called from an already-signed-in browser tab (right after magic-link
-// sign-in, or later from account settings) to create a new Home Screen
-// device link. Requires the caller's own valid session — a user can only
-// ever mint a token for themselves, never for anyone else.
+// Called from an already-signed-in browser (the parent's own device) to
+// start pairing a new device (e.g. an athlete's iPad). Requires the
+// caller's own valid session — a user can only ever create a pairing code
+// for themselves, never for anyone else.
 //
-// The raw token is a random 256-bit secret, returned to the caller exactly
-// once in this response. Only its SHA-256 hash is ever written to the
-// device_tokens table (0015_device_tokens.sql) — this function is the only
-// place in the whole system that ever sees the raw value.
+// Generates a short, human-typeable pairing code (like pairing a smart
+// TV) — NOT a long secret. The code is stored as-is (not hashed): it's
+// short-lived (15 minutes) and single-use by design, so it's a much lower
+// value target than the long-lived credential the old design used, and
+// there's nothing meaningful gained by hashing something this short and
+// short-lived. Returned once to the caller for display.
 //
-// Deploy: Supabase Dashboard → Edge Functions → New function → name it
-// "mint-device-token" → paste this file's contents → Deploy. No local CLI
-// needed. Requires the SUPABASE_SERVICE_ROLE_KEY secret to already be set
-// on the project (Dashboard → Edge Functions → Secrets) — Supabase sets
-// SUPABASE_URL/SUPABASE_ANON_KEY/SUPABASE_SERVICE_ROLE_KEY automatically
-// for every project's functions, so nothing extra to configure there.
+// Deploy: Supabase Dashboard → Edge Functions → mint-device-token →
+// replace its code with this file's contents → Deploy.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
@@ -28,27 +26,23 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-// 90-day sliding expiry — matches redeem-device-token's renewal window.
-const TOKEN_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000;
+const PAIRING_CODE_LIFETIME_MS = 15 * 60 * 1000;
+const DEVICE_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000;
 
-function randomToken(): string {
-  const bytes = new Uint8Array(32);
+// Excludes visually-ambiguous characters (0/O, 1/I/L) so a code is easy to
+// read off one screen and type correctly on another.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+function randomPairingCode(): string {
+  const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    // Identify the caller from their own Authorization header — never trust
-    // a user id passed in the request body.
     const authHeader = req.headers.get('Authorization') ?? '';
     const callerClient = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
@@ -69,27 +63,24 @@ Deno.serve(async (req) => {
       }
     } catch { /* no body / not JSON — device_label stays null */ }
 
-    const rawToken = randomToken();
-    const tokenHash = await sha256Hex(rawToken);
-    const expiresAt = new Date(Date.now() + TOKEN_LIFETIME_MS).toISOString();
+    const code = randomPairingCode();
+    const now = Date.now();
 
-    // Service-role client for the actual write — bypasses RLS, which is
-    // fine here because we already authenticated the caller above and are
-    // inserting user_id: user.id, never a caller-supplied id.
     const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const { error: insertErr } = await adminClient.from('device_tokens').insert({
       user_id: user.id,
-      token_hash: tokenHash,
       device_label: deviceLabel,
-      expires_at: expiresAt,
+      pairing_code: code,
+      pairing_code_expires_at: new Date(now + PAIRING_CODE_LIFETIME_MS).toISOString(),
+      expires_at: new Date(now + DEVICE_LIFETIME_MS).toISOString(),
     });
     if (insertErr) throw insertErr;
 
-    return new Response(JSON.stringify({ token: rawToken }), {
+    return new Response(JSON.stringify({ code }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : 'Could not create device link.' }), {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : 'Could not create a device code.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
