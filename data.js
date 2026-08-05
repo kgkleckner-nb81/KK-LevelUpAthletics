@@ -225,7 +225,7 @@ function setStoredActiveAthleteId(athleteId){
 // now, so the spin history has to come from the server too or a reload
 // would show a balance that doesn't match what was actually earned.
 async function loadAthleteState(athleteId){
-  const [dailyRes, gearInvRes, gearEqRes, gearPurchRes, xpTotalRes, attrPtsRes, combineRes, questRes, rewardRes, checkpointRes, bonusRes, spinRes]=await Promise.all([
+  const [dailyRes, gearInvRes, gearEqRes, gearPurchRes, xpTotalRes, attrPtsRes, combineRes, questRes, rewardRes, checkpointRes, bonusRes, spinRes, arcadeGameRes]=await Promise.all([
     supabase.from('daily_check_ins').select('*').eq('athlete_id',athleteId).order('date'),
     supabase.from('gear_inventory').select('*').eq('athlete_id',athleteId),
     supabase.from('gear_equipped').select('*').eq('athlete_id',athleteId).maybeSingle(),
@@ -237,9 +237,10 @@ async function loadAthleteState(athleteId){
     supabase.from('reward_claims').select('*, rewards(name,xp_cost,tier)').eq('athlete_id',athleteId).order('claimed_at'),
     supabase.from('combine_checkpoints').select('*').eq('athlete_id',athleteId).order('created_at'),
     supabase.from('xp_ledger').select('*').eq('athlete_id',athleteId).eq('source','bonus').order('created_at'),
-    supabase.from('xp_ledger').select('*').eq('athlete_id',athleteId).eq('source','spin').order('created_at')
+    supabase.from('xp_ledger').select('*').eq('athlete_id',athleteId).eq('source','spin').order('created_at'),
+    supabase.from('xp_ledger').select('*').eq('athlete_id',athleteId).eq('source','arcade_game').order('created_at')
   ]);
-  [dailyRes,gearInvRes,gearEqRes,gearPurchRes,xpTotalRes,attrPtsRes,combineRes,questRes,rewardRes,checkpointRes,bonusRes,spinRes].forEach(r=>{if(r.error) throw r.error});
+  [dailyRes,gearInvRes,gearEqRes,gearPurchRes,xpTotalRes,attrPtsRes,combineRes,questRes,rewardRes,checkpointRes,bonusRes,spinRes,arcadeGameRes].forEach(r=>{if(r.error) throw r.error});
 
   const daily=(dailyRes.data||[]).map(row=>({
     date:row.date,
@@ -318,7 +319,17 @@ async function loadAthleteState(athleteId){
     xp:row.amount
   }));
 
-  return {daily,inventory,equipped,gearPurchases,totalXP,attributePoints,combine,quests,claimedRewards,combineCheckpoints,bonuses,spinLog};
+  // xp_ledger.note holds the game id (award_arcade_xp, 0017_*.sql) — read
+  // back only so the UI can show "today's arcade game XP so far" against
+  // the real server-enforced 25/day cap; state.arcadeScores/arcadeMetrics
+  // (personal bests, Player Card mapping) are unrelated and stay local.
+  const arcadeGameLog=(arcadeGameRes.data||[]).map(row=>({
+    date:(row.created_at||'').slice(0,10),
+    xp:row.amount,
+    gameId:row.note
+  }));
+
+  return {daily,inventory,equipped,gearPurchases,totalXP,attributePoints,combine,quests,claimedRewards,combineCheckpoints,bonuses,spinLog,arcadeGameLog};
 }
 
 // ---------------- Daily check-in (frictionless, Phase B) ----------------
@@ -371,6 +382,16 @@ async function awardBonusXPRemote(athleteId,bonusType,xp,reason,pin){
 async function awardSpinXpRemote(athleteId,xp){
   const {error}=await supabase.rpc('award_spin_xp',{p_athlete_id:athleteId,p_xp:xp});
   if(error) throw error;
+}
+
+// Unlike spin (exact value awarded or nothing), arcade game XP can be
+// partially credited server-side against the 25/day cross-game cap — the
+// RPC returns the actual amount credited, which the caller should display
+// instead of the requested amount. Not PIN-gated, same tier as spin.
+async function awardArcadeXpRemote(athleteId,gameId,xp){
+  const {data,error}=await supabase.rpc('award_arcade_xp',{p_athlete_id:athleteId,p_game_id:gameId,p_xp:xp});
+  if(error) throw error;
+  return data;
 }
 
 // rewards.id is a server-generated uuid, unlike quests/gear_items which keep
