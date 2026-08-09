@@ -26,8 +26,8 @@ If any step errors, stop and send me the exact error message rather than continu
 
 1. Left sidebar → **Authentication** → **Providers**. Confirm **Email** is enabled (it is by default).
 2. **Authentication** → **URL Configuration**:
-   - **Site URL**: your GitHub Pages URL, e.g. `https://kgkleckner-nb81.github.io/KK-LevelUpAthletics/` (check the exact URL your Pages deployment actually uses).
-   - **Redirect URLs**: add the same URL again here (Supabase needs it in both places).
+   - **Site URL**: `https://lvl-up-athletics.com` (the site's custom domain — check Settings > Pages in GitHub for the exact URL if this hasn't been set up yet, or if it's still on the default `github.io` address).
+   - **Redirect URLs**: add the same URL again here (Supabase needs it in both places). If you're migrating from the old `github.io` URL, keep both listed until you've confirmed sign-in works on the new domain, then remove the old one.
 3. Leave "Confirm email" / OTP settings at their defaults for now — the app will use `signInWithOtp` (a magic link, not a password), so no separate email/password confirmation flow is needed.
 
 **Heads up on email sending:** Supabase's built-in email sender has fairly low rate limits and isn't meant for production traffic — fine for testing this yourself, but before inviting real families, it's worth connecting a custom SMTP provider (Resend, Postmark, etc. — both have generous free tiers) under **Authentication → Providers → Email → SMTP Settings**. Flagging this now so it's not a surprise later; not required to proceed with Phase B.
