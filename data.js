@@ -252,11 +252,17 @@ async function loadAthleteState(athleteId){
 
   const inventory=['default',...(gearInvRes.data||[]).map(r=>r.gear_item_id)];
 
+  // Gear Locker v2 (0018_gear_locker_v2.sql) — column names match the
+  // slots 1:1 except faceExtra (column face_extra), same snake_case
+  // convention as the rest of this file's row mapping.
   const eq=gearEqRes.data;
+  const equippedDefault={base:'default',jersey:'default',headwear:'default',hair:'default',faceExtra:'default',gear:'default',accessory:'default',border:'default',background:'default',skin:'default',badge:'default'};
   const equipped=eq?{
-    frame:eq.frame,background:eq.background,outfit:eq.outfit,
-    prop:eq.prop,faceAccent:eq.face_accent,title:eq.title
-  }:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'};
+    base:eq.base,jersey:eq.jersey,headwear:eq.headwear,hair:eq.hair,
+    faceExtra:eq.face_extra,gear:eq.gear,accessory:eq.accessory,
+    border:eq.border,background:eq.background,skin:eq.skin,badge:eq.badge
+  }:equippedDefault;
+  const slotColors=(eq&&eq.colors)||{};
 
   const gearPurchases=(gearPurchRes.data||[]).map(r=>({
     itemId:r.gear_item_id,xpCost:r.xp_cost,date:(r.created_at||'').slice(0,10)
@@ -329,7 +335,7 @@ async function loadAthleteState(athleteId){
     gameId:row.note
   }));
 
-  return {daily,inventory,equipped,gearPurchases,totalXP,attributePoints,combine,quests,claimedRewards,combineCheckpoints,bonuses,spinLog,arcadeGameLog};
+  return {daily,inventory,equipped,slotColors,gearPurchases,totalXP,attributePoints,combine,quests,claimedRewards,combineCheckpoints,bonuses,spinLog,arcadeGameLog};
 }
 
 // ---------------- Daily check-in (frictionless, Phase B) ----------------
@@ -418,13 +424,29 @@ async function buyGearItemRemote(athleteId,gearItemId){
   if(error) throw error;
 }
 
+// Gear Locker v2 (0018_gear_locker_v2.sql) column map — keys are the
+// slot names lockerItems/gearSlotOrder use in app.js, values are the
+// actual gear_equipped columns (differs only for faceExtra->face_extra).
+const gearEquippedColumnBySlot={base:'base',jersey:'jersey',headwear:'headwear',hair:'hair',faceExtra:'face_extra',gear:'gear',accessory:'accessory',border:'border',background:'background',skin:'skin',badge:'badge'};
 async function equipGearItemRemote(athleteId,slot,itemId){
-  const columnBySlot={frame:'frame',background:'background',outfit:'outfit',prop:'prop',faceAccent:'face_accent',title:'title'};
-  const column=columnBySlot[slot];
+  const column=gearEquippedColumnBySlot[slot];
   if(!column) throw new Error('unknown gear slot: '+slot);
   const {error}=await supabase.from('gear_equipped')
     .upsert({athlete_id:athleteId,[column]:itemId},{onConflict:'athlete_id'});
   if(error) throw error;
+}
+
+// colors is a single jsonb column shared across every tintable slot
+// ({"jersey":"#1F7AE0","headwear":"#..."}), so this merges the one
+// changed slot into the caller's already-known colors object (from
+// state.slotColors) rather than reading it back first — cheap since
+// there's rarely more than a couple of tintable slots equipped at once.
+async function setGearColorRemote(athleteId,slot,colorHex,currentColors){
+  const merged={...(currentColors||{}),[slot]:colorHex};
+  const {error}=await supabase.from('gear_equipped')
+    .upsert({athlete_id:athleteId,colors:merged},{onConflict:'athlete_id'});
+  if(error) throw error;
+  return merged;
 }
 
 async function completeDailyMissionRemote(athleteId,missionTitle){

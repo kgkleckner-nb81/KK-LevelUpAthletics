@@ -996,6 +996,58 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .gear-equip-row>span{min-width:100px;font-weight:700;font-family:var(--accent)}
 .gear-equip-options{display:flex;gap:6px;flex-wrap:wrap}
 
+/* Placeholder-art avatar compositing preview (see renderAvatarComposite()
+   in app.js). Fixed-size card with absolutely-positioned layers stacked in
+   equip order — no real illustrated art yet, so each layer is a labeled,
+   tier/custom-colored shape roughly where that body part belongs. Swap in
+   real art later by changing what renderAvatarComposite() puts in each
+   .avatar-layer-* div; these position/size rules can stay or be replaced
+   alongside it. */
+.avatar-composite{
+  position:relative;
+  width:220px;
+  height:300px;
+  margin:0 auto;
+  border-radius:16px;
+  overflow:hidden;
+  background:var(--cream);
+  border:2px solid var(--ink);
+  box-shadow:var(--shadow-sm);
+}
+.avatar-layer{
+  position:absolute;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  background:var(--layer-color,#8a7f6a);
+  color:#fff;
+  font-family:var(--accent);
+  font-weight:700;
+  font-size:10px;
+  line-height:1.2;
+  text-shadow:0 1px 2px rgba(0,0,0,.5);
+  padding:2px;
+  box-sizing:border-box;
+}
+.avatar-layer span{pointer-events:none}
+.avatar-layer-background{inset:0;border-radius:14px;font-size:11px;align-items:flex-end;padding-bottom:6px;opacity:.55}
+.avatar-layer-border{inset:6px;border-radius:10px;background:transparent!important;border:6px solid var(--layer-color,#8a7f6a);color:transparent}
+.avatar-layer-base{left:30%;right:30%;bottom:14%;top:52%;border-radius:14px 14px 6px 6px}
+.avatar-layer-jersey{left:26%;right:26%;bottom:16%;top:56%;border-radius:12px 12px 4px 4px;opacity:.85}
+.avatar-layer-skin,.avatar-layer-headwear,.avatar-layer-hair,.avatar-layer-faceExtra{
+  left:32%;right:32%;top:14%;height:34%;border-radius:50%;
+}
+.avatar-layer-headwear{top:10%;height:16%;border-radius:12px 12px 40% 40%}
+.avatar-layer-hair{top:11%;height:15%;border-radius:50% 50% 10% 10%}
+.avatar-layer-faceExtra{top:26%;height:12%;font-size:9px}
+.avatar-layer-gear,.avatar-layer-accessory,.avatar-layer-badge{
+  width:30%;height:16%;bottom:2%;border-radius:8px;font-size:9px;
+}
+.avatar-layer-gear{left:2%}
+.avatar-layer-accessory{left:35%}
+.avatar-layer-badge{right:2%}
+
 /* "Under Construction" overlay — feature-flagged purely by the
    data-under-construction attribute on the .card itself. To bring a
    section back online later, flip that attribute to "false" (or just

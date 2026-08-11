@@ -755,6 +755,20 @@ document.addEventListener('click',e=>{
   const equipBtn=e.target.closest('.gear-equip-btn');
   if(equipBtn) equipGearItem(equipBtn.dataset.slot,equipBtn.dataset.item);
 });
+document.addEventListener('change',e=>{
+  const colorInput=e.target.closest('.gear-color-input');
+  if(colorInput) setGearColor(colorInput.dataset.slot,colorInput.value);
+});
+async function setGearColor(slot,colorHex){
+  if(!activeAthlete) return;
+  try{
+    state.slotColors=await setGearColorRemote(activeAthlete.id,slot,colorHex,state.slotColors);
+  }catch(err){
+    alert('Could not save color: '+(err.message||'unknown error'));
+    return;
+  }
+  renderAvatarComposite($('#gearAvatarPreview'));
+}
 
 function renderQuests(){
   const wk=weekStartISO(todayISO());
@@ -1385,38 +1399,120 @@ function combineValueFor(entry,key){
   }
   return +entry[key]||0;
 }
-// Round 12: Player Card Gear Locker. lockerItems is a slotted cosmetic
-// catalog (frame/background/outfit/prop/faceAccent/title), sold via the
-// same availableBalance() pool as rewardMilestones but tracked separately
-// (see totalGearXPSpent()) — rewardMilestones stays real-world-only.
-// Every slot's free option is the sentinel id 'default' rather than a
-// catalog entry, since it's always owned/equippable regardless of slot.
-const gearSlotOrder=['frame','background','outfit','prop','faceAccent','title'];
-const gearSlotLabels={frame:'Frame',background:'Background',outfit:'Outfit',prop:'Prop',faceAccent:'Face Accent',title:'Title'};
+// Gear Locker v2 (gear-locker-v2 branch): slotted cosmetic catalog matching
+// design-reference/player-card-avatar-attributes.md and
+// 0018_gear_locker_v2.sql exactly — item ids here MUST match that
+// migration's seed rows 1:1, since gear_inventory/gear_purchases reference
+// gear_items.id as a foreign key. Sold via the same availableBalance()
+// pool as rewardMilestones but tracked separately (see totalGearXPSpent()).
+// Every slot's free option is the sentinel id 'default', always
+// owned/equippable regardless of slot. tintable:true slots get a color
+// picker in the UI instead of (or alongside) their fixed art — see
+// renderAvatarComposite() for how color is applied.
+// 'skin' is a full head override: when equipped (!=='default'), the
+// renderer hides the face/headwear/hair layers entirely instead of
+// stacking with them (a mascot head replaces the face, it doesn't wear a
+// cap over it) — see gearSlotHiddenBySkin below.
+const gearSlotOrder=['base','jersey','headwear','hair','faceExtra','gear','accessory','border','background','skin','badge'];
+const gearSlotLabels={base:'Body',jersey:'Jersey',headwear:'Headwear',hair:'Hair',faceExtra:'Face Extra',gear:'Gear',accessory:'Accessory',border:'Border',background:'Background',skin:'Skin',badge:'Badge'};
+// Slots a non-default skin hides (replaces) rather than stacks with.
+const gearSlotHiddenBySkin=['headwear','hair','faceExtra'];
 const lockerItems=[
+  // base
+  {id:'beast-mode-base',name:'Beast Mode',slot:'base',xpCost:150,tier:'Uncommon'},
+  {id:'giant-head-base',name:'Giant Head',slot:'base',xpCost:250,tier:'Rare'},
+  // jersey
+  {id:'jersey-standard-color',name:'Standard Jersey',slot:'jersey',xpCost:75,tier:'Common',tintable:true},
+  {id:'pinstripe-kit',name:'Pinstripe Jersey',slot:'jersey',xpCost:75,tier:'Common'},
+  {id:'jersey-cutoff',name:'Cut-Off Sleeves',slot:'jersey',xpCost:150,tier:'Uncommon'},
+  {id:'jersey-hype',name:'Hype Jersey',slot:'jersey',xpCost:250,tier:'Rare'},
+  // headwear
+  {id:'headwear-batting-helmet',name:'Batting Helmet',slot:'headwear',xpCost:75,tier:'Common'},
+  {id:'headwear-classic-cap',name:'Classic Cap',slot:'headwear',xpCost:75,tier:'Common',tintable:true},
+  {id:'headwear-visor',name:'Visor',slot:'headwear',xpCost:150,tier:'Uncommon'},
+  {id:'headwear-bandana',name:'Bandana',slot:'headwear',xpCost:150,tier:'Uncommon'},
+  {id:'headwear-cheesehead',name:'Cheesehead Hat',slot:'headwear',xpCost:400,tier:'Legendary'},
+  // hair
+  {id:'hair-mullet',name:'Mullet',slot:'hair',xpCost:75,tier:'Common'},
+  {id:'hair-giant-afro',name:'Giant Afro',slot:'hair',xpCost:150,tier:'Uncommon'},
+  {id:'hair-mohawk',name:'Mohawk',slot:'hair',xpCost:150,tier:'Uncommon'},
+  {id:'hair-rainbow-wig',name:'Rainbow Wig',slot:'hair',xpCost:250,tier:'Rare'},
+  // faceExtra
+  {id:'face-paint',name:'Face Paint',slot:'faceExtra',xpCost:75,tier:'Common',tintable:true},
+  {id:'face-mustache',name:'Handlebar Mustache',slot:'faceExtra',xpCost:75,tier:'Common'},
+  {id:'face-gold-grill',name:'Gold Grill',slot:'faceExtra',xpCost:250,tier:'Rare'},
+  // gear
+  {id:'gear-bat',name:'Bat',slot:'gear',xpCost:75,tier:'Common'},
+  {id:'gear-glove',name:'Glove',slot:'gear',xpCost:75,tier:'Common'},
+  {id:'eye-black',name:'Lightning Eye Black',slot:'gear',xpCost:75,tier:'Common'},
+  {id:'gear-shades-wrap',name:'Wrap-Around Shades',slot:'gear',xpCost:75,tier:'Common'},
+  {id:'grip-tape',name:'Grip Tape',slot:'gear',xpCost:150,tier:'Uncommon'},
+  {id:'gear-shades-flip',name:'Flip-Up Shades',slot:'gear',xpCost:150,tier:'Uncommon'},
+  {id:'gear-shades-silly',name:'Silly Shades',slot:'gear',xpCost:250,tier:'Rare'},
+  {id:'gear-banana',name:'Banana',slot:'gear',xpCost:400,tier:'Legendary'},
+  // accessory
+  {id:'accessory-bling',name:'Bling Chain',slot:'accessory',xpCost:150,tier:'Uncommon'},
+  {id:'accessory-cape',name:'Cape',slot:'accessory',xpCost:250,tier:'Rare'},
+  // border
+  {id:'border-rookie',name:'Rookie Border',slot:'border',xpCost:75,tier:'Common'},
+  {id:'border-starter',name:'Starter Border',slot:'border',xpCost:150,tier:'Uncommon'},
+  {id:'fire-frame',name:'All-Star Border',slot:'border',xpCost:250,tier:'Rare'},
+  {id:'diamond-frame',name:'Legendary Holographic Border',slot:'border',xpCost:400,tier:'Legendary'},
+  // background
   {id:'blueprint-bg',name:'Blueprint Card Background',slot:'background',xpCost:75,tier:'Common'},
   {id:'stadium-lights-bg',name:'Stadium Lights Background',slot:'background',xpCost:150,tier:'Uncommon'},
-  {id:'fire-frame',name:'Fire Player Frame',slot:'frame',xpCost:250,tier:'Rare'},
-  {id:'diamond-frame',name:'Diamond Card Border',slot:'frame',xpCost:400,tier:'Legendary'},
-  {id:'pinstripe-kit',name:'Pinstripe Kit',slot:'outfit',xpCost:75,tier:'Common'},
-  {id:'grip-tape',name:'Grip Tape',slot:'prop',xpCost:150,tier:'Uncommon'},
-  {id:'eye-black',name:'Lightning Eye Black',slot:'faceAccent',xpCost:75,tier:'Common'},
-  {id:'captain-title',name:'Captain Title',slot:'title',xpCost:250,tier:'Rare'}
+  {id:'bg-sunset',name:'Sunset Game Day',slot:'background',xpCost:150,tier:'Uncommon'},
+  {id:'bg-outer-space',name:'Outer Space',slot:'background',xpCost:250,tier:'Rare'},
+  {id:'bg-volcano',name:'Volcano / Lava Field',slot:'background',xpCost:400,tier:'Legendary'},
+  // skin (full head override)
+  {id:'skin-mascot',name:'Team Mascot',slot:'skin',xpCost:250,tier:'Rare'},
+  {id:'skin-shark',name:'Shark',slot:'skin',xpCost:250,tier:'Rare'},
+  {id:'skin-trex',name:'T. Rex',slot:'skin',xpCost:400,tier:'Legendary'},
+  {id:'skin-banana-costume',name:'Banana Costume',slot:'skin',xpCost:400,tier:'Legendary'},
+  // badge
+  {id:'badge-first-pitch',name:'First Pitch',slot:'badge',xpCost:75,tier:'Common'},
+  {id:'badge-diamond-grinder',name:'Diamond Grinder',slot:'badge',xpCost:150,tier:'Uncommon'},
+  {id:'badge-streak-king',name:'Streak King/Queen',slot:'badge',xpCost:150,tier:'Uncommon'},
+  {id:'badge-clutch-gene',name:'Clutch Gene',slot:'badge',xpCost:250,tier:'Rare'},
+  {id:'badge-most-improved',name:'Most Improved',slot:'badge',xpCost:250,tier:'Rare'},
+  {id:'captain-title',name:'Team Captain',slot:'badge',xpCost:250,tier:'Rare'},
+  {id:'badge-the-show',name:'The Show',slot:'badge',xpCost:400,tier:'Legendary'}
 ];
 function findGearItem(id){return lockerItems.find(i=>i.id===id)}
-const defaultEquipped={frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'};
-// Swappable-art-slot lookups, same pattern as tierBadges — missing files
-// fall back to a plain placeholder (see avatarLayerHTML/tierBadgeHTML).
-const avatarBaseArt='assets/avatar-base.png';
-const gearArt={
-  'blueprint-bg':'assets/gear-blueprint-bg.png',
-  'stadium-lights-bg':'assets/gear-stadium-lights-bg.png',
-  'fire-frame':'assets/gear-fire-frame.png',
-  'diamond-frame':'assets/gear-diamond-frame.png',
-  'pinstripe-kit':'assets/gear-pinstripe-kit.png',
-  'grip-tape':'assets/gear-grip-tape.png',
-  'eye-black':'assets/gear-eye-black.png'
-};
+const defaultEquipped={base:'default',jersey:'default',headwear:'default',hair:'default',faceExtra:'default',gear:'default',accessory:'default',border:'default',background:'default',skin:'default',badge:'default'};
+// Placeholder-art color palette per tier, used by the CSS-only compositing
+// renderer (renderAvatarComposite) until real illustrated art exists —
+// see 0018_gear_locker_v2.sql's header note. Swapping in real art later
+// only touches the renderer, not this catalog or the schema.
+const gearTierColor={Common:'#8a7f6a',Uncommon:'#1FA35C',Rare:'#1F7AE0',Legendary:'#F76C1E'};
+// Back-to-front stacking order for the compositing renderer. 'skin' sits
+// where the head goes and, when equipped, suppresses headwear/hair/
+// faceExtra via gearSlotHiddenBySkin above rather than stacking under them.
+const avatarLayerOrder=['background','border','base','jersey','skin','headwear','hair','faceExtra','gear','accessory','badge'];
+// Placeholder-art compositing renderer — no real illustrated assets exist
+// yet (see 0018_gear_locker_v2.sql's header note), so each equipped slot
+// renders as a labeled, tier-colored (or custom-tinted) shape positioned
+// roughly where that layer belongs on a card. This proves out the actual
+// system under test — equip state, layering/z-order, color tinting, and
+// the skin-overrides-face/headwear/hair rule — independent of art, which
+// can replace this function's innerHTML later (an <img> per layer instead
+// of a colored div) without touching the schema, catalog, or equip logic.
+function renderAvatarComposite(containerEl){
+  if(!containerEl) return;
+  const equipped=state.equipped||defaultEquipped;
+  const colors=state.slotColors||{};
+  const skinActive=!!(equipped.skin&&equipped.skin!=='default');
+  const layerHTML=slot=>{
+    if(gearSlotHiddenBySkin.includes(slot)&&skinActive) return '';
+    const itemId=equipped[slot];
+    if(!itemId||itemId==='default') return '';
+    const item=findGearItem(itemId);
+    if(!item) return '';
+    const color=item.tintable&&colors[slot]?colors[slot]:(gearTierColor[item.tier]||'#8a7f6a');
+    return `<div class="avatar-layer avatar-layer-${slot}" style="--layer-color:${color}" title="${item.name}"><span>${item.name}</span></div>`;
+  };
+  containerEl.innerHTML=`<div class="avatar-composite">${avatarLayerOrder.map(layerHTML).join('')}</div>`;
+}
 
 const wheelSegments=[5,10,10,15,20,20,25,25,50,50,100,250,1000];
 // Slice size (and therefore landing odds — the wedge angle IS the probability)
@@ -1622,14 +1718,16 @@ async function equipGearItem(slot,itemId){
 }
 function useRainToken(){state.rainTokens=state.rainTokens??1;if(state.rainTokens<=0){alert('No Rain Delay Tokens available.');return}state.rainTokens-=1;state.bonuses=state.bonuses||[];state.bonuses.push({date:todayISO(),type:'Rain Delay Token',xp:0,reason:'Streak protected'});save();alert('Streak protected for one missed day.');renderTeamEdition()}
 function renderMission(){const m=missionForToday();if($('#missionTitle'))$('#missionTitle').textContent=m.title;if($('#missionTasks'))$('#missionTasks').innerHTML='<ul>'+m.tasks.map(t=>`<li>☐ ${t}</li>`).join('')+'</ul>';if($('#missionReward'))$('#missionReward').textContent=m.reward;if($('#streakLarge'))$('#streakLarge').textContent=streak();if($('#rainTokens'))$('#rainTokens').textContent=state.rainTokens??1}
-// Round 12 items 4-5: shop grouped by slot (buy) + equip controls grouped
-// by slot (always free, always includes Default). Replaces the old dead
-// renderLocker(), which targeted a #lockerInventory element that never
-// existed anywhere in index.html.
+// Gear Locker v2: shop grouped by slot (buy) + equip controls grouped by
+// slot (always free, always includes Default), plus a live compositing
+// preview and a color picker on whichever slot's currently-equipped item
+// is tintable. Replaces the old dead renderLocker(), which targeted a
+// #lockerInventory element that never existed anywhere in index.html.
 function renderGearLocker(){
   const inv=state.inventory||['default'];
   const equipped=state.equipped||defaultEquipped;
   const balance=availableBalance();
+  renderAvatarComposite($('#gearAvatarPreview'));
   if($('#gearShop')){
     $('#gearShop').innerHTML=gearSlotOrder.map(slot=>{
       const items=lockerItems.filter(i=>i.slot===slot);
@@ -1639,7 +1737,7 @@ function renderGearLocker(){
         const afford=balance>=item.xpCost;
         return `<div class="reward-tile ${owned?'unlocked':''}">
           <span class="reward-tier-badge tier-${item.tier.toLowerCase()}">${item.tier}</span>
-          <h3>${item.name}</h3>
+          <h3>${item.name}${item.tintable?' 🎨':''}</h3>
           <p><strong>${item.xpCost} XP</strong></p>
           ${owned?'<strong>Owned</strong>':`<button type="button" class="primary buy-gear-btn" data-item="${item.id}" ${afford?'':'disabled'}>${afford?'Buy':'Not enough XP'}</button>`}
         </div>`;
@@ -1647,10 +1745,14 @@ function renderGearLocker(){
     }).join('');
   }
   if($('#gearEquip')){
+    const colors=state.slotColors||{};
     $('#gearEquip').innerHTML=gearSlotOrder.map(slot=>{
       const ownedInSlot=lockerItems.filter(i=>i.slot===slot&&inv.includes(i.id));
-      const options=[{id:'default',name:slot==='title'?'No Title':'Default'},...ownedInSlot];
-      return `<div class="gear-equip-row"><span>${gearSlotLabels[slot]}</span><div class="gear-equip-options">${options.map(o=>`<button type="button" class="gear-equip-btn ${equipped[slot]===o.id?'active':''}" data-slot="${slot}" data-item="${o.id}">${o.name}</button>`).join('')}</div></div>`;
+      const options=[{id:'default',name:'Default'},...ownedInSlot];
+      const equippedItem=findGearItem(equipped[slot]);
+      const colorPicker=equippedItem&&equippedItem.tintable
+        ?`<input type="color" class="gear-color-input" data-slot="${slot}" value="${colors[slot]||'#1F7AE0'}" title="Color for ${equippedItem.name}">`:'';
+      return `<div class="gear-equip-row"><span>${gearSlotLabels[slot]}</span><div class="gear-equip-options">${options.map(o=>`<button type="button" class="gear-equip-btn ${equipped[slot]===o.id?'active':''}" data-slot="${slot}" data-item="${o.id}">${o.name}</button>`).join('')}${colorPicker}</div></div>`;
     }).join('');
   }
 }
