@@ -200,12 +200,16 @@
           <img src="assets/cards/card-hentry.jpg" alt="Player card design 3">
           <img src="assets/cards/card-cam.jpg" alt="Player card design 4">
           <img src="assets/cards/card-bananas.jpg" alt="Player card design 5">
+          <img id="playerCardHeroAvatar" class="hidden" alt="Your athlete">
+          <div id="playerCardNameplate" class="player-card-nameplate hidden">
+            <strong id="playerCardName" class="editable-badge" title="Click to set a nickname">Ethan</strong>
+            <span id="playerCardRealName" class="hidden"></span>
+          </div>
         </div>
         <div class="player-card-dots" id="playerCardDots"></div>
       </div>
       <div class="player-card-info">
         <p class="eyebrow dark">Player Card</p>
-        <h2 id="playerCardName">Ethan</h2>
         <p id="playerCardTeam" class="player-card-team">Free Agent</p>
         <div class="player-card-badges">
           <div class="player-card-badge overall">
@@ -223,6 +227,7 @@
         </div>
         <p id="levelDesc" class="muted">Start stacking workouts.</p>
         <button type="button" id="buildYourAthleteBtn" class="primary player-card-cta">Build Your Athlete →</button>
+        <button type="button" id="viewSampleAvatarsBtn" class="link-btn hidden">See sample avatars</button>
       </div>
     </div>
     <div class="player-card-ratings">
@@ -579,6 +584,45 @@
     <label>Age (optional)<input id="newAthleteAge" type="number" min="1" max="25" placeholder="e.g. 9"></label>
     <button id="saveNewAthleteBtn" class="primary" type="button">Add Athlete</button>
     <p id="addAthleteStatus" class="muted"></p>
+  </div>
+</div>
+
+<div id="buildAvatarModal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closeBuildAvatarModal" class="modal-close" type="button">×</button>
+    <h2>Build Your Athlete</h2>
+    <p class="muted">Early access — this is only turned on for approved athletes right now. Choose a clear, front-facing photo.</p>
+    <div id="buildAvatarStepUpload">
+      <label class="wide">Photo<input id="avatarSelfieInput" type="file" accept="image/*"></label>
+      <label class="wide">Style
+        <select id="avatarStyleSelect">
+          <option value="illustrated">Illustrated (cartoon)</option>
+          <option value="realistic">Realistic</option>
+        </select>
+      </label>
+      <button id="generateAvatarBtn" class="primary wide" type="button">Generate</button>
+      <p id="buildAvatarStatus" class="muted"></p>
+    </div>
+    <div id="buildAvatarStepReview" class="hidden">
+      <img id="avatarPreviewImg" alt="Generated avatar preview" style="max-width:260px;display:block;margin:0 auto 12px">
+      <button id="saveAvatarBtn" class="primary wide" type="button">Save as My Avatar</button>
+      <button id="retryAvatarBtn" class="wide" type="button">Try a Different Photo</button>
+    </div>
+  </div>
+</div>
+
+<div id="sampleAvatarsModal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closeSampleAvatarsModal" class="modal-close" type="button">×</button>
+    <h2>Sample Avatars</h2>
+    <p class="muted">Just for inspiration — these aren't tied to your athlete.</p>
+    <div class="sample-avatars-grid">
+      <img src="assets/cards/card-shark.jpg" alt="Sample avatar 1">
+      <img src="assets/cards/card-ascher.jpg" alt="Sample avatar 2">
+      <img src="assets/cards/card-hentry.jpg" alt="Sample avatar 3">
+      <img src="assets/cards/card-cam.jpg" alt="Sample avatar 4">
+      <img src="assets/cards/card-bananas.jpg" alt="Sample avatar 5">
+    </div>
   </div>
 </div>
 

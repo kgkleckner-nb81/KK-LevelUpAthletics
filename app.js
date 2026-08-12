@@ -902,9 +902,28 @@ function ratingTierClass(v){
 function renderPlayerCardHero(){
   const name=state.athleteName||'Athlete';
   if($('#statusAthleteName')) $('#statusAthleteName').textContent=name.toUpperCase();
-  if($('#playerCardName')) $('#playerCardName').textContent=name;
+  const nickname=activeAthlete&&activeAthlete.nickname;
+  if($('#playerCardName')) $('#playerCardName').textContent=nickname||name;
+  if($('#playerCardRealName')){
+    $('#playerCardRealName').textContent=nickname?name:'';
+    $('#playerCardRealName').classList.toggle('hidden',!nickname);
+  }
   if($('#playerCardTeam')) $('#playerCardTeam').textContent=(athleteTeamMembership&&athleteTeamMembership.status==='approved'&&athleteTeamMembership.teams&&athleteTeamMembership.teams.name)||'Free Agent';
   if($('#playerCardAge')) $('#playerCardAge').textContent=(activeAthlete&&activeAthlete.age)||'—';
+  if($('#playerCardHeroAvatar')){
+    const url=activeAthlete&&activeAthlete.avatar_url;
+    const heroImg=$('#playerCardHeroAvatar');
+    const sampleImgs=$('#playerCardSlot')?[...$('#playerCardSlot').querySelectorAll('img:not(#playerCardHeroAvatar)')]:[];
+    heroImg.src=url||'';
+    heroImg.classList.toggle('hidden',!url);
+    sampleImgs.forEach(img=>img.classList.toggle('hidden',!!url));
+    if($('#playerCardDots')) $('#playerCardDots').classList.toggle('hidden',!!url);
+    if($('#viewSampleAvatarsBtn')) $('#viewSampleAvatarsBtn').classList.toggle('hidden',!url);
+    // Nameplate only overlays the real generated photo — the rotating
+    // sample cards already have their own baked-in captions, so showing
+    // it there too would double up.
+    if($('#playerCardNameplate')) $('#playerCardNameplate').classList.toggle('hidden',!url);
+  }
   [...performanceAxisOrder,'consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
     if(!bar) return;
@@ -912,11 +931,65 @@ function renderPlayerCardHero(){
     bar.classList.add(ratingTierClass(+($('#'+k).textContent)||0));
   });
 }
-// TODO(Build Your Athlete): stub for the future selfie-capture -> 3D-avatar
-// render -> Reward Locker gear-purchase flow described in
-// design-reference/player-card-avatar-attributes.md. No destination yet.
+// Early access — gated server-side by ALLOWED_ATHLETE_IDS on the
+// generate-avatar-face Edge Function, so this is safe to expose to every
+// signed-in parent even though only approved athletes will succeed.
 function buildYourAthlete(){
-  alert('Coming soon: take a selfie, render your 3D avatar, and gear it up in the Reward Locker!');
+  if(!activeAthlete){alert('Sign in and select an athlete first.');return}
+  $('#buildAvatarStepUpload').classList.remove('hidden');
+  $('#buildAvatarStepReview').classList.add('hidden');
+  $('#avatarSelfieInput').value='';
+  $('#buildAvatarStatus').textContent='';
+  $('#buildAvatarModal').classList.remove('hidden');
+}
+function hideBuildAvatarModal(){$('#buildAvatarModal').classList.add('hidden')}
+function fileToDataUri(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(reader.error||new Error('Could not read that file.'));
+    reader.readAsDataURL(file);
+  });
+}
+let pendingAvatarUrl=null;
+async function generateAvatarAction(){
+  const file=$('#avatarSelfieInput').files[0];
+  if(!file){$('#buildAvatarStatus').textContent='Choose a photo first.';return}
+  $('#buildAvatarStatus').textContent='Generating... this can take 20-30 seconds.';
+  $('#generateAvatarBtn').disabled=true;
+  try{
+    const dataUri=await fileToDataUri(file);
+    const style=$('#avatarStyleSelect')?$('#avatarStyleSelect').value:'illustrated';
+    const {image_url}=await generateAvatarFaceRemote(activeAthlete.id,dataUri,'flux-2-pro',style);
+    pendingAvatarUrl=image_url;
+    $('#avatarPreviewImg').src=image_url;
+    $('#buildAvatarStepUpload').classList.add('hidden');
+    $('#buildAvatarStepReview').classList.remove('hidden');
+  }catch(err){
+    $('#buildAvatarStatus').textContent=err.message||'Could not generate an avatar. Try a different photo.';
+  }finally{
+    $('#generateAvatarBtn').disabled=false;
+  }
+}
+async function saveAvatarAction(){
+  if(!pendingAvatarUrl||!activeAthlete) return;
+  try{
+    await saveAthleteAvatarUrl(activeAthlete.id,pendingAvatarUrl);
+    activeAthlete.avatar_url=pendingAvatarUrl;
+  }catch(err){
+    alert('Could not save avatar: '+(err.message||'unknown error'));
+    return;
+  }
+  pendingAvatarUrl=null;
+  hideBuildAvatarModal();
+  renderPlayerCardHero();
+}
+function retryAvatarAction(){
+  pendingAvatarUrl=null;
+  $('#buildAvatarStepReview').classList.add('hidden');
+  $('#buildAvatarStepUpload').classList.remove('hidden');
+  $('#avatarSelfieInput').value='';
+  $('#buildAvatarStatus').textContent='';
 }
 // One-time setup (not called from render()) — the rotation is decorative
 // sample content, independent of app state, so it shouldn't be torn down
@@ -927,7 +1000,7 @@ function initPlayerCardRotation(){
   const slot=$('#playerCardSlot');
   const dotsWrap=$('#playerCardDots');
   if(!slot||!dotsWrap) return;
-  const images=[...slot.querySelectorAll('img')];
+  const images=[...slot.querySelectorAll('img:not(#playerCardHeroAvatar)')];
   if(!images.length) return;
   images.forEach((_,i)=>{
     const dot=document.createElement('span');
@@ -991,6 +1064,18 @@ document.addEventListener('click',e=>{
       if(idx>=0) currentAthletes[idx].age=age;
       renderPlayerCardHero();
     }).catch(err=>alert('Could not save age: '+(err.message||err)));
+  }
+  if(e.target.id==='playerCardName'){
+    if(!activeAthlete) return;
+    const val=prompt('Enter a nickname for the player card (leave blank to remove):',activeAthlete.nickname||'');
+    if(val===null) return;
+    const nickname=val.trim().slice(0,30)||null;
+    updateAthleteNickname(activeAthlete.id,nickname).then(()=>{
+      activeAthlete.nickname=nickname;
+      const idx=currentAthletes.findIndex(a=>a.id===activeAthlete.id);
+      if(idx>=0) currentAthletes[idx].nickname=nickname;
+      renderPlayerCardHero();
+    }).catch(err=>alert('Could not save nickname: '+(err.message||err)));
   }
 });
 
@@ -3180,6 +3265,12 @@ function initAuthUI(){
     }
   };
   if($('#closeAddAthleteModal'))$('#closeAddAthleteModal').onclick=hideAddAthleteModal;
+  if($('#closeBuildAvatarModal'))$('#closeBuildAvatarModal').onclick=hideBuildAvatarModal;
+  if($('#viewSampleAvatarsBtn'))$('#viewSampleAvatarsBtn').onclick=()=>$('#sampleAvatarsModal').classList.remove('hidden');
+  if($('#closeSampleAvatarsModal'))$('#closeSampleAvatarsModal').onclick=()=>$('#sampleAvatarsModal').classList.add('hidden');
+  if($('#generateAvatarBtn'))$('#generateAvatarBtn').onclick=generateAvatarAction;
+  if($('#saveAvatarBtn'))$('#saveAvatarBtn').onclick=saveAvatarAction;
+  if($('#retryAvatarBtn'))$('#retryAvatarBtn').onclick=retryAvatarAction;
   if($('#saveNewAthleteBtn'))$('#saveNewAthleteBtn').onclick=async()=>{
     const name=$('#newAthleteName').value.trim();
     if(!name){$('#addAthleteStatus').textContent='Enter a name.';return}
