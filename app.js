@@ -905,10 +905,14 @@ function renderPlayerCardHero(){
   if($('#playerCardName')) $('#playerCardName').textContent=name;
   if($('#playerCardTeam')) $('#playerCardTeam').textContent=(athleteTeamMembership&&athleteTeamMembership.status==='approved'&&athleteTeamMembership.teams&&athleteTeamMembership.teams.name)||'Free Agent';
   if($('#playerCardAge')) $('#playerCardAge').textContent=(activeAthlete&&activeAthlete.age)||'—';
-  if($('#playerCardAvatarImg')){
+  if($('#playerCardHeroAvatar')){
     const url=activeAthlete&&activeAthlete.avatar_url;
-    $('#playerCardAvatarImg').src=url||'';
-    $('#playerCardAvatarImg').classList.toggle('hidden',!url);
+    const heroImg=$('#playerCardHeroAvatar');
+    const sampleImgs=$('#playerCardSlot')?[...$('#playerCardSlot').querySelectorAll('img:not(#playerCardHeroAvatar)')]:[];
+    heroImg.src=url||'';
+    heroImg.classList.toggle('hidden',!url);
+    sampleImgs.forEach(img=>img.classList.toggle('hidden',!!url));
+    if($('#playerCardDots')) $('#playerCardDots').classList.toggle('hidden',!!url);
   }
   [...performanceAxisOrder,'consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
@@ -945,7 +949,8 @@ async function generateAvatarAction(){
   $('#generateAvatarBtn').disabled=true;
   try{
     const dataUri=await fileToDataUri(file);
-    const {image_url}=await generateAvatarFaceRemote(activeAthlete.id,dataUri,'flux-2-pro','illustrated');
+    const style=$('#avatarStyleSelect')?$('#avatarStyleSelect').value:'illustrated';
+    const {image_url}=await generateAvatarFaceRemote(activeAthlete.id,dataUri,'flux-2-pro',style);
     pendingAvatarUrl=image_url;
     $('#avatarPreviewImg').src=image_url;
     $('#buildAvatarStepUpload').classList.add('hidden');
@@ -985,7 +990,7 @@ function initPlayerCardRotation(){
   const slot=$('#playerCardSlot');
   const dotsWrap=$('#playerCardDots');
   if(!slot||!dotsWrap) return;
-  const images=[...slot.querySelectorAll('img')];
+  const images=[...slot.querySelectorAll('img:not(#playerCardHeroAvatar)')];
   if(!images.length) return;
   images.forEach((_,i)=>{
     const dot=document.createElement('span');

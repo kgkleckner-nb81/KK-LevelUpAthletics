@@ -200,6 +200,7 @@
           <img src="assets/cards/card-hentry.jpg" alt="Player card design 3">
           <img src="assets/cards/card-cam.jpg" alt="Player card design 4">
           <img src="assets/cards/card-bananas.jpg" alt="Player card design 5">
+          <img id="playerCardHeroAvatar" class="hidden" alt="Your athlete">
         </div>
         <div class="player-card-dots" id="playerCardDots"></div>
       </div>
@@ -222,7 +223,6 @@
           </div>
         </div>
         <p id="levelDesc" class="muted">Start stacking workouts.</p>
-        <img id="playerCardAvatarImg" alt="Your generated avatar" class="hidden" style="max-width:120px;display:block;margin-bottom:10px">
         <button type="button" id="buildYourAthleteBtn" class="primary player-card-cta">Build Your Athlete →</button>
       </div>
     </div>
@@ -590,6 +590,12 @@
     <p class="muted">Early access — this is only turned on for approved athletes right now. Choose a clear, front-facing photo.</p>
     <div id="buildAvatarStepUpload">
       <label class="wide">Photo<input id="avatarSelfieInput" type="file" accept="image/*"></label>
+      <label class="wide">Style
+        <select id="avatarStyleSelect">
+          <option value="illustrated">Illustrated (cartoon)</option>
+          <option value="realistic">Realistic</option>
+        </select>
+      </label>
       <button id="generateAvatarBtn" class="primary wide" type="button">Generate</button>
       <p id="buildAvatarStatus" class="muted"></p>
     </div>
