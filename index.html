@@ -222,6 +222,7 @@
           </div>
         </div>
         <p id="levelDesc" class="muted">Start stacking workouts.</p>
+        <img id="playerCardAvatarImg" alt="Your generated avatar" class="hidden" style="max-width:120px;display:block;margin-bottom:10px">
         <button type="button" id="buildYourAthleteBtn" class="primary player-card-cta">Build Your Athlete →</button>
       </div>
     </div>
@@ -579,6 +580,24 @@
     <label>Age (optional)<input id="newAthleteAge" type="number" min="1" max="25" placeholder="e.g. 9"></label>
     <button id="saveNewAthleteBtn" class="primary" type="button">Add Athlete</button>
     <p id="addAthleteStatus" class="muted"></p>
+  </div>
+</div>
+
+<div id="buildAvatarModal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closeBuildAvatarModal" class="modal-close" type="button">×</button>
+    <h2>Build Your Athlete</h2>
+    <p class="muted">Early access — this is only turned on for approved athletes right now. Choose a clear, front-facing photo.</p>
+    <div id="buildAvatarStepUpload">
+      <label class="wide">Photo<input id="avatarSelfieInput" type="file" accept="image/*"></label>
+      <button id="generateAvatarBtn" class="primary wide" type="button">Generate</button>
+      <p id="buildAvatarStatus" class="muted"></p>
+    </div>
+    <div id="buildAvatarStepReview" class="hidden">
+      <img id="avatarPreviewImg" alt="Generated avatar preview" style="max-width:260px;display:block;margin:0 auto 12px">
+      <button id="saveAvatarBtn" class="primary wide" type="button">Save as My Avatar</button>
+      <button id="retryAvatarBtn" class="wide" type="button">Try a Different Photo</button>
+    </div>
   </div>
 </div>
 

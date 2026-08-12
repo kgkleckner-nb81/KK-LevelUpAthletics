@@ -206,6 +206,28 @@ async function archiveAthleteRemote(athleteId,pin){
   if(error) throw error;
 }
 
+// ---------------- Avatar face-layer generation ----------------
+// Early-access: only athlete ids on the Edge Function's ALLOWED_ATHLETE_IDS
+// allowlist will succeed — everyone else gets a clean "not turned on yet"
+// error back (see supabase/functions/generate-avatar-face/index.ts).
+// Generation only — does NOT save to the athlete's profile. The caller
+// shows the result for review, then calls saveAthleteAvatarUrl() to commit.
+async function generateAvatarFaceRemote(athleteId,selfieDataUri,model,style){
+  const data=await callEdgeFunction('generate-avatar-face',{
+    athlete_id:athleteId,
+    selfie_data_uri:selfieDataUri,
+    model:model||'flux-2-pro',
+    style:style||'illustrated',
+  });
+  return data; // {image_url, metadata}
+}
+
+// Frictionless, same as updateAthleteAge — not a PIN-gated field.
+async function saveAthleteAvatarUrl(athleteId,avatarUrl){
+  const {error}=await supabase.from('athletes').update({avatar_url:avatarUrl}).eq('id',athleteId);
+  if(error) throw error;
+}
+
 function getStoredActiveAthleteId(){
   try{return localStorage.getItem(ACTIVE_ATHLETE_STORAGE_KEY)}catch{return null}
 }
