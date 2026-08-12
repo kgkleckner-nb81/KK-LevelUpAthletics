@@ -1,0 +1,72 @@
+// Local pipeline test — runs the real fal.ai pipeline against a sample
+// photo and saves the result locally. No Supabase involved; pure
+// verification that generateStylizedBust -> removeBackground ->
+// reviewGeneratedImage works end-to-end before anything gets wired to the
+// live app.
+//
+// Usage:
+//   FAL_KEY=... deno run --allow-net --allow-env --allow-read --allow-write \
+//     supabase/functions/generate-avatar-face/test.ts \
+//     <path-to-selfie.jpg> <fake-athlete-id> [--model=flux-2-pro|nano-banana-2]
+//
+// FAL_KEY is read from the environment (see ~/.zshrc) — never hardcode it.
+
+import { createAvatarFaceLayer, type EditModel } from './pipeline.ts';
+
+function parseArgs() {
+  const [photoPath, athleteId, ...rest] = Deno.args;
+  if (!photoPath || !athleteId) {
+    console.error('Usage: test.ts <path-to-selfie.jpg> <fake-athlete-id> [--model=flux-2-pro|nano-banana-2]');
+    Deno.exit(1);
+  }
+  const modelFlag = rest.find((a) => a.startsWith('--model='));
+  const model = (modelFlag ? modelFlag.split('=')[1] : 'flux-2-pro') as EditModel;
+  if (model !== 'flux-2-pro' && model !== 'nano-banana-2') {
+    console.error(`Unknown --model value "${model}" — expected flux-2-pro or nano-banana-2`);
+    Deno.exit(1);
+  }
+  return { photoPath, athleteId, model };
+}
+
+function guessMimeType(path: string): string {
+  const ext = path.toLowerCase().split('.').pop();
+  if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  return 'image/jpeg';
+}
+
+async function main() {
+  const { photoPath, athleteId, model } = parseArgs();
+  const falKey = Deno.env.get('FAL_KEY');
+  if (!falKey) {
+    console.error('FAL_KEY is not set in this shell. See ~/.zshrc setup.');
+    Deno.exit(1);
+  }
+
+  console.log(`Reading ${photoPath}...`);
+  const bytes = await Deno.readFile(photoPath);
+  const base64 = btoa(String.fromCharCode(...bytes));
+  const dataUri = `data:${guessMimeType(photoPath)};base64,${base64}`;
+
+  console.log(`Running createAvatarFaceLayer (model=${model}, athleteId=${athleteId})...`);
+  const started = performance.now();
+
+  const { imageUrl, metadata } = await createAvatarFaceLayer(dataUri, athleteId, model, falKey);
+
+  const elapsedSec = ((performance.now() - started) / 1000).toFixed(1);
+  console.log(`Done in ${elapsedSec}s.`);
+  console.log('Metadata:', JSON.stringify(metadata, null, 2));
+  console.log('Result URL:', imageUrl);
+
+  console.log('Downloading result...');
+  const res = await fetch(imageUrl);
+  const outBytes = new Uint8Array(await res.arrayBuffer());
+  const outPath = `./avatar-test-output-${model}-${athleteId}.png`;
+  await Deno.writeFile(outPath, outBytes);
+  console.log(`Saved to ${outPath}`);
+}
+
+main().catch((err) => {
+  console.error(`Pipeline failed: ${err.name ?? 'Error'}: ${err.message ?? err}`);
+  Deno.exit(1);
+});
