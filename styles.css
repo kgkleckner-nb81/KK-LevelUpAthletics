@@ -1104,6 +1104,12 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 /* Transparent-background generated avatar — contain (not cover) so the
    bust isn't cropped, shown at full opacity once populated with a src. */
 #playerCardHeroAvatar{object-fit:contain;opacity:1}
+/* Baseball-card style nameplate overlaid on the bottom of the generated
+   avatar photo, matching the plate look on the sample cards' baked-in
+   art. Only shown once a real avatar exists (see renderPlayerCardHero). */
+.player-card-nameplate{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:14px 12px 12px;text-align:center;background:linear-gradient(to top,rgba(0,0,0,.78),rgba(0,0,0,0))}
+.player-card-nameplate strong{display:block;font-family:var(--display);font-weight:800;font-size:20px;color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.6)}
+.player-card-nameplate span{display:block;font-family:var(--accent);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.82);margin-top:2px}
 .player-card-dots{display:flex;justify-content:center;gap:6px}
 /* Higher specificity than the single-class .player-card-dots rule above
    (which would otherwise win the cascade tie against .hidden, since it

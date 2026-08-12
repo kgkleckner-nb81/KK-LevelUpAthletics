@@ -919,6 +919,10 @@ function renderPlayerCardHero(){
     sampleImgs.forEach(img=>img.classList.toggle('hidden',!!url));
     if($('#playerCardDots')) $('#playerCardDots').classList.toggle('hidden',!!url);
     if($('#viewSampleAvatarsBtn')) $('#viewSampleAvatarsBtn').classList.toggle('hidden',!url);
+    // Nameplate only overlays the real generated photo — the rotating
+    // sample cards already have their own baked-in captions, so showing
+    // it there too would double up.
+    if($('#playerCardNameplate')) $('#playerCardNameplate').classList.toggle('hidden',!url);
   }
   [...performanceAxisOrder,'consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
