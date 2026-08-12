@@ -49,36 +49,31 @@ const FAL_QUEUE_BASE = 'https://queue.fal.run';
 
 // Locked prompt template — do not edit inline without re-testing against a
 // real photo first (see supabase/functions/generate-avatar-face/test.ts).
-// v3: added confident/determined/dynamic energy + striking, dramatic
-// lighting so the default render reads more like an athlete with
-// presence (comic-book cool) and less like a soft elementary-school
-// portrait — while staying age-appropriate; nothing here ages the kid up,
-// it's about expression and lighting, not maturity. v2: added a basic
+// v3 (confident/determined/dynamic comic-book energy) was tried and
+// rejected on real-photo review — reverted back to v2. v2: added a basic
 // "Rookie" uniform + cap so every default avatar starts dressed for the
 // part, before any Gear Locker cosmetics are equipped on top. "No
 // additional text/logos" (not a blanket "no text") deliberately carves
 // out room for the one intentional ROOKIE chest text.
 export const STYLIZED_BUST_PROMPT =
-  'Convert this photo into a 2D stylized illustrated bust portrait with ' +
-  'bold, dynamic comic-book energy, front-facing, neutral gradient ' +
-  'background, centered head and shoulders, wearing a simple gray and ' +
-  "navy baseball uniform with 'ROOKIE' across the chest and a plain navy " +
-  'baseball cap, confident and determined athletic expression, striking ' +
-  'dramatic lighting and polished shading, no additional text, no logos, ' +
-  'age-appropriate and safe style suitable for a youth sports platform.';
+  'Convert this photo into a 2D stylized illustrated bust portrait, ' +
+  'front-facing, neutral gradient background, centered head and shoulders, ' +
+  "wearing a simple gray and navy baseball uniform with 'ROOKIE' across " +
+  'the chest and a plain navy baseball cap, polished shading and lighting, ' +
+  'no additional text, no logos, age-appropriate and safe style suitable ' +
+  'for a youth sports platform.';
 
 // Experimental alternate — under evaluation, not locked. Same structural
 // constraints as the locked template (front-facing, neutral background,
-// centered head/shoulders, rookie uniform + cap, confident/determined
-// energy, no additional text/logos, age-appropriate), swapped toward a
-// photorealistic render instead of an illustrated one.
+// centered head/shoulders, rookie uniform + cap, no additional text/logos,
+// age-appropriate), swapped toward a photorealistic render instead of an
+// illustrated one.
 export const REALISTIC_BUST_PROMPT =
-  'Render this photo as a polished, photorealistic portrait with bold, ' +
-  'dynamic athletic energy, front-facing, neutral gradient background, ' +
-  'centered head and shoulders, wearing a simple gray and navy baseball ' +
-  "uniform with 'ROOKIE' across the chest and a plain navy baseball cap, " +
-  'confident and determined expression, striking dramatic studio ' +
-  'lighting, sports-trading-card photo quality, no additional text, no ' +
+  'Render this photo as a polished, photorealistic portrait, front-facing, ' +
+  'neutral gradient background, centered head and shoulders, wearing a ' +
+  "simple gray and navy baseball uniform with 'ROOKIE' across the chest " +
+  'and a plain navy baseball cap, natural studio lighting and soft ' +
+  'shading, sports-trading-card photo quality, no additional text, no ' +
   'logos, age-appropriate and safe style suitable for a youth sports ' +
   'platform.';
 
