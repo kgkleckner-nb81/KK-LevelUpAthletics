@@ -28,6 +28,17 @@ function parseArgs() {
   return { photoPath, athleteId, model };
 }
 
+// String.fromCharCode(...bytes) blows the call stack on multi-MB images
+// (spreading the whole array as function args) — encode in chunks instead.
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 function guessMimeType(path: string): string {
   const ext = path.toLowerCase().split('.').pop();
   if (ext === 'png') return 'image/png';
@@ -45,7 +56,7 @@ async function main() {
 
   console.log(`Reading ${photoPath}...`);
   const bytes = await Deno.readFile(photoPath);
-  const base64 = btoa(String.fromCharCode(...bytes));
+  const base64 = bytesToBase64(bytes);
   const dataUri = `data:${guessMimeType(photoPath)};base64,${base64}`;
 
   console.log(`Running createAvatarFaceLayer (model=${model}, athleteId=${athleteId})...`);
