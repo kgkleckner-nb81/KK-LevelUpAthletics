@@ -48,12 +48,25 @@ export class FalGenerationError extends Error {
 const FAL_QUEUE_BASE = 'https://queue.fal.run';
 
 // Locked prompt template — do not edit inline, this exact wording was
-// approved before any generation code was written.
+// approved before any generation code was written. This is still the
+// default everywhere; a promptOverride param exists on the functions below
+// purely for A/B testing alternate styles without touching this constant.
 export const STYLIZED_BUST_PROMPT =
   'Convert this photo into a 2D stylized illustrated bust portrait, ' +
   'front-facing, neutral gradient background, centered head and shoulders, ' +
   'polished shading and lighting, no text, no logos, age-appropriate and ' +
   'safe style suitable for a youth sports platform.';
+
+// Experimental alternate — under evaluation, not locked. Same structural
+// constraints as the locked template (front-facing, neutral background,
+// centered head/shoulders, no text/logos, age-appropriate), swapped toward
+// a photorealistic render instead of an illustrated one.
+export const REALISTIC_BUST_PROMPT =
+  'Render this photo as a polished, photorealistic portrait, front-facing, ' +
+  'neutral gradient background, centered head and shoulders, natural studio ' +
+  'lighting and soft shading, sports-trading-card photo quality, no text, ' +
+  'no logos, age-appropriate and safe style suitable for a youth sports ' +
+  'platform.';
 
 const EDIT_MODEL_ENDPOINTS: Record<EditModel, string> = {
   'flux-2-pro': 'fal-ai/flux-2-pro/edit',
@@ -177,14 +190,16 @@ export async function generateStylizedBust(
   athleteId: string,
   model: EditModel = 'flux-2-pro',
   falKey: string,
+  promptOverride?: string,
 ): Promise<{ imageUrl: string; metadata: GenerationMetadata }> {
   const seed = deriveDeterministicSeed(athleteId);
   const modelEndpoint = EDIT_MODEL_ENDPOINTS[model];
   const timestamp = new Date().toISOString();
+  const prompt = promptOverride ?? STYLIZED_BUST_PROMPT;
 
   if (model === 'flux-2-pro') {
     const result = await runFalJob<FluxEditResult>(modelEndpoint, {
-      prompt: STYLIZED_BUST_PROMPT,
+      prompt,
       image_urls: [selfieUrlOrDataUri],
       image_size: 'portrait_4_3',
       seed,
@@ -201,7 +216,7 @@ export async function generateStylizedBust(
   // image_size) and a different safety_tolerance scale (1-6, not 1-5) —
   // does not return seed in its response, so we report back the seed we sent.
   const result = await runFalJob<NanoBananaEditResult>(modelEndpoint, {
-    prompt: STYLIZED_BUST_PROMPT,
+    prompt,
     image_urls: [selfieUrlOrDataUri],
     aspect_ratio: '3:4',
     resolution: '1K',
@@ -259,11 +274,12 @@ export async function createAvatarFaceLayer(
   athleteId: string,
   model: EditModel = 'flux-2-pro',
   falKey: string = Deno.env.get('FAL_KEY') ?? '',
+  promptOverride?: string,
 ): Promise<AvatarFaceResult> {
   if (!falKey) throw new FalGenerationError('FAL_KEY is not set');
 
   const { imageUrl: bustUrl, metadata } = await withRetry(() =>
-    generateStylizedBust(selfieUrlOrDataUri, athleteId, model, falKey)
+    generateStylizedBust(selfieUrlOrDataUri, athleteId, model, falKey, promptOverride)
   );
   const cutoutUrl = await withRetry(() => removeBackground(bustUrl, falKey));
 

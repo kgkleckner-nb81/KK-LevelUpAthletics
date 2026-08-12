@@ -7,16 +7,20 @@
 // Usage:
 //   FAL_KEY=... deno run --allow-net --allow-env --allow-read --allow-write \
 //     supabase/functions/generate-avatar-face/test.ts \
-//     <path-to-selfie.jpg> <fake-athlete-id> [--model=flux-2-pro|nano-banana-2]
+//     <path-to-selfie.jpg> <fake-athlete-id> [--model=flux-2-pro|nano-banana-2] [--style=illustrated|realistic]
+//
+// --style=realistic uses the experimental REALISTIC_BUST_PROMPT (pipeline.ts)
+// instead of the locked STYLIZED_BUST_PROMPT — for A/B comparison only, does
+// not change what the shipped Edge Function uses by default.
 //
 // FAL_KEY is read from the environment (see ~/.zshrc) — never hardcode it.
 
-import { createAvatarFaceLayer, type EditModel } from './pipeline.ts';
+import { createAvatarFaceLayer, REALISTIC_BUST_PROMPT, type EditModel } from './pipeline.ts';
 
 function parseArgs() {
   const [photoPath, athleteId, ...rest] = Deno.args;
   if (!photoPath || !athleteId) {
-    console.error('Usage: test.ts <path-to-selfie.jpg> <fake-athlete-id> [--model=flux-2-pro|nano-banana-2]');
+    console.error('Usage: test.ts <path-to-selfie.jpg> <fake-athlete-id> [--model=flux-2-pro|nano-banana-2] [--style=illustrated|realistic]');
     Deno.exit(1);
   }
   const modelFlag = rest.find((a) => a.startsWith('--model='));
@@ -25,7 +29,13 @@ function parseArgs() {
     console.error(`Unknown --model value "${model}" — expected flux-2-pro or nano-banana-2`);
     Deno.exit(1);
   }
-  return { photoPath, athleteId, model };
+  const styleFlag = rest.find((a) => a.startsWith('--style='));
+  const style = styleFlag ? styleFlag.split('=')[1] : 'illustrated';
+  if (style !== 'illustrated' && style !== 'realistic') {
+    console.error(`Unknown --style value "${style}" — expected illustrated or realistic`);
+    Deno.exit(1);
+  }
+  return { photoPath, athleteId, model, style };
 }
 
 // String.fromCharCode(...bytes) blows the call stack on multi-MB images
@@ -47,7 +57,7 @@ function guessMimeType(path: string): string {
 }
 
 async function main() {
-  const { photoPath, athleteId, model } = parseArgs();
+  const { photoPath, athleteId, model, style } = parseArgs();
   const falKey = Deno.env.get('FAL_KEY');
   if (!falKey) {
     console.error('FAL_KEY is not set in this shell. See ~/.zshrc setup.');
@@ -59,10 +69,11 @@ async function main() {
   const base64 = bytesToBase64(bytes);
   const dataUri = `data:${guessMimeType(photoPath)};base64,${base64}`;
 
-  console.log(`Running createAvatarFaceLayer (model=${model}, athleteId=${athleteId})...`);
+  const promptOverride = style === 'realistic' ? REALISTIC_BUST_PROMPT : undefined;
+  console.log(`Running createAvatarFaceLayer (model=${model}, style=${style}, athleteId=${athleteId})...`);
   const started = performance.now();
 
-  const { imageUrl, metadata } = await createAvatarFaceLayer(dataUri, athleteId, model, falKey);
+  const { imageUrl, metadata } = await createAvatarFaceLayer(dataUri, athleteId, model, falKey, promptOverride);
 
   const elapsedSec = ((performance.now() - started) / 1000).toFixed(1);
   console.log(`Done in ${elapsedSec}s.`);
@@ -72,7 +83,7 @@ async function main() {
   console.log('Downloading result...');
   const res = await fetch(imageUrl);
   const outBytes = new Uint8Array(await res.arrayBuffer());
-  const outPath = `./avatar-test-output-${model}-${athleteId}.png`;
+  const outPath = `./avatar-test-output-${model}-${style}-${athleteId}.png`;
   await Deno.writeFile(outPath, outBytes);
   console.log(`Saved to ${outPath}`);
 }
