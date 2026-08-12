@@ -902,7 +902,12 @@ function ratingTierClass(v){
 function renderPlayerCardHero(){
   const name=state.athleteName||'Athlete';
   if($('#statusAthleteName')) $('#statusAthleteName').textContent=name.toUpperCase();
-  if($('#playerCardName')) $('#playerCardName').textContent=name;
+  const nickname=activeAthlete&&activeAthlete.nickname;
+  if($('#playerCardName')) $('#playerCardName').textContent=nickname||name;
+  if($('#playerCardRealName')){
+    $('#playerCardRealName').textContent=nickname?name:'';
+    $('#playerCardRealName').classList.toggle('hidden',!nickname);
+  }
   if($('#playerCardTeam')) $('#playerCardTeam').textContent=(athleteTeamMembership&&athleteTeamMembership.status==='approved'&&athleteTeamMembership.teams&&athleteTeamMembership.teams.name)||'Free Agent';
   if($('#playerCardAge')) $('#playerCardAge').textContent=(activeAthlete&&activeAthlete.age)||'—';
   if($('#playerCardHeroAvatar')){
@@ -1055,6 +1060,18 @@ document.addEventListener('click',e=>{
       if(idx>=0) currentAthletes[idx].age=age;
       renderPlayerCardHero();
     }).catch(err=>alert('Could not save age: '+(err.message||err)));
+  }
+  if(e.target.id==='playerCardName'){
+    if(!activeAthlete) return;
+    const val=prompt('Enter a nickname for the player card (leave blank to remove):',activeAthlete.nickname||'');
+    if(val===null) return;
+    const nickname=val.trim().slice(0,30)||null;
+    updateAthleteNickname(activeAthlete.id,nickname).then(()=>{
+      activeAthlete.nickname=nickname;
+      const idx=currentAthletes.findIndex(a=>a.id===activeAthlete.id);
+      if(idx>=0) currentAthletes[idx].nickname=nickname;
+      renderPlayerCardHero();
+    }).catch(err=>alert('Could not save nickname: '+(err.message||err)));
   }
 });
 

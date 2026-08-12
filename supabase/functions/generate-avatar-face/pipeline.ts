@@ -47,25 +47,32 @@ export class FalGenerationError extends Error {
 
 const FAL_QUEUE_BASE = 'https://queue.fal.run';
 
-// Locked prompt template — do not edit inline, this exact wording was
-// approved before any generation code was written. This is still the
-// default everywhere; a promptOverride param exists on the functions below
-// purely for A/B testing alternate styles without touching this constant.
+// Locked prompt template — do not edit inline without re-testing against a
+// real photo first (see supabase/functions/generate-avatar-face/test.ts).
+// v2: added a basic "Rookie" uniform + cap so every default avatar starts
+// dressed for the part, before any Gear Locker cosmetics are equipped on
+// top. "No additional text/logos" (not a blanket "no text") deliberately
+// carves out room for the one intentional ROOKIE chest text.
 export const STYLIZED_BUST_PROMPT =
   'Convert this photo into a 2D stylized illustrated bust portrait, ' +
   'front-facing, neutral gradient background, centered head and shoulders, ' +
-  'polished shading and lighting, no text, no logos, age-appropriate and ' +
-  'safe style suitable for a youth sports platform.';
+  "wearing a simple gray and navy baseball uniform with 'ROOKIE' across " +
+  'the chest and a plain navy baseball cap, polished shading and lighting, ' +
+  'no additional text, no logos, age-appropriate and safe style suitable ' +
+  'for a youth sports platform.';
 
 // Experimental alternate — under evaluation, not locked. Same structural
 // constraints as the locked template (front-facing, neutral background,
-// centered head/shoulders, no text/logos, age-appropriate), swapped toward
-// a photorealistic render instead of an illustrated one.
+// centered head/shoulders, rookie uniform + cap, no additional text/logos,
+// age-appropriate), swapped toward a photorealistic render instead of an
+// illustrated one.
 export const REALISTIC_BUST_PROMPT =
   'Render this photo as a polished, photorealistic portrait, front-facing, ' +
-  'neutral gradient background, centered head and shoulders, natural studio ' +
-  'lighting and soft shading, sports-trading-card photo quality, no text, ' +
-  'no logos, age-appropriate and safe style suitable for a youth sports ' +
+  'neutral gradient background, centered head and shoulders, wearing a ' +
+  "simple gray and navy baseball uniform with 'ROOKIE' across the chest " +
+  'and a plain navy baseball cap, natural studio lighting and soft ' +
+  'shading, sports-trading-card photo quality, no additional text, no ' +
+  'logos, age-appropriate and safe style suitable for a youth sports ' +
   'platform.';
 
 const EDIT_MODEL_ENDPOINTS: Record<EditModel, string> = {

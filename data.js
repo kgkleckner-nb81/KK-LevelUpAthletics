@@ -200,6 +200,12 @@ async function updateAthleteAge(athleteId,age){
   if(error) throw error;
 }
 
+// Frictionless, same as age — not a PIN-gated field.
+async function updateAthleteNickname(athleteId,nickname){
+  const {error}=await supabase.from('athletes').update({nickname:nickname||null}).eq('id',athleteId);
+  if(error) throw error;
+}
+
 // PIN-gated soft delete — see 0010_athlete_age_and_archive.sql.
 async function archiveAthleteRemote(athleteId,pin){
   const {error}=await supabase.rpc('archive_athlete',{p_athlete_id:athleteId,p_pin:pin});
