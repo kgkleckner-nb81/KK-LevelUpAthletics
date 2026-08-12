@@ -913,6 +913,7 @@ function renderPlayerCardHero(){
     heroImg.classList.toggle('hidden',!url);
     sampleImgs.forEach(img=>img.classList.toggle('hidden',!!url));
     if($('#playerCardDots')) $('#playerCardDots').classList.toggle('hidden',!!url);
+    if($('#viewSampleAvatarsBtn')) $('#viewSampleAvatarsBtn').classList.toggle('hidden',!url);
   }
   [...performanceAxisOrder,'consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
@@ -3244,6 +3245,8 @@ function initAuthUI(){
   };
   if($('#closeAddAthleteModal'))$('#closeAddAthleteModal').onclick=hideAddAthleteModal;
   if($('#closeBuildAvatarModal'))$('#closeBuildAvatarModal').onclick=hideBuildAvatarModal;
+  if($('#viewSampleAvatarsBtn'))$('#viewSampleAvatarsBtn').onclick=()=>$('#sampleAvatarsModal').classList.remove('hidden');
+  if($('#closeSampleAvatarsModal'))$('#closeSampleAvatarsModal').onclick=()=>$('#sampleAvatarsModal').classList.add('hidden');
   if($('#generateAvatarBtn'))$('#generateAvatarBtn').onclick=generateAvatarAction;
   if($('#saveAvatarBtn'))$('#saveAvatarBtn').onclick=saveAvatarAction;
   if($('#retryAvatarBtn'))$('#retryAvatarBtn').onclick=retryAvatarAction;
