@@ -1801,9 +1801,18 @@ async function buyGearItem(itemId){
     alert('Could not complete purchase: '+(err.message||'unknown error'));
     return;
   }
-  await refreshAthleteState();
-  alert(`${item.name} unlocked! -${item.xpCost} XP.`);
-  render();
+  // Purchasing unlocks the item into the closet — it does NOT equip it.
+  // Ask right away, while the athlete is still looking at what they just
+  // bought, instead of silently auto-equipping or leaving them to hunt for
+  // the separate Equip section below to notice anything changed.
+  if(confirm(`${item.name} unlocked! -${item.xpCost} XP.\n\nWear it on your Player Card now?`)){
+    try{
+      await equipGearItemRemote(activeAthlete.id,item.slot,itemId);
+    }catch(err){
+      alert('Unlocked, but could not equip it: '+(err.message||'unknown error'));
+    }
+  }
+  await refreshAthleteState(); // re-fetches inventory + equipped state, calls render()
 }
 async function equipGearItem(slot,itemId){
   if(!activeAthlete) return;
@@ -1840,8 +1849,10 @@ function renderGearLocker(){
       return `<div class="gear-slot-group"><h4>${gearSlotLabels[slot]}</h4><div class="reward-grid">${items.map(item=>{
         const owned=inv.includes(item.id);
         const afford=balance>=item.xpCost;
+        const art=gearItemArt[item.id];
         return `<div class="reward-tile ${owned?'unlocked':''}">
           <span class="reward-tier-badge tier-${item.tier.toLowerCase()}">${item.tier}</span>
+          ${art?`<img class="gear-tile-art" src="${art}" alt="${item.name}">`:''}
           <h3>${item.name}${item.tintable?' 🎨':''}</h3>
           <p><strong>${item.xpCost} XP</strong></p>
           ${owned?'<strong>Owned</strong>':`<button type="button" class="primary buy-gear-btn" data-item="${item.id}" ${afford?'':'disabled'}>${afford?'Buy':'Not enough XP'}</button>`}
