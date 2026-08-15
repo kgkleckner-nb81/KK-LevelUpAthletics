@@ -913,7 +913,7 @@ function renderPlayerCardHero(){
   if($('#playerCardHeroAvatar')){
     const url=activeAthlete&&activeAthlete.avatar_url;
     const heroImg=$('#playerCardHeroAvatar');
-    const sampleImgs=$('#playerCardSlot')?[...$('#playerCardSlot').querySelectorAll('img:not(#playerCardHeroAvatar)')]:[];
+    const sampleImgs=$('#playerCardSlot')?[...$('#playerCardSlot').querySelectorAll('img:not(#playerCardHeroAvatar):not(#playerCardGearOverlayFaceExtra)')]:[];
     heroImg.src=url||'';
     heroImg.classList.toggle('hidden',!url);
     sampleImgs.forEach(img=>img.classList.toggle('hidden',!!url));
@@ -923,6 +923,18 @@ function renderPlayerCardHero(){
     // sample cards already have their own baked-in captions, so showing
     // it there too would double up.
     if($('#playerCardNameplate')) $('#playerCardNameplate').classList.toggle('hidden',!url);
+    // Real gear art layered on top of the real photo — only for slots
+    // that have art (gearItemArt) and only once a real avatar exists.
+    // Respects the same skin-hides-faceExtra rule as the Gear Locker's
+    // own compositing preview.
+    if($('#playerCardGearOverlayFaceExtra')){
+      const equipped=state.equipped||defaultEquipped;
+      const skinActive=!!(equipped.skin&&equipped.skin!=='default');
+      const faceExtraArt=!skinActive&&gearItemArt[equipped.faceExtra];
+      const overlay=$('#playerCardGearOverlayFaceExtra');
+      overlay.src=(url&&faceExtraArt)||'';
+      overlay.classList.toggle('hidden',!(url&&faceExtraArt));
+    }
   }
   [...performanceAxisOrder,'consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
@@ -1564,6 +1576,13 @@ const lockerItems=[
   {id:'badge-the-show',name:'The Show',slot:'badge',xpCost:400,tier:'Legendary'}
 ];
 function findGearItem(id){return lockerItems.find(i=>i.id===id)}
+// Real illustrated art, keyed by gear item id — first entry replaces the
+// placeholder colored box for that item (in both renderAvatarComposite's
+// mini preview and the real Player Card avatar overlay below) without
+// touching the schema, catalog, or equip logic. Add more items here as
+// art gets produced; anything not listed still falls back to the
+// placeholder box.
+const gearItemArt={'face-mustache':'assets/gear/face-mustache.png'};
 const defaultEquipped={base:'default',jersey:'default',headwear:'default',hair:'default',faceExtra:'default',gear:'default',accessory:'default',border:'default',background:'default',skin:'default',badge:'default'};
 // Placeholder-art color palette per tier, used by the CSS-only compositing
 // renderer (renderAvatarComposite) until real illustrated art exists —
@@ -1593,6 +1612,7 @@ function renderAvatarComposite(containerEl){
     if(!itemId||itemId==='default') return '';
     const item=findGearItem(itemId);
     if(!item) return '';
+    if(gearItemArt[itemId]) return `<img class="avatar-layer avatar-layer-${slot} avatar-layer-art" src="${gearItemArt[itemId]}" alt="${item.name}" title="${item.name}">`;
     const color=item.tintable&&colors[slot]?colors[slot]:(gearTierColor[item.tier]||'#8a7f6a');
     return `<div class="avatar-layer avatar-layer-${slot}" style="--layer-color:${color}" title="${item.name}"><span>${item.name}</span></div>`;
   };
