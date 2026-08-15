@@ -862,6 +862,10 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .add-set-btn{margin-top:6px;font-size:12px;padding:6px 12px}
 .claim-reward-btn{margin-top:10px}
 .reward-tier-badge{position:absolute;left:12px;top:12px;font-family:var(--accent);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px;border-radius:999px;background:var(--ink);color:#fff}
+/* Real gear-item art thumbnail on a shop tile (see gearItemArt in app.js) —
+   shown above the name for any item with produced art; items without an
+   entry keep the plain text-only tile. */
+.gear-tile-art{width:64px;height:64px;object-fit:contain;margin:18px auto 4px;display:block}
 .reward-tier-badge.tier-common{background:#8a7f6a}
 .reward-tier-badge.tier-uncommon{background:var(--deep-blue)}
 .reward-tier-badge.tier-rare{background:var(--neon-pink)}

@@ -1801,8 +1801,20 @@ async function buyGearItem(itemId){
     alert('Could not complete purchase: '+(err.message||'unknown error'));
     return;
   }
-  await refreshAthleteState();
-  alert(`${item.name} unlocked! -${item.xpCost} XP.`);
+  // Auto-equip on first purchase for that slot so the item actually shows up
+  // on the Player Card right away — otherwise buying feels like nothing
+  // happened until the athlete finds the separate Equip section below.
+  // Never overrides a slot that already has something equipped.
+  const equipped=state.equipped||defaultEquipped;
+  let autoEquipped=false;
+  if(!equipped[item.slot]||equipped[item.slot]==='default'){
+    try{
+      await equipGearItemRemote(activeAthlete.id,item.slot,itemId);
+      autoEquipped=true;
+    }catch(err){/* purchase already succeeded; equip can still be done manually below */}
+  }
+  await refreshAthleteState(); // re-fetches equipped state too, already reflects the auto-equip above
+  alert(`${item.name} unlocked! -${item.xpCost} XP.${autoEquipped?' Equipped on your Player Card.':''}`);
   render();
 }
 async function equipGearItem(slot,itemId){
@@ -1840,8 +1852,10 @@ function renderGearLocker(){
       return `<div class="gear-slot-group"><h4>${gearSlotLabels[slot]}</h4><div class="reward-grid">${items.map(item=>{
         const owned=inv.includes(item.id);
         const afford=balance>=item.xpCost;
+        const art=gearItemArt[item.id];
         return `<div class="reward-tile ${owned?'unlocked':''}">
           <span class="reward-tier-badge tier-${item.tier.toLowerCase()}">${item.tier}</span>
+          ${art?`<img class="gear-tile-art" src="${art}" alt="${item.name}">`:''}
           <h3>${item.name}${item.tintable?' 🎨':''}</h3>
           <p><strong>${item.xpCost} XP</strong></p>
           ${owned?'<strong>Owned</strong>':`<button type="button" class="primary buy-gear-btn" data-item="${item.id}" ${afford?'':'disabled'}>${afford?'Buy':'Not enough XP'}</button>`}
