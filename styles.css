@@ -1033,6 +1033,10 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
   box-sizing:border-box;
 }
 .avatar-layer span{pointer-events:none}
+/* Real illustrated art (see gearItemArt in app.js) — overrides the
+   placeholder box's background/border-radius/label styling, keeps the
+   same position/size rule for whichever slot it's in. */
+.avatar-layer-art{background:transparent;object-fit:contain;padding:0}
 .avatar-layer-background{inset:0;border-radius:14px;font-size:11px;align-items:flex-end;padding-bottom:6px;opacity:.55}
 .avatar-layer-border{inset:6px;border-radius:10px;background:transparent!important;border:6px solid var(--layer-color,#8a7f6a);color:transparent}
 .avatar-layer-base{left:30%;right:30%;bottom:14%;top:52%;border-radius:14px 14px 6px 6px}
@@ -1104,6 +1108,20 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 /* Transparent-background generated avatar — contain (not cover) so the
    bust isn't cropped, shown at full opacity once populated with a src. */
 #playerCardHeroAvatar{object-fit:contain;opacity:1}
+/* Real gear art overlaid directly on the generated avatar photo (see
+   gearItemArt in app.js). Position is a fixed percentage of the card
+   frame, measured against how the locked prompt template frames avatars
+   (front-facing, centered head and shoulders) — not real face detection,
+   so it's an approximation that works well for that consistent framing
+   but won't perfectly track every generated photo. ID selector (not
+   .player-card-gear-overlay-* class) deliberately — needed to beat
+   .player-card-slot img's opacity:0/inset:0/width:100% defaults, which
+   an equal-or-lower-specificity class rule would lose to. */
+#playerCardGearOverlayFaceExtra{
+  left:50%;top:41.4%;width:22%;height:auto;
+  transform:translateX(-50%);
+  opacity:1;object-fit:contain;pointer-events:none;z-index:1;
+}
 /* Baseball-card style nameplate — an inset cream text box with its own
    border, matching the baked-in caption box on the sample cards (a
    rounded tan plate sitting just inside the card's outer border), not a
