@@ -1801,21 +1801,18 @@ async function buyGearItem(itemId){
     alert('Could not complete purchase: '+(err.message||'unknown error'));
     return;
   }
-  // Auto-equip on first purchase for that slot so the item actually shows up
-  // on the Player Card right away — otherwise buying feels like nothing
-  // happened until the athlete finds the separate Equip section below.
-  // Never overrides a slot that already has something equipped.
-  const equipped=state.equipped||defaultEquipped;
-  let autoEquipped=false;
-  if(!equipped[item.slot]||equipped[item.slot]==='default'){
+  // Purchasing unlocks the item into the closet — it does NOT equip it.
+  // Ask right away, while the athlete is still looking at what they just
+  // bought, instead of silently auto-equipping or leaving them to hunt for
+  // the separate Equip section below to notice anything changed.
+  if(confirm(`${item.name} unlocked! -${item.xpCost} XP.\n\nWear it on your Player Card now?`)){
     try{
       await equipGearItemRemote(activeAthlete.id,item.slot,itemId);
-      autoEquipped=true;
-    }catch(err){/* purchase already succeeded; equip can still be done manually below */}
+    }catch(err){
+      alert('Unlocked, but could not equip it: '+(err.message||'unknown error'));
+    }
   }
-  await refreshAthleteState(); // re-fetches equipped state too, already reflects the auto-equip above
-  alert(`${item.name} unlocked! -${item.xpCost} XP.${autoEquipped?' Equipped on your Player Card.':''}`);
-  render();
+  await refreshAthleteState(); // re-fetches inventory + equipped state, calls render()
 }
 async function equipGearItem(slot,itemId){
   if(!activeAthlete) return;
