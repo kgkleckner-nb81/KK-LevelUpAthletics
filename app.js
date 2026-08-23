@@ -1003,6 +1003,26 @@ function retryAvatarAction(){
   $('#avatarSelfieInput').value='';
   $('#buildAvatarStatus').textContent='';
 }
+// Feedback to Developer (Coach/Parent Corner) — write-only, see
+// 0021_developer_feedback.sql. pageContext is just the current screen id,
+// captured so a bug report carries some idea of where it happened.
+async function sendDeveloperFeedback(){
+  if(!currentProfile){alert('Sign in first.');return}
+  const input=$('#devFeedbackInput');
+  const message=(input.value||'').trim();
+  if(!message){$('#devFeedbackStatus').textContent='Write a message first.';return}
+  $('#sendDevFeedbackBtn').disabled=true;
+  try{
+    const pageContext=document.querySelector('.screen.active')?.id||null;
+    await submitDeveloperFeedback(currentProfile.id,activeAthlete&&activeAthlete.id,message,pageContext);
+    input.value='';
+    $('#devFeedbackStatus').textContent='Thanks — sent to the developer!';
+  }catch(err){
+    $('#devFeedbackStatus').textContent='Could not send feedback: '+(err.message||'unknown error');
+  }finally{
+    $('#sendDevFeedbackBtn').disabled=false;
+  }
+}
 // One-time setup (not called from render()) — the rotation is decorative
 // sample content, independent of app state, so it shouldn't be torn down
 // and rebuilt on every re-render. Respects prefers-reduced-motion by
@@ -3379,6 +3399,7 @@ function initAuthUI(){
     await selectAthlete(e.target.value);
   };
   if($('#openHomeScreenSetupBtn'))$('#openHomeScreenSetupBtn').onclick=showHomeScreenModal;
+  if($('#sendDevFeedbackBtn'))$('#sendDevFeedbackBtn').onclick=sendDeveloperFeedback;
   if($('#closeHomeScreenModal'))$('#closeHomeScreenModal').onclick=()=>{
     localStorage.setItem(HOME_SCREEN_DISMISS_KEY,'1');
     hideHomeScreenModal();

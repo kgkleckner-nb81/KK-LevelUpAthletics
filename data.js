@@ -631,3 +631,11 @@ async function optInTeamProgramRemote(teamProgramId,athleteId){
     .insert({team_program_id:teamProgramId,athlete_id:athleteId});
   if(error) throw error;
 }
+
+// Write-only (0021_developer_feedback.sql) — no select policy exists, so
+// this never reads anything back beyond the insert error/success itself.
+async function submitDeveloperFeedback(profileId,athleteId,message,pageContext){
+  const {error}=await supabase.from('developer_feedback')
+    .insert({profile_id:profileId,athlete_id:athleteId||null,message,page_context:pageContext||null});
+  if(error) throw error;
+}
