@@ -1181,9 +1181,9 @@ const goalChipDefs=[
 
 // ---- Skills Lab activity catalog ----
 // Each activity: {id, name, category, sportTags, ageBand, media, metric}
-// media.video.plannedUrl is reserved for a future pass — no component in this
-// build ever reads it. See renderActivityDetail(): the Demo Video section is
-// always the "coming soon" placeholder, regardless of this field's value.
+// media.video.plannedUrl, when set (via a sampleMedia entry's videoUrl), is
+// rendered as a real <video> by renderActivityDetail() — see that function.
+// Still null/"coming soon" for every activity without one.
 //
 // Round 3: every activity tracks exactly one metric — reps, time, or distance
 // (no RPE/effort, no weight) — because Daily Check-In now logs a list of sets
@@ -1316,7 +1316,7 @@ const sampleMedia={
   'Drop Lunges':{instructionText:'Step one leg back and slightly behind you, drop that back knee toward the ground, then push back up to standing. Alternate legs each rep.',formCues:[],commonFaults:['Don’t let your front knee cave inward or shoot way past your toes.']},
   'Pull-Ups':{instructionText:'Grab the bar just outside shoulder-width, hang with arms fully straight, then pull your chin over the bar leading with your chest. Lower back down under control — don’t just drop.',formCues:[],commonFaults:['Don’t kip or swing wildly to "cheat" a rep up — that yanks on your shoulders. Full arm extension at the bottom, every rep.']},
   'Dead Hang':{instructionText:'Grab the bar with a firm grip, feet off the ground, shoulders relaxed but engaged, and just hang there and breathe.',formCues:[],commonFaults:['Don’t hang until your grip suddenly gives out and you drop wrong — hop off and reset the second your hands start slipping.']},
-  'Plank':{instructionText:'Forearms and toes on the ground, body in one straight line, core braced tight, eyes down at the floor.',formCues:[],commonFaults:['Don’t let your hips sag toward the floor or pike up toward the ceiling.']},
+  'Plank':{instructionText:'Forearms and toes on the ground, body in one straight line, core braced tight, eyes down at the floor.',formCues:[],commonFaults:['Don’t let your hips sag toward the floor or pike up toward the ceiling.'],videoUrl:'assets/videos/plank-demo.mov'},
   'Side Plank':{instructionText:'Lie on your side, prop up on one forearm stacked right under your shoulder, lift your hips so your body forms a straight line. Stack your feet on top of each other.',formCues:[],commonFaults:['Don’t let your hips drop or rotate forward — keep everything stacked and square.']},
   'Hollow Hold':{instructionText:'Lie on your back, press your lower back flat into the floor, and lift your shoulders and legs slightly off the ground, arms reaching overhead. Hold that "banana" shape and breathe steady.',formCues:[],commonFaults:['Don’t let your lower back arch up off the floor — that means your legs are too low, so raise them a bit until your back stays flat.']},
   'Dead Bugs':{instructionText:'Lie on your back, arms reaching straight up, knees bent at 90°. Slowly lower one arm and the opposite leg toward the floor while keeping your lower back flat, then switch sides.',formCues:[],commonFaults:['Don’t let your lower back lift off the floor as you lower — that means you’re going too low too soon. Only go as far as you can control.']},
@@ -1365,7 +1365,7 @@ const activities=categoryOrder.flatMap(cat=>activityDefs[cat].map(([name,metricF
     category:cat,
     sportTags:['multi-sport'],
     ageBand:'all',
-    media:m?{instructionText:m.instructionText,formCues:m.formCues||[],commonFaults:m.commonFaults||[],video:{plannedUrl:null}}:emptyMedia(),
+    media:m?{instructionText:m.instructionText,formCues:m.formCues||[],commonFaults:m.commonFaults||[],video:{plannedUrl:m.videoUrl||null}}:emptyMedia(),
     metric:metricFn(),
     attributes:attrs||null
   };
@@ -2092,7 +2092,9 @@ function renderActivityDetail(name){
   const perform=media.instructionText
     ?`<p>${media.instructionText}</p>${media.formCues&&media.formCues.length?`<h4>Form Cues</h4><ul>${media.formCues.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}${media.commonFaults&&media.commonFaults.length?`<h4>Watch For</h4><ul class="fault-list">${media.commonFaults.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}`
     :`<div class="placeholder-card">Written instructions coming soon</div>`;
-  const video=`<div class="video-placeholder"><span class="play-glyph">▶</span><p>Demo video coming soon</p></div>`;
+  const video=media.video&&media.video.plannedUrl
+    ?`<div class="demo-video-frame"><video class="demo-video" src="${media.video.plannedUrl}" controls playsinline preload="metadata"></video><img class="demo-video-watermark" src="assets/brand-logo-transparent.png" alt="Level Up Athletics"></div>`
+    :`<div class="video-placeholder"><span class="play-glyph">▶</span><p>Demo video coming soon</p></div>`;
   const legend=`<div class="metric-legend-item"><strong>${a.metric.label}</strong><span>${a.metric.unit||'—'}</span></div>`;
   const draft=state.draftProgram;
   const inDraft=!!(draft&&draft.activityIds.includes(a.id));
