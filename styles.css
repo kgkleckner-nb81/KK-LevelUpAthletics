@@ -823,6 +823,9 @@ footer{
 .placeholder-card{background:var(--cream);border:2px dashed var(--ink);border-radius:14px;padding:16px;text-align:center;color:var(--muted);font-family:var(--accent);font-weight:600}
 .video-placeholder{background:var(--ink);color:#fff;border-radius:16px;padding:36px 16px;text-align:center;border:2px solid var(--ink)}
 .video-placeholder p{margin:0;font-family:var(--accent);font-weight:600}
+.demo-video-frame{position:relative;line-height:0}
+.demo-video{display:block;width:100%;max-height:70vh;border-radius:16px;border:2px solid var(--ink);background:#000}
+.demo-video-watermark{position:absolute;top:14px;right:14px;width:64px;height:auto;pointer-events:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55))}
 .play-glyph{display:grid;place-items:center;width:56px;height:56px;border-radius:50%;background:var(--neon-blue);color:var(--ink);font-size:20px;margin:0 auto 12px}
 .metric-legend{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
 .metric-legend-item{background:var(--cream);border:2px solid var(--ink);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;font-family:var(--accent);font-weight:600;font-size:13px}
