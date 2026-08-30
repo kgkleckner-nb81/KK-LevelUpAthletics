@@ -592,6 +592,34 @@ async function loadAllTeamXpTotalsRanked(){
   return data||[];
 }
 
+// ---------------- Team Streak & Team Challenge ----------------
+// get_team_active_dates returns `setof date` (a scalar set, not rows of a
+// composite type) — PostgREST hands supabase-js a plain array of
+// 'YYYY-MM-DD' strings for a scalar-returning function, but the .map
+// below tolerates the {get_team_active_dates: '...'} object shape too in
+// case that assumption doesn't hold against the live project.
+async function loadTeamActiveDates(teamId){
+  const {data,error}=await supabase.rpc('get_team_active_dates',{p_team_id:teamId});
+  if(error) throw error;
+  return (data||[]).map(v=>typeof v==='string'?v:Object.values(v)[0]);
+}
+
+async function loadTeamChallenge(teamId){
+  const {data,error}=await supabase.rpc('get_or_create_active_team_challenge',{p_team_id:teamId});
+  if(error) throw error;
+  return (data&&data[0])||null;
+}
+
+async function saveTeamChallengeRemote(teamId,title,targetXp,eligibleSources,durationDays,rewardType,rewardGearItemId,rewardDescription,pin){
+  const {data,error}=await supabase.rpc('set_team_coach_challenge',{
+    p_team_id:teamId,p_title:title,p_target_xp:targetXp,p_eligible_sources:eligibleSources,
+    p_duration_days:durationDays,p_reward_type:rewardType,p_reward_gear_item_id:rewardGearItemId,
+    p_reward_description:rewardDescription,p_pin:pin
+  });
+  if(error) throw error;
+  return (data&&data[0])||null;
+}
+
 // ---------------- Team Program (Phase C) ----------------
 // Mirrors the old single-object-per-team model (state.teamProgram): one row
 // per team, overwritten wholesale on each save rather than versioned.
