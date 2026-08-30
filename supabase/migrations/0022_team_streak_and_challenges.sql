@@ -199,7 +199,18 @@ begin
       now() + (v_duration || ' days')::interval, 'active',
       'custom', 'Bragging rights for the whole team!'
     )
-    on conflict (team_id) where status = 'active' do nothing;
+    -- team_challenges.status (not bare "status") deliberately — this
+    -- function's RETURNS TABLE has an OUT parameter literally named
+    -- "status", and a bare column reference in this WHERE predicate is
+    -- a plain expression plpgsql scans for variable substitution against,
+    -- which collides with it ("column reference "status" is ambiguous" —
+    -- confirmed live, exact same bug class as 0007's athletes.id fix).
+    -- Note this predicate must match team_challenges_active_team_idx's
+    -- definition (0022, above) verbatim for the index to be inferred as
+    -- the ON CONFLICT arbiter — ON CONFLICT ON CONSTRAINT is not an
+    -- option here since that clause requires an actual named constraint
+    -- (ALTER TABLE ... ADD CONSTRAINT), not a plain CREATE UNIQUE INDEX.
+    on conflict (team_id) where team_challenges.status = 'active' do nothing;
 
     select tc.* into v_row from team_challenges as tc
       where tc.team_id = p_team_id
