@@ -2232,6 +2232,35 @@ document.addEventListener('click',e=>{
 // person can be both a parent and a coach at once, and those are different
 // identities in the data model.
 let athleteTeamMembership=null, currentTeamXpTotals=null, currentTeamRank=null, currentTeamRankTotal=null, currentTeamRoster=[];
+// Team Streak & Team Challenge — see 0022_team_streak_and_challenges.sql.
+// currentTeamActiveDates is bare dates only (no athlete identity), fed
+// into teamStreak() below the same way personal streak() walks
+// state.daily. CHALLENGE_CATEGORIES maps the coach-facing broad category
+// checkboxes to the real xp_ledger.source values that count toward a
+// challenge's target — 'mission' (Daily Mission XP) is folded into
+// Workouts since it's physical training, same spirit as a check-in.
+let currentTeamActiveDates=[], currentTeamStreak=0, currentTeamChallenge=null;
+const CHALLENGE_CATEGORIES={
+  'Workouts':['daily_check_in','team_program_bonus','mission'],
+  'Arcade':['arcade_game','spin'],
+  'Quests & Battles':['quest','bonus'],
+  'Combine Testing':['combine_verified']
+};
+// Mirrors personal streak() exactly (app.js, walks state.daily backward
+// day-by-day) — only the input source differs: a team-wide Set<date> from
+// get_team_active_dates() instead of one athlete's own check-in dates.
+function teamStreak(dates){
+  const set=new Set(dates||[]);
+  if(!set.size) return 0;
+  let s=0,d=new Date();
+  for(let i=0;i<365;i++){
+    const iso=d.toISOString().slice(0,10);
+    if(set.has(iso)){s++;d.setDate(d.getDate()-1)}
+    else if(i===0)d.setDate(d.getDate()-1);
+    else break;
+  }
+  return s;
+}
 function generateTeamJoinCode(){
   return Math.random().toString(36).slice(2,8).toUpperCase();
 }
@@ -2278,6 +2307,37 @@ function renderTeamIdentity(){
   const weekMs=7*24*60*60*1000, now=Date.now();
   const activeThisWeek=approvedRoster.filter(r=>r.last_workout_date&&(now-new Date(r.last_workout_date).getTime())<=weekMs).length;
   if($('#teamStatCompletion')) $('#teamStatCompletion').textContent=(approvedRoster.length?Math.round(activeThisWeek/approvedRoster.length*100):0)+'%';
+  if($('#teamStatStreak')) $('#teamStatStreak').textContent=currentTeamStreak||0;
+}
+// Active Team Challenge card — separate from renderTeamIdentity() so a
+// challenge-only repaint (e.g. after the coach saves a new one) doesn't
+// have to re-run the whole team-identity paint. Hidden entirely if the
+// athlete isn't on an approved team, or the team currently has no
+// occupying challenge row (shouldn't normally happen since
+// get_or_create_active_team_challenge always creates a system one, but
+// defensive against a failed/timed-out fetch leaving currentTeamChallenge
+// null).
+function renderTeamChallenge(){
+  const card=$('#teamChallengeCard');
+  if(!card) return;
+  const approved=!!(athleteTeamMembership&&athleteTeamMembership.status==='approved');
+  card.classList.toggle('hidden',!approved||!currentTeamChallenge);
+  if(!approved||!currentTeamChallenge) return;
+  const c=currentTeamChallenge;
+  if($('#teamChallengeKind')) $('#teamChallengeKind').textContent=c.kind==='coach'?'Coach Challenge':'Team Challenge';
+  if($('#teamChallengeTitle')) $('#teamChallengeTitle').textContent=c.title;
+  const pct=Math.max(0,Math.min(100,Math.round((c.progress_xp/c.target_xp)*100)));
+  if($('#teamChallengeMeterFill')) $('#teamChallengeMeterFill').style.width=pct+'%';
+  if($('#teamChallengeMeterText')) $('#teamChallengeMeterText').textContent=
+    c.status==='completed'
+      ?`Complete! ${c.progress_xp} / ${c.target_xp} XP.`
+      :`${c.progress_xp} / ${c.target_xp} XP · ends ${new Date(c.ends_at).toLocaleDateString()}`;
+  const gearName=c.reward_type==='gear'?(findGearItem(c.reward_gear_item_id)?.name||c.reward_gear_item_id):null;
+  if($('#teamChallengeReward')) $('#teamChallengeReward').textContent=
+    c.reward_type==='gear'
+      ?`Reward: ${gearName} — auto-granted to the whole roster on completion!`
+      :`Reward: ${c.reward_description}`;
+  card.classList.toggle('challenge-complete',c.status==='completed');
 }
 // Async: fetches the active athlete's membership + (if approved) roster/
 // totals/rank, caches them, then repaints. Called on athlete select and
@@ -2302,23 +2362,30 @@ async function refreshTeamMembershipUI(){
     const approved=athleteTeamMembership&&athleteTeamMembership.status==='approved';
     if(approved){
       const teamId=athleteTeamMembership.teams.id;
-      const [totals,ranked,roster]=await withTimeout(Promise.all([
-        loadTeamXpTotals(teamId), loadAllTeamXpTotalsRanked(), loadTeamRoster(teamId)
+      const [totals,ranked,roster,activeDates,challenge]=await withTimeout(Promise.all([
+        loadTeamXpTotals(teamId), loadAllTeamXpTotalsRanked(), loadTeamRoster(teamId),
+        loadTeamActiveDates(teamId), loadTeamChallenge(teamId)
       ]),10000,'Loading team stats');
       currentTeamXpTotals=totals;
       currentTeamRoster=roster;
       const rankIndex=ranked.findIndex(t=>t.team_id===teamId);
       currentTeamRank=rankIndex>=0?rankIndex+1:null;
       currentTeamRankTotal=ranked.length;
+      currentTeamActiveDates=activeDates;
+      currentTeamStreak=teamStreak(activeDates);
+      currentTeamChallenge=challenge;
     }else{
       currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
+      currentTeamActiveDates=[]; currentTeamStreak=0; currentTeamChallenge=null;
     }
   }catch(err){
     currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
+    currentTeamActiveDates=[]; currentTeamStreak=0; currentTeamChallenge=null;
     if(statusEl) statusEl.textContent='Could not load team stats: '+(err&&err.message?err.message:String(err));
   }
   renderTeamIdentity();
   renderLeaderboard();
+  renderTeamChallenge();
   await refreshTeamProgramForAthlete();
 }
 async function joinTeamIdentity(){
@@ -2558,6 +2625,56 @@ async function saveTeamProgram(){
   }
   if($('#teamProgramStatus')) $('#teamProgramStatus').textContent=`Saved "${title}" with ${chosen.length} activities.`;
   if(activeAthlete&&athleteTeamMembership?.teams?.id===coachTeam.id) await refreshTeamProgramForAthlete();
+}
+// Team Challenge — Coach Tools ("Set a Team Challenge"). Populates the
+// gear-reward <select> once from the existing static lockerItems catalog
+// (same source findGearItem already reads — no new catalog introduced)
+// and toggles the gear-vs-custom-prize fields based on the reward-type
+// radio.
+function renderTeamChallengeRewardGearOptions(){
+  const sel=$('#teamChallengeRewardGearSelect');
+  if(!sel || sel.options.length) return;
+  sel.innerHTML=lockerItems.map(i=>`<option value="${i.id}">${i.name} (${i.tier})</option>`).join('');
+}
+function toggleTeamChallengeRewardFields(){
+  const gearChecked=$('input[name=teamChallengeRewardType][value=gear]').checked;
+  if($('#teamChallengeRewardGearWrap')) $('#teamChallengeRewardGearWrap').classList.toggle('hidden',!gearChecked);
+  if($('#teamChallengeRewardTextWrap')) $('#teamChallengeRewardTextWrap').classList.toggle('hidden',gearChecked);
+}
+// Sets (replaces) the team's active challenge — same PIN-modal-then-
+// verify-then-RPC shape as saveTeamProgram() above.
+async function saveTeamChallenge(){
+  if(!coachTeam){alert('Set up your team first.');return}
+  const title=$('#teamChallengeTitleInput').value.trim();
+  if(!title){alert('Enter a challenge title.');return}
+  const targetXp=parseInt($('#teamChallengeTargetInput').value,10);
+  if(!targetXp||targetXp<=0){alert('Enter a target XP greater than 0.');return}
+  const durationDays=parseInt($('#teamChallengeDurationSelect').value,10);
+  const eligibleSources=[...$$('#teamChallengeCategories input[type=checkbox]:checked')]
+    .flatMap(cb=>CHALLENGE_CATEGORIES[cb.value]||[]);
+  if(!eligibleSources.length){alert('Pick at least one activity category.');return}
+  const rewardType=$('input[name=teamChallengeRewardType]:checked')?.value;
+  let rewardGearItemId=null, rewardDescription=null;
+  if(rewardType==='gear'){
+    rewardGearItemId=$('#teamChallengeRewardGearSelect').value;
+    if(!rewardGearItemId){alert('Pick a gear reward.');return}
+  }else{
+    rewardDescription=($('#teamChallengeRewardTextInput')?.value||'').trim();
+    if(!rewardDescription){alert('Describe the real-world reward.');return}
+  }
+  const pin=await showPinModal('set this team challenge');
+  if(!pin) return;
+  let pinOk=false;
+  try{ pinOk=await verifyApprovalPinRemote(pin); }catch(err){ /* treat as failed */ }
+  if(!pinOk){alert('Incorrect PIN.');return}
+  try{
+    await saveTeamChallengeRemote(coachTeam.id,title,targetXp,eligibleSources,durationDays,rewardType,rewardGearItemId,rewardDescription,pin);
+  }catch(err){
+    alert('Could not set team challenge: '+(err.message||'unknown error'));
+    return;
+  }
+  if($('#teamChallengeSetupStatus')) $('#teamChallengeSetupStatus').textContent=`Saved "${title}". It replaces any previous active challenge.`;
+  if(activeAthlete&&athleteTeamMembership?.teams?.id===coachTeam.id) await refreshTeamMembershipUI();
 }
 // Joining is one-way — there's no leave action from the athlete's side.
 async function joinTeamProgram(){
@@ -3024,7 +3141,7 @@ document.addEventListener('click',e=>{
 });
 
 seedPresetPrograms();
-renderLadder();renderHeroLadderPreview();
+renderLadder();renderHeroLadderPreview();renderTeamChallengeRewardGearOptions();
 window.addEventListener('resize',renderCharts);render();renderTeamEdition();
 
 
@@ -3035,6 +3152,8 @@ if($('#libraryCategory'))$('#libraryCategory').onchange=renderExerciseLibrary;
 if($('#goalChips'))$('#goalChips').onclick=e=>{const btn=e.target.closest('.goal-chip');if(!btn)return;$('#libraryCategory').value=btn.dataset.category;renderExerciseLibrary()};
 if($('#addShoutout'))$('#addShoutout').onclick=addShoutout;
 if($('#saveTeamProgram'))$('#saveTeamProgram').onclick=saveTeamProgram;
+if($('#saveTeamChallenge'))$('#saveTeamChallenge').onclick=saveTeamChallenge;
+$$('input[name=teamChallengeRewardType]').forEach(r=>r.onchange=toggleTeamChallengeRewardFields);
 if($('#saveTeamSetup'))$('#saveTeamSetup').onclick=saveTeamSetup;
 if($('#coachTeamSwitcher'))$('#coachTeamSwitcher').onchange=e=>switchCoachTeam(e.target.value);
 if($('#joinTeamIdentityBtn'))$('#joinTeamIdentityBtn').onclick=joinTeamIdentity;

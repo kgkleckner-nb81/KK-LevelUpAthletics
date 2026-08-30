@@ -360,8 +360,15 @@
 
 <section id="team" class="screen">
 <div class="card team-hero hidden" id="teamHeroCard"><div><p class="eyebrow dark">Team HQ</p><h2 id="teamHeroName">Your Team</h2><p id="teamHeroMeta" class="muted"></p><button class="danger" id="leaveTeamBtn" type="button">Leave Team</button></div><div id="teamHeroLogo"></div></div>
-<div class="grid stats hidden" id="teamStatsGrid"><div class="stat"><span>Team XP</span><strong id="teamStatXP">—</strong><small>points</small></div><div class="stat"><span>Weekly Completion</span><strong id="teamStatCompletion">—</strong><small>team</small></div><div class="stat"><span>Roster Size</span><strong id="teamStatRoster">—</strong><small>athletes</small></div><div class="stat"><span>Team Rank</span><strong id="teamStatRank">—</strong><small id="teamStatRankOf"></small></div></div>
+<div class="grid stats hidden" id="teamStatsGrid"><div class="stat"><span>Team XP</span><strong id="teamStatXP">—</strong><small>points</small></div><div class="stat"><span>Weekly Completion</span><strong id="teamStatCompletion">—</strong><small>team</small></div><div class="stat"><span>Roster Size</span><strong id="teamStatRoster">—</strong><small>athletes</small></div><div class="stat"><span>Team Rank</span><strong id="teamStatRank">—</strong><small id="teamStatRankOf"></small></div><div class="stat"><span>Team Streak</span><strong id="teamStatStreak">—</strong><small>days</small></div></div>
 <p id="teamStatsStatus" class="muted"></p>
+<div class="card hidden" id="teamChallengeCard">
+  <p class="eyebrow dark" id="teamChallengeKind">Team Challenge</p>
+  <h2 id="teamChallengeTitle">—</h2>
+  <div class="meter large"><div id="teamChallengeMeterFill" style="width:0%"></div></div>
+  <p id="teamChallengeMeterText" class="muted"></p>
+  <p id="teamChallengeReward" class="muted"></p>
+</div>
 <div class="grid two hidden" id="teamBoardsGrid"><div class="card"><h2>Team Leaderboards</h2><label>Sort by<select id="leaderboardMetric"><option value="xp">Total XP</option><option value="workouts">Workouts Logged</option></select></label><div id="teamLeaderboard"></div></div><div class="card"><h2>Team Feed</h2><div id="teamFeed"></div></div></div>
 <div class="card">
   <h2>Team Shout-Outs</h2>
@@ -498,6 +505,37 @@
       <button id="saveTeamProgram" class="primary wide" type="button">Save Team Program</button>
     </div>
     <p id="teamProgramStatus" class="muted"></p>
+  </div>
+  <div class="card" data-coach-only>
+    <p class="eyebrow dark">Coach Tools</p>
+    <h2>Set a Team Challenge</h2>
+    <p class="muted">Setting a new challenge replaces whatever's currently active for your team.</p>
+    <div class="form-grid">
+      <label class="wide">Challenge title<input id="teamChallengeTitleInput" type="text" placeholder="e.g. August XP Blitz"></label>
+      <label>Target XP<input id="teamChallengeTargetInput" type="number" min="1" step="1" placeholder="e.g. 1000"></label>
+      <label>Duration<select id="teamChallengeDurationSelect">
+        <option value="3">3 days</option>
+        <option value="7" selected>7 days</option>
+        <option value="14">14 days</option>
+        <option value="30">30 days</option>
+      </select></label>
+      <div class="wide" id="teamChallengeCategories">
+        <label>Counts toward the target</label>
+        <label class="checkbox-row"><input type="checkbox" value="Workouts" checked>Workouts</label>
+        <label class="checkbox-row"><input type="checkbox" value="Arcade">Arcade</label>
+        <label class="checkbox-row"><input type="checkbox" value="Quests & Battles">Quests &amp; Battles</label>
+        <label class="checkbox-row"><input type="checkbox" value="Combine Testing">Combine Testing</label>
+      </div>
+      <div class="wide">
+        <label>Reward</label>
+        <label class="checkbox-row"><input type="radio" name="teamChallengeRewardType" value="gear" checked>Gear item (free unlock for the whole roster)</label>
+        <label class="checkbox-row"><input type="radio" name="teamChallengeRewardType" value="custom">Real-world prize (you fulfill it)</label>
+      </div>
+      <label class="wide" id="teamChallengeRewardGearWrap">Gear reward<select id="teamChallengeRewardGearSelect"></select></label>
+      <label class="wide hidden" id="teamChallengeRewardTextWrap">Prize description<input id="teamChallengeRewardTextInput" type="text" placeholder="e.g. Pizza party"></label>
+      <button id="saveTeamChallenge" class="primary wide" type="button">Save Team Challenge</button>
+    </div>
+    <p id="teamChallengeSetupStatus" class="muted"></p>
   </div>
   <div class="card">
     <h2>Local Device Settings</h2>
