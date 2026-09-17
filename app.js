@@ -139,10 +139,11 @@ function enterMode(mode){
   if(mode==='athlete') switchScreen('clubhouse');
   if(mode==='team') switchScreen('team');
   if(mode==='arcade'){
-    // Round 8: each arcade game's per-session difficulty ramp (Home Run
-    // Hero's pitch speed, Web Gem's delay/size, Clutch Catch's in-progress
-    // round) resets on a fresh visit to Arcade, not on every re-render.
-    resetHomerSession();resetWebGemSession();resetClutchSession();
+    // Round 8: each arcade game's per-session difficulty ramp (Web Gem's
+    // delay/size, Clutch Catch's in-progress round) resets on a fresh
+    // visit to Arcade, not on every re-render. Home Run Hero's own
+    // difficulty/session state lives entirely inside its iframe now (v2).
+    resetWebGemSession();resetClutchSession();
     switchScreen('arcade');
   }
   if(mode==='parent') switchScreen('parent');
@@ -2959,58 +2960,32 @@ async function endClutchGame(){
   $('#clutchResult').innerHTML=`Final score: <strong>${clutchScore}</strong> · ${xpText}${res.isNewBest?' · New Best! 🎉':''}`;
 }
 let strikeTarget=0,strikeRound=0,strikeScore=0;function startStrikeGame(){strikeRound=1;strikeScore=0;nextStrike()}function nextStrike(){strikeTarget=1+Math.floor(Math.random()*9);const names={1:'High & Inside',2:'High Center',3:'High & Away',4:'Middle Inside',5:'Middle',6:'Middle Away',7:'Low & Inside',8:'Low Center',9:'Low & Away'};$('#strikePrompt').textContent=`Round ${strikeRound}/5: ${names[strikeTarget]}`}async function chooseStrike(z){if(!strikeRound)return;if(z===strikeTarget){strikeScore+=100;$('#strikeResult').textContent='Correct! +100'}else $('#strikeResult').textContent='Missed. Keep learning the zone.';strikeRound++;if(strikeRound>5){state.gameScores=state.gameScores||{};state.gameScores.strike=Math.max(state.gameScores.strike||0,strikeScore);const finalScore=strikeScore;strikeRound=0;save();const e=await awardArcadeXp('strikeZone',10);const xpText=e===null?'Could not save XP — try again.':`+${e} XP`;$('#strikePrompt').textContent=`Final Score: ${finalScore} · ${xpText}`}else nextStrike()}
-// ---- Home Run Hero (Round 8 glow-up of the old Home Run Timing) ----
-// Contact-quality tiers by distance from the hit-zone center (76%, matching
-// .hit-zone's left:70%/width:12%), instead of a flat hit/miss. Ball travel
-// time shortens each successful swing within a session (reset on Arcade
-// entry via resetHomerSession) for a starts-easy-gets-harder curve.
-const HOMER_START_SPEED=1800,HOMER_SPEED_FLOOR=900,HOMER_SPEED_STEP=70;
-let homerAnimation=null,homerStart=0,homerActive=false,homerPitchSpeed=HOMER_START_SPEED;
-function resetHomerSession(){homerPitchSpeed=HOMER_START_SPEED}
-function homerContactTier(left){
-  const dist=Math.abs(left-76);
-  if(dist<=3) return{tier:'perfect',label:'PERFECT!',points:125};
-  if(dist<=8) return{tier:'good',label:'Good contact!',points:75};
-  if(dist<=18) return{tier:left<76?'early':'late',label:left<76?'Too early':'Too late',points:40};
-  if(dist<=30) return{tier:left<76?'veryEarly':'veryLate',label:left<76?'Way too early':'Way too late',points:10};
-  return{tier:'miss',label:'Miss!',points:0};
-}
-const HOMER_XP_BY_TIER={perfect:12,good:8,early:5,late:5,veryEarly:2,veryLate:2,miss:0};
-function startHomerGame(){
-  const ball=$('#timingBall');
-  cancelAnimationFrame(homerAnimation);
-  homerStart=performance.now();
-  homerActive=true;
-  $('#homerResult').textContent='';
-  const speed=homerPitchSpeed;
-  function move(t){
-    const pct=Math.min(100,((t-homerStart)/speed)*100);
-    ball.style.left=pct+'%';
-    if(pct<100&&homerActive) homerAnimation=requestAnimationFrame(move);
-    else if(homerActive){$('#homerResult').textContent='Strike! Try again.';homerActive=false}
-  }
-  homerAnimation=requestAnimationFrame(move);
-}
-function flashHomerPerfect(){
-  const zone=$('.hit-zone'); if(!zone) return;
-  zone.classList.add('perfect-flash');
-  setTimeout(()=>zone.classList.remove('perfect-flash'),500);
-}
-async function swingHomer(){
-  if(!homerActive) return;
-  homerActive=false;
-  cancelAnimationFrame(homerAnimation);
-  const left=parseFloat($('#timingBall').style.left)||0;
-  const result=homerContactTier(left);
-  const {isNewBest,prevBest}=recordArcadeResult('homeRunHero',{score:result.points});
-  const e=await awardArcadeXp('homeRunHero',HOMER_XP_BY_TIER[result.tier]||0);
-  if(result.points>0) homerPitchSpeed=Math.max(HOMER_SPEED_FLOOR,homerPitchSpeed-HOMER_SPEED_STEP);
-  recordArcadeMetric('homeRunHero',result.points/125*100);
-  if(result.tier==='perfect') flashHomerPerfect();
-  const delta=result.points-prevBest;
-  const deltaText=prevBest>0?(delta>=0?`+${delta} above your best`:`${Math.abs(delta)} below your best (${prevBest})`):(result.points>0?'First result logged!':'');
+// ---- Home Run Hero (v2: embedded "Wild Home Run Derby" Phaser build) ----
+// The game itself lives entirely at assets/games/home-run-derby/ (a
+// self-contained Vite/Phaser build, no shared code with this file) and
+// runs in an iframe (#homerDerbyFrame). It reports each completed 9-pitch
+// session via postMessage — {type:'LUA_GAME_COMPLETE', detail:{score, ...}}
+// per that project's own LUA integration contract (see its README) — score
+// is 0-100 and explicitly marked non-authoritative by the game itself, so
+// XP is decided and awarded here, exactly the same way every other arcade
+// game's result is: through awardArcadeXp(), which enforces the real
+// 25/day cap server-side. XP formula mirrors the other full-round games
+// (Web Gem, Clutch Catch), which also let one good round hit the full
+// daily cap on its own: xp = round(score/100 * 25).
+async function handleHomerDerbyMessage(event){
+  const frame=$('#homerDerbyFrame');
+  if(!frame||event.source!==frame.contentWindow) return;
+  const data=event.data;
+  if(!data||data.type!=='LUA_GAME_COMPLETE'||!data.detail) return;
+  const score=Math.max(0,Math.min(100,Math.round(+data.detail.score||0)));
+  const {isNewBest,prevBest}=recordArcadeResult('homeRunHero',{score});
+  const xpEarned=Math.round(score/100*25);
+  const e=await awardArcadeXp('homeRunHero',xpEarned);
+  recordArcadeMetric('homeRunHero',score);
+  const delta=score-prevBest;
+  const deltaText=prevBest>0?(delta>=0?`+${delta} above your best`:`${Math.abs(delta)} below your best (${prevBest})`):(score>0?'First result logged!':'');
   const xpText=e===null?'Could not save XP — try again.':`+${e} XP`;
-  $('#homerResult').innerHTML=`<strong>${result.label}</strong> ${result.points} pts · ${xpText}${isNewBest?' · New Best! 🎉':''}${deltaText?`<br><small>${deltaText}</small>`:''}`;
+  if($('#homerResult')) $('#homerResult').innerHTML=`<strong>${score} / 100</strong> · ${xpText}${isNewBest?' · New Best! 🎉':''}${deltaText?`<br><small>${deltaText}</small>`:''}`;
 }
 function ensureArcadeDay(){
   const today=todayISO();
@@ -3165,8 +3140,7 @@ if($('#startReaction'))$('#startReaction').onclick=startReactionGame;
 if($('#reactionBall'))$('#reactionBall').onclick=hitReactionBall;
 if($('#startStrike'))$('#startStrike').onclick=startStrikeGame;
 $$('#strikeZone button').forEach(b=>b.onclick=()=>chooseStrike(+b.dataset.zone));
-if($('#startHomer'))$('#startHomer').onclick=startHomerGame;
-if($('#swingButton'))$('#swingButton').onclick=swingHomer;
+window.addEventListener('message',handleHomerDerbyMessage);
 if($('#startClutch'))$('#startClutch').onclick=startClutchGame;
 if($('#wheelInner'))$('#wheelInner').innerHTML=buildWheelSVG();
 if($('#spinButton'))$('#spinButton').onclick=spinWheel;
