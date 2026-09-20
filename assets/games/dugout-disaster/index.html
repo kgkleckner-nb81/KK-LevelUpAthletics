@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#080e18"><title>Dugout Disaster • Level Up Athletics</title><link rel="stylesheet" href="style.css"></head>
+<body><main class="shell">
+<header class="masthead"><img src="assets/logo.png" alt="Level Up Athletics"><div class="edition">THE LEVEL UP ARCADE <span>001 / DUGOUT DISASTER</span></div><div class="top-actions"><button id="sound" aria-pressed="false">Sound off</button><button id="pause">Pause</button></div></header>
+<section class="arena" aria-label="Dugout Disaster game"><canvas id="game" tabindex="0" aria-label="Move left or right to catch sports balls. Avoid red X-marked popcorn, cones, and bowling balls. Use arrow keys, A and D, or tap a lane."></canvas>
+<div class="hud"><div><small>WAVE <b id="wave">01</b></small><strong id="waveName">THE WARM-UP</strong></div><div class="score"><small>ARCADE POINTS</small><strong id="points">0000</strong></div><div class="health"><small>CHANCES</small><strong id="lives" aria-label="3 chances">● ● ●</strong></div></div>
+<div class="progress"><div id="progress"></div></div>
+<div id="toast" class="toast" role="status"></div>
+<div class="lane-buttons"><button data-lane="0" aria-label="Move to lane 1">1</button><button data-lane="1" aria-label="Move to lane 2">2</button><button data-lane="2" aria-label="Move to lane 3">3</button><button data-lane="3" aria-label="Move to lane 4">4</button></div>
+<div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+</section>
+<footer><div><span class="dot"></span> CATCH THE BALLS <span class="sep">/</span> <span class="danger-dot"></span> DODGE RED X OBJECTS</div><button id="bank">End & score run</button><span class="keys">1–4 or ← → · P to pause</span></footer>
+<p id="live" class="sr-only" aria-live="polite"></p>
+</main><script src="game.js"></script></body></html>
