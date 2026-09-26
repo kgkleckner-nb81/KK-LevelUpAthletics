@@ -2223,6 +2223,9 @@ document.addEventListener('click',e=>{
   const rmDraftBtn=e.target.closest('.remove-draft-activity');
   if(rmDraftBtn) removeActivityFromDraft(rmDraftBtn.dataset.activity);
   if(e.target.id==='goToBuilderBtn') switchScreen('library');
+  const gameTile=e.target.closest('.game-tile');
+  if(gameTile) openGameModal(gameTile.dataset.game);
+  if(e.target.id==='closeGameModal' || e.target.id==='gameModal') closeGameModal();
 });
 // ---- Team Identity (Phase C) ----
 // Real team join is now request -> pending -> coach approve/decline
@@ -2972,6 +2975,38 @@ let strikeTarget=0,strikeRound=0,strikeScore=0;function startStrikeGame(){strike
 // 25/day cap server-side. XP formula mirrors the other full-round games
 // (Web Gem, Clutch Catch), which also let one good round hit the full
 // daily cap on its own: xp = round(score/100 * 25).
+// ---- Game entry tiles / shared game modal ----
+// Home Run Hero, Cannon Arm, and Dugout Disaster used to be embedded
+// inline as full-width cards; they're now condensed clickable tiles
+// (see .game-tile in index.html) that all open into the one shared
+// #gameModal, toggling which .game-frame wrapper is visible. Each
+// iframe's real src lives in data-src and is only assigned the first
+// time that game's tile is clicked, so the game's JS/asset bundle isn't
+// fetched at all until the athlete actually wants to play — closing the
+// modal just hides it again rather than tearing the iframe down, so a
+// game already in progress keeps running if you reopen it.
+const GAME_MODAL_CONFIG={
+  homer:{wrap:'homerFrameWrap',frame:'homerDerbyFrame',title:'Home Run Hero'},
+  cannon:{wrap:'cannonFrameWrap',frame:'cannonArmFrame',title:'Cannon Arm'},
+  dugout:{wrap:'dugoutFrameWrap',frame:'dugoutDisasterFrame',title:'Dugout Disaster'}
+};
+function openGameModal(gameKey){
+  const cfg=GAME_MODAL_CONFIG[gameKey];
+  if(!cfg) return;
+  Object.values(GAME_MODAL_CONFIG).forEach(c=>{
+    const visible=c===cfg;
+    if($('#'+c.wrap)) $('#'+c.wrap).classList.toggle('hidden',!visible);
+  });
+  const frame=$('#'+cfg.frame);
+  if(frame && !frame.src && frame.dataset.src) frame.src=frame.dataset.src;
+  if($('#gameModalTitle')) $('#gameModalTitle').textContent=cfg.title;
+  if($('#gameModal')) $('#gameModal').classList.remove('hidden');
+  document.body.style.overflow='hidden';
+}
+function closeGameModal(){
+  if($('#gameModal')) $('#gameModal').classList.add('hidden');
+  document.body.style.overflow='';
+}
 async function handleHomerDerbyMessage(event){
   const frame=$('#homerDerbyFrame');
   if(!frame||event.source!==frame.contentWindow) return;
