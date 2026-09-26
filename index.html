@@ -58,8 +58,8 @@
   <button class="mode-btn active" data-mode="home" type="button">Home</button>
   <button class="mode-btn" data-mode="athlete" type="button" aria-label="Athlete"><span class="lua-icon icon-athlete icon-bold" aria-hidden="true"></span></button>
   <button class="mode-btn" data-mode="team" type="button" aria-label="Team HQ"><span class="lua-icon icon-team icon-bold" aria-hidden="true"></span></button>
-  <button class="mode-btn coachhq-mode" data-mode="coachhq" type="button">Coach HQ</button>
   <button class="mode-btn" data-mode="arcade" type="button" aria-label="Arcade"><span class="lua-icon icon-arcade icon-bold" aria-hidden="true"></span></button>
+  <button class="mode-btn coachhq-mode" data-mode="coachhq" type="button">Coach HQ</button>
   <button class="mode-btn parent-mode" data-mode="parent" type="button">Settings</button>
 </nav>
 
@@ -79,12 +79,12 @@
   <button class="tab" data-screen="league"><span class="lua-icon icon-leaderboards" aria-hidden="true"></span>League HQ</button>
 </nav>
 
-<nav class="subnav hidden" id="coachhqSubnav">
-  <button class="tab" data-screen="coachhq">Coach HQ</button>
-</nav>
-
 <nav class="subnav hidden" id="arcadeSubnav">
   <button class="tab" data-screen="arcade">Baseball Arcade</button>
+</nav>
+
+<nav class="subnav hidden" id="coachhqSubnav">
+  <button class="tab" data-screen="coachhq">Coach HQ</button>
 </nav>
 
 <nav class="subnav hidden" id="parentSubnav">
@@ -111,17 +111,17 @@
       <ul><li>Team feed</li><li>Leaderboards</li><li>League challenges</li><li>Coach awards</li></ul>
       <span>ENTER TEAM HQ →</span>
     </button>
-    <button class="path-card coachhq-path" data-path="coachhq" type="button">
-      <div class="coming-soon-ribbon">Coming Soon</div>
-      <h3>COACH HQ</h3><p>Coach the Coach</p>
-      <ul><li>Practice drills</li><li>Coaching playbook</li><li>Lesson plans</li><li>Skill videos</li></ul>
-      <span>PREVIEW →</span>
-    </button>
     <button class="path-card arcade-path" data-path="arcade" type="button">
       <div class="path-icon"><span class="lua-icon icon-arcade" aria-hidden="true"></span></div>
       <h3>ARCADE</h3><p>Play. Flex. Unlock.</p>
       <ul><li>Reaction Catch</li><li>Strike Zone</li><li>Home Run Timing</li><li>Cosmetic rewards</li></ul>
       <span>ENTER ARCADE →</span>
+    </button>
+    <button class="path-card coachhq-path" data-path="coachhq" type="button">
+      <div class="coming-soon-ribbon">Coming Soon</div>
+      <h3>COACH HQ</h3><p>Coach the Coach</p>
+      <ul><li>Practice drills</li><li>Coaching playbook</li><li>Lesson plans</li><li>Skill videos</li></ul>
+      <span>PREVIEW →</span>
     </button>
   </div>
   <div class="home-pulse">
