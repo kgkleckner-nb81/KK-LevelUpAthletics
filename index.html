@@ -58,8 +58,9 @@
   <button class="mode-btn active" data-mode="home" type="button">Home</button>
   <button class="mode-btn" data-mode="athlete" type="button" aria-label="Athlete"><span class="lua-icon icon-athlete icon-bold" aria-hidden="true"></span></button>
   <button class="mode-btn" data-mode="team" type="button" aria-label="Team HQ"><span class="lua-icon icon-team icon-bold" aria-hidden="true"></span></button>
+  <button class="mode-btn coachhq-mode" data-mode="coachhq" type="button">Coach HQ</button>
   <button class="mode-btn" data-mode="arcade" type="button" aria-label="Arcade"><span class="lua-icon icon-arcade icon-bold" aria-hidden="true"></span></button>
-  <button class="mode-btn parent-mode" data-mode="parent" type="button">Coach/Parent Corner</button>
+  <button class="mode-btn parent-mode" data-mode="parent" type="button">Settings</button>
 </nav>
 
 <nav class="subnav hidden" id="athleteSubnav">
@@ -78,12 +79,16 @@
   <button class="tab" data-screen="league"><span class="lua-icon icon-leaderboards" aria-hidden="true"></span>League HQ</button>
 </nav>
 
+<nav class="subnav hidden" id="coachhqSubnav">
+  <button class="tab" data-screen="coachhq">Coach HQ</button>
+</nav>
+
 <nav class="subnav hidden" id="arcadeSubnav">
   <button class="tab" data-screen="arcade">Baseball Arcade</button>
 </nav>
 
 <nav class="subnav hidden" id="parentSubnav">
-  <button class="tab" data-screen="parent">Coach/Parent Corner</button>
+  <button class="tab" data-screen="parent">Settings</button>
 </nav>
 
 <main>
@@ -105,6 +110,12 @@
       <h3>TEAM HQ</h3><p>Squad Up</p>
       <ul><li>Team feed</li><li>Leaderboards</li><li>League challenges</li><li>Coach awards</li></ul>
       <span>ENTER TEAM HQ →</span>
+    </button>
+    <button class="path-card coachhq-path" data-path="coachhq" type="button">
+      <div class="coming-soon-ribbon">Coming Soon</div>
+      <h3>COACH HQ</h3><p>Coach the Coach</p>
+      <ul><li>Practice drills</li><li>Coaching playbook</li><li>Lesson plans</li><li>Skill videos</li></ul>
+      <span>PREVIEW →</span>
     </button>
     <button class="path-card arcade-path" data-path="arcade" type="button">
       <div class="path-icon"><span class="lua-icon icon-arcade" aria-hidden="true"></span></div>
@@ -417,6 +428,36 @@
   <div id="programBuilderBody"></div>
 </div>
 <div class="card"><p class="eyebrow dark">Training Repository</p><h2>Choose a Skill Module</h2><p class="muted">What do you want to get better at?</p><div id="goalChips" class="goal-chips"></div><label>Category<select id="libraryCategory"></select></label><div id="exerciseLibrary" class="library-grid"></div></div></section>
+
+<section id="coachhq" class="screen">
+  <div class="card">
+    <p class="eyebrow dark">Coach HQ</p>
+    <h2>Coach the Coach</h2>
+    <p class="muted">A dedicated home for coaching itself — built for the parent-coach who knows the sport but hasn't coached before. This is a preview; the real content is on the roadmap.</p>
+  </div>
+  <div class="grid two">
+    <div class="card">
+      <h2>Practice Drills</h2>
+      <p class="muted">A searchable drill library by skill, age, and time available — each with setup, coaching cues, and an easier/harder variant.</p>
+      <p><strong>Coming soon</strong></p>
+    </div>
+    <div class="card">
+      <h2>Coaching Playbook</h2>
+      <p class="muted">Bite-size guidance on how to coach kids well — praise ratios, one cue at a time, running a huddle, handling a tough moment.</p>
+      <p><strong>Coming soon</strong></p>
+    </div>
+    <div class="card">
+      <h2>Lesson Plans</h2>
+      <p class="muted">Per-kid plans built from how that athlete says they want to be coached, tied into their existing player data.</p>
+      <p><strong>Coming soon</strong></p>
+    </div>
+    <div class="card">
+      <h2>Skill Videos</h2>
+      <p class="muted">Instructional skill-breakdown videos pairing a checkpoint walkthrough with real footage.</p>
+      <p><strong>Coming soon</strong></p>
+    </div>
+  </div>
+</section>
 
 <section id="parent" class="screen">
   <div class="grid two">

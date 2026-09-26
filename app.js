@@ -99,6 +99,7 @@ $$('.tab').forEach(b=>b.onclick=()=>switchScreen(b.dataset.screen));
 function modeForScreen(id){
   if(['clubhouse','daily','player','combine','quests','charts','library','rewards'].includes(id)) return 'athlete';
   if(['team','league'].includes(id)) return 'team';
+  if(id==='coachhq') return 'coachhq';
   if(id==='arcade') return 'arcade';
   if(id==='parent') return 'parent';
   return 'home';
@@ -108,7 +109,7 @@ function showModeNav(mode){
   // .active class via plain CSS descendant selectors (.mode-btn.active
   // .lua-icon), so no separate icon-level class to toggle here anymore.
   $$('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
-  ['athlete','team','arcade','parent'].forEach(m=>{
+  ['athlete','team','coachhq','arcade','parent'].forEach(m=>{
     const el=$('#'+m+'Subnav'); if(el) el.classList.toggle('hidden',m!==mode);
   });
 }
@@ -138,6 +139,7 @@ function enterMode(mode){
   if(mode==='home') switchScreen('home');
   if(mode==='athlete') switchScreen('clubhouse');
   if(mode==='team') switchScreen('team');
+  if(mode==='coachhq') switchScreen('coachhq');
   if(mode==='arcade'){
     // Round 8: each arcade game's per-session difficulty ramp (Web Gem's
     // delay/size, Clutch Catch's in-progress round) resets on a fresh
