@@ -969,7 +969,7 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .home-pulse div:last-child{border-right:0}
 .home-pulse span{display:block;font-size:10px;color:#aaa;letter-spacing:.1em;text-transform:uppercase}
 .home-pulse strong{display:block;margin-top:5px;font-family:var(--accent);font-size:18px;color:var(--neon-yellow)}
-@media(max-width:900px){.status-bar{gap:6px;padding:7px 8px}.status-item{min-width:40px;padding:3px}.status-athlete{display:none}.mode-nav{top:47px;grid-template-columns:repeat(5,1fr)}.parent-mode{display:none}.subnav{top:96px}.path-grid{grid-template-columns:1fr}.path-card{min-height:350px}.home-pulse{grid-template-columns:1fr 1fr}.path-card h3{font-size:38px}}
+@media(max-width:900px){.status-bar{gap:6px;padding:7px 8px}.status-item{min-width:40px;padding:3px}.status-athlete{display:none}.mode-nav{top:47px;grid-template-columns:repeat(5,1fr)}.mode-nav .parent-mode{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.10)}.subnav{top:96px}.path-grid{grid-template-columns:1fr}.path-card{min-height:350px}.home-pulse{grid-template-columns:1fr 1fr}.path-card h3{font-size:38px}}
 
 /* Round 14: final vector icon library, referenced as CSS masks (files are
    plain solid-fill silhouettes, no currentColor built in) so every state
