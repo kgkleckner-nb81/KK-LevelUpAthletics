@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">Level Up Athletics — Rookie badge</title>
+<desc id="desc">Rookie rank insignia. Flat #FF901F symbol on a black shield with a cream inset border. Transparent surroundings.</desc>
+<path fill="#141414" d="M256 24 462 94V332L256 484 50 332V94Z"/>
+<path fill="#FFF6DF" d="M256 42 446 106V324L256 464 66 324V106Z"/>
+<path fill="#141414" d="M256 60 430 118V316L256 444 82 316V118Z"/>
+<g fill="#FF901F"><path d="M139 254 256 143 373 254V313L256 206 139 313Z"/></g>
+</svg>

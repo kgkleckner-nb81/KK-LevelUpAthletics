@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">Level Up Athletics — Legend badge</title>
+<desc id="desc">Legend rank insignia. Flat #FFD12F symbol on a black shield with a cream inset border. Transparent surroundings.</desc>
+<path fill="#141414" d="M256 24 462 94V332L256 484 50 332V94Z"/>
+<path fill="#FFF6DF" d="M256 42 446 106V324L256 464 66 324V106Z"/>
+<path fill="#141414" d="M256 60 430 118V316L256 444 82 316V118Z"/>
+<g fill="#FFD12F"><path d="M144 197 208 250 256 140 304 250 368 197 339 311H173Z"/><path d="M176 329H336L331 351H181Z"/></g>
+</svg>
