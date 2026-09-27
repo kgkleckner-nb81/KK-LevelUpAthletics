@@ -167,13 +167,6 @@
       <ul id="records"></ul>
     </div>
     <div class="card"><h2>Coach’s Report</h2><div id="coachReport" class="coach-report"></div></div>
-    <div class="card reward">
-      <h2>Home Run Meter</h2>
-      <p>Fill the meter to unlock a parent surprise.</p>
-      <div class="meter"><div id="meterFill"></div></div>
-      <p id="meterText"></p>
-      <div id="rewardNotice"></div>
-    </div>
   </div>
 </section>
 
@@ -332,19 +325,28 @@
 <section id="rewards" class="screen">
   <div class="card reward-hero">
     <h2>🎁 Reward Locker</h2>
-    <p class="muted">Earn XP from workouts, parent-verified combine tests, quests, boss battles, arcade play, and parent bonus awards — then spend your balance on rewards below. A parent approves every claim.</p>
-    <div class="grid stats">
-      <div class="stat"><span>Available Balance</span><strong id="balanceBig">0</strong><small>ready to spend</small></div>
-      <div class="stat"><span>Lifetime XP</span><strong id="lifetimeXPBig">0</strong><small>ever earned</small></div>
-      <div class="stat"><span>Total Spent</span><strong id="spentXPBig">0</strong><small>on rewards</small></div>
-      <div class="stat"><span>Rewards</span><strong id="claimsCountBig">0</strong><small>claimed</small></div>
+    <p class="muted">Earn XP from workouts, parent-verified combine tests, quests, boss battles, arcade play, and parent bonus awards — then spend your balance on rewards below or on gear in the Gear Locker. A parent approves every reward claim.</p>
+  </div>
+
+  <div class="card xp-vault-card">
+    <img src="assets/xp/lua-xp-vault.svg" alt="" class="xp-vault-icon" width="128" height="128">
+    <div class="xp-vault-info">
+      <span class="eyebrow dark">Available to spend</span>
+      <strong id="balanceBig">0</strong>
+      <small>XP balance</small>
     </div>
   </div>
 
+  <div class="grid stats stats-3">
+    <div class="stat"><span>Lifetime XP</span><strong id="lifetimeXPBig">0</strong><small>ever earned</small></div>
+    <div class="stat"><span>Total Spent</span><strong id="spentXPBig">0</strong><small>on rewards</small></div>
+    <div class="stat"><span>Rewards</span><strong id="claimsCountBig">0</strong><small>claimed</small></div>
+  </div>
+
   <div class="card">
-    <h2>Next Reward Meter</h2>
-    <p id="vaultMeterText" class="muted"></p>
-    <div class="meter large"><div id="vaultMeterFill"></div></div>
+    <h2>Reward Track</h2>
+    <p id="rewardTrackText" class="muted"></p>
+    <div id="rewardTrack" class="reward-track"></div>
   </div>
 
   <div class="card">

@@ -677,7 +677,6 @@ function renderPlatformStatus(){
 }
 function render(){renderPlatformStatus();const r=ratings(), rec=pr(), x=xp(), t=tier();$('#overall').textContent=r.overall;$('#overallBig').textContent=r.overall;$('#streak').textContent=streak();$('#workouts').textContent=state.daily.length;$('#xp').textContent=x;$('#levelName').textContent=t.name;$('#levelDesc').textContent=t.name==='THE SHOW'?'Major league energy. Keep building.':(t.name==='Triple AAA'?'One step from THE SHOW. Keep stacking wins.':'Keep training to get called up.');[...performanceAxisOrder,'consistency'].forEach(k=>{$('#'+k).textContent=r[k];$('#'+k+'Bar').style.width=Math.min(100,r[k])+'%'});
 $$('.tier').forEach((el,i)=>el.classList.toggle('active',i===(state.currentTierIndex||0)));$('#records').innerHTML=`<li>${rec.pushups} max push-ups</li><li>${rec.squats} max squats</li><li>${rec.plank} sec plank</li><li>${rec.shuffleTouches} shuffle touches</li><li>${rec.broadJumpIn} in verified broad jump</li><li>${rec.sprintSec||'—'} sec verified sprint</li><li>${rec.singleLegBalanceSec||'—'} sec single-leg balance</li>`;renderPathToNextTier();
-const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#meterText').textContent=`${x%250} / 250 XP to next parent surprise`;$('#rewardNotice').textContent=x>=250&&x%250<75?'🎁 Parent surprise may be unlocked. Check Settings.':'';
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
 $('#pendingList').innerHTML=table(['Week','Program','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.programName||'—',a.status]));
@@ -721,6 +720,14 @@ async function claimReward(xpCost,title){
   alert(`${title} claimed! -${xpCost} XP.`);
   render();
 }
+// Round 17 — XP Vault + Reward Track visual refresh. The underlying
+// economy is unchanged: rewardMilestones stay repeatable, balance-priced
+// items (claiming still spends from the same pool as Gear Locker
+// purchases — see availableBalance()/claimReward()). This only changes
+// how that data is presented: a vault-styled balance hero, a Reward
+// Track stepper across all milestones (2 states only — locked/ready,
+// same eligibility test as the tiles below, so the track never implies
+// a state the tiles contradict), and status icons per tile.
 function renderRewards(){
   const total=xp();
   const spent=totalXPSpent();
@@ -730,23 +737,32 @@ function renderRewards(){
   if($('#lifetimeXPBig')) $('#lifetimeXPBig').textContent=total;
   if($('#spentXPBig')) $('#spentXPBig').textContent=spent;
   if($('#claimsCountBig')) $('#claimsCountBig').textContent=(state.claimedRewards||[]).length;
-  const prevAvailable=[...rewardMilestones].reverse().find(r=>balance>=r.xp);
-  const base=prevAvailable?prevAvailable.xp:0;
-  const top=next?next.xp:base+250;
-  const pct=Math.min(100,((balance-base)/(top-base||1))*100);
-  if($('#vaultMeterFill')) $('#vaultMeterFill').style.width=pct+'%';
-  if($('#vaultMeterText')) $('#vaultMeterText').textContent=next?`${balance} XP available. ${next.xp-balance} XP until you can claim ${next.title}.`:`${balance} XP available. Every listed reward is claimable!`;
+  if($('#rewardTrackText')) $('#rewardTrackText').textContent=next?`${balance} XP available. ${next.xp-balance} XP until you can claim ${next.title}.`:`${balance} XP available. Every listed reward is claimable!`;
+  if($('#rewardTrack')) $('#rewardTrack').innerHTML=rewardMilestones.map((r,i)=>{
+    const ready=balance>=r.xp;
+    const isNext=r===next;
+    const icon=ready?'assets/xp/lua-reward-ready.svg':'assets/xp/lua-reward-locked.svg';
+    const connector=i<rewardMilestones.length-1?`<div class="reward-track-connector ${ready?'filled':''}"></div>`:'';
+    return `<div class="reward-track-step">
+      <div class="reward-track-node ${ready?'ready':'locked'}">
+        <img src="${icon}" alt="${ready?'Ready to claim':'Locked'}" width="40" height="40">
+        ${isNext?`<img src="assets/xp/lua-reward-marker.svg" alt="Next goal" class="reward-track-marker">`:''}
+      </div>
+      <span class="reward-track-amount">${r.xp}</span>
+    </div>${connector}`;
+  }).join('');
   if($('#rewardVault')) $('#rewardVault').innerHTML=rewardMilestones.map(r=>{
     const available=balance>=r.xp;
     const claimCount=(state.claimedRewards||[]).filter(c=>c.title===r.title).length;
     return `<div class="reward-tile ${available?'unlocked':''}">
       <span class="reward-tier-badge tier-${r.tier.toLowerCase()}">${r.tier}</span>
+      <img class="reward-status-icon" src="${available?'assets/xp/lua-reward-ready.svg':'assets/xp/lua-reward-locked.svg'}" alt="${available?'Ready to claim':'Locked'}" width="32" height="32">
       <div class="quest-icon">${r.icon}</div>
       <h3>${r.title}</h3>
-      <p><strong>${r.xp} XP</strong></p>
+      <p class="reward-price"><img src="assets/xp/lua-xp-coin.svg" alt="" width="22" height="22"><strong>${r.xp} XP</strong></p>
       <p>${r.desc}</p>
-      <strong>${available?'Available':'Locked'}</strong>
-      ${claimCount?`<p class="muted">Claimed ${claimCount}x</p>`:''}
+      <strong>${available?'Available':`${r.xp-balance} XP away`}</strong>
+      ${claimCount?`<p class="muted"><img src="assets/xp/lua-reward-claimed.svg" alt="" width="16" height="16" style="vertical-align:-3px;margin-right:4px">Claimed ${claimCount}x</p>`:''}
       ${available?`<button type="button" class="primary claim-reward-btn" data-xp="${r.xp}" data-title="${r.title}">Claim</button>`:''}
     </div>`;
   }).join('');
@@ -1928,7 +1944,7 @@ function renderGearLocker(){
           <span class="reward-tier-badge tier-${item.tier.toLowerCase()}">${item.tier}</span>
           ${art?`<img class="gear-tile-art" src="${art}" alt="${item.name}">`:''}
           <h3>${item.name}${item.tintable?' 🎨':''}</h3>
-          <p><strong>${item.xpCost} XP</strong></p>
+          <p class="reward-price"><img src="assets/xp/lua-xp-coin.svg" alt="" width="22" height="22"><strong>${item.xpCost} XP</strong></p>
           ${owned?'<strong>Owned</strong>':`<button type="button" class="primary buy-gear-btn" data-item="${item.id}" ${afford?'':'disabled'}>${afford?'Buy':'Not enough XP'}</button>`}
         </div>`;
       }).join('')}</div></div>`;
