@@ -681,7 +681,8 @@ const pct=Math.min(100,(x%250)/250*100);$('#meterFill').style.width=pct+'%';$('#
 $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
 $('#pendingList').innerHTML=table(['Week','Program','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.programName||'—',a.status]));
-$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderPlayerCardHero();renderCoachReport();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
+const targetLabels={pushups:'Push-ups',squats:'Squats',plank:'Plank (sec)',shuffleTouches:'Lateral Shuffle Touches',skaterJumps:'Skater Jumps',broadJumpIn:'Broad Jump (in)'};
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${targetLabels[k]||k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderPlayerCardHero();renderCoachReport();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
 
 
 function xpEvents(){
