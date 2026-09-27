@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},rainTokens:1,spinLog:[],arcadeGameLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0},attributePoints:{}};
+const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},rainTokens:1,spinLog:[],arcadeGameLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0},attributePoints:{}};
 let state=load();
 // account-layer equivalent of `state` — WHO is signed in and WHICH athlete
 // is selected, not athlete data itself (see refreshAthleteState()). Declared
@@ -370,8 +370,8 @@ $('#resetData').onclick=()=>{
   state.activeProgramId=null;
   state.draftProgram=null;
   state.presetsSeeded=false;
-  state.arcadeScores={homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null}};
-  state.arcadeMetrics={homeRunHero:0,webGem:0,clutchCatch:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0};
+  state.arcadeScores={homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null}};
+  state.arcadeMetrics={homeRunHero:0,webGem:0,clutchCatch:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0};
   state.gameScores={reaction:null,strike:0,homer:0};
   state.rainTokens=1;
   state.spinLog=[];
@@ -2791,7 +2791,7 @@ async function renderLeagueHQ(){
   $('#leagueMeta').textContent=`${standings.length} Team${standings.length===1?'':'s'}${league.season?' · '+league.season:''}`;
   $('#leagueLeaderboardBody').innerHTML=standings.map(s=>`<tr><td>${s.team_name}</td><td>${s.athlete_count}</td><td>${s.team_xp}</td></tr>`).join('');
 }
-function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();if($('#gameXPToday'))$('#gameXPToday').textContent=todayArcadeGameXP();if($('#reactionBest'))$('#reactionBest').textContent=getWebGemBestReaction()??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#clutchBest'))$('#clutchBest').textContent=getArcadeBest('clutchCatch');if($('#cannonArmBest'))$('#cannonArmBest').textContent=getArcadeBest('cannonArm');if($('#dugoutDisasterBest'))$('#dugoutDisasterBest').textContent=getArcadeBest('dugoutDisaster');if($('#ballparkBreakoutBest'))$('#ballparkBreakoutBest').textContent=getArcadeBest('ballparkBreakout');renderArcadeExtras()}
+function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();if($('#gameXPToday'))$('#gameXPToday').textContent=todayArcadeGameXP();if($('#reactionBest'))$('#reactionBest').textContent=getWebGemBestReaction()??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#clutchBest'))$('#clutchBest').textContent=getArcadeBest('clutchCatch');if($('#cannonArmBest'))$('#cannonArmBest').textContent=getArcadeBest('cannonArm');if($('#dugoutDisasterBest'))$('#dugoutDisasterBest').textContent=getArcadeBest('dugoutDisaster');if($('#ballparkBreakoutBest'))$('#ballparkBreakoutBest').textContent=getArcadeBest('ballparkBreakout');if($('#skylineSlamBest'))$('#skylineSlamBest').textContent=getArcadeBest('skylineSlam');renderArcadeExtras()}
 // ---- Web Gem (Round 8 glow-up of the old Reaction Catch) ----
 // Streak/combo model: a catch immediately queues the next ball at a
 // shorter delay and slightly smaller size; a miss or too-slow tap ends the
@@ -2994,7 +2994,8 @@ const GAME_MODAL_CONFIG={
   homer:{wrap:'homerFrameWrap',frame:'homerDerbyFrame',title:'Home Run Hero'},
   cannon:{wrap:'cannonFrameWrap',frame:'cannonArmFrame',title:'Cannon Arm'},
   dugout:{wrap:'dugoutFrameWrap',frame:'dugoutDisasterFrame',title:'Dugout Disaster'},
-  ballpark:{wrap:'ballparkFrameWrap',frame:'ballparkBreakoutFrame',title:'Ballpark Breakout'}
+  ballpark:{wrap:'ballparkFrameWrap',frame:'ballparkBreakoutFrame',title:'Ballpark Breakout'},
+  skyline:{wrap:'skylineFrameWrap',frame:'skylineSlamFrame',title:'Skyline Slam'}
 };
 function openGameModal(gameKey){
   const cfg=GAME_MODAL_CONFIG[gameKey];
@@ -3094,6 +3095,24 @@ async function handleBallparkBreakoutResult(data){
   const deltaText=prevBest>0?(delta>=0?`+${delta} above your best`:`${Math.abs(delta)} below your best (${prevBest})`):(score>0?'First result logged!':'');
   const xpText=e===null?'Could not save XP — try again.':`+${e} XP`;
   if($('#ballparkBreakoutResult')) $('#ballparkBreakoutResult').innerHTML=`<strong>${score} / 100</strong> · ${xpText}${isNewBest?' · New Best! 🎉':''}${deltaText?`<br><small>${deltaText}</small>`:''}`;
+}
+// ---- Skyline Slam (embedded Canvas platformer build) ----
+// Same same-origin window.onLevelUpGameComplete contract as Ballpark
+// Breakout above — see that function's comment for the full rationale.
+// Only the iframe id, arcadeScores/arcadeMetrics key ('skylineSlam'),
+// and result element differ; the game itself lives at
+// assets/games/skyline-slam/, entirely separate code from this file.
+async function handleSkylineSlamResult(data){
+  if(!data) return;
+  const score=Math.max(0,Math.min(100,Math.round(+data.score||0)));
+  const {isNewBest,prevBest}=recordArcadeResult('skylineSlam',{score});
+  const xpEarned=Math.round(score/100*25);
+  const e=await awardArcadeXp('skylineSlam',xpEarned);
+  recordArcadeMetric('skylineSlam',score);
+  const delta=score-prevBest;
+  const deltaText=prevBest>0?(delta>=0?`+${delta} above your best`:`${Math.abs(delta)} below your best (${prevBest})`):(score>0?'First result logged!':'');
+  const xpText=e===null?'Could not save XP — try again.':`+${e} XP`;
+  if($('#skylineSlamResult')) $('#skylineSlamResult').innerHTML=`<strong>${score} / 100</strong> · ${xpText}${isNewBest?' · New Best! 🎉':''}${deltaText?`<br><small>${deltaText}</small>`:''}`;
 }
 function ensureArcadeDay(){
   const today=todayISO();
@@ -3253,6 +3272,9 @@ window.addEventListener('message',handleCannonArmMessage);
 window.addEventListener('message',handleDugoutDisasterMessage);
 if($('#ballparkBreakoutFrame')) $('#ballparkBreakoutFrame').addEventListener('load',function(){
   try{ this.contentWindow.onLevelUpGameComplete=handleBallparkBreakoutResult; }catch(e){}
+});
+if($('#skylineSlamFrame')) $('#skylineSlamFrame').addEventListener('load',function(){
+  try{ this.contentWindow.onLevelUpGameComplete=handleSkylineSlamResult; }catch(e){}
 });
 if($('#startClutch'))$('#startClutch').onclick=startClutchGame;
 if($('#wheelInner'))$('#wheelInner').innerHTML=buildWheelSVG();
