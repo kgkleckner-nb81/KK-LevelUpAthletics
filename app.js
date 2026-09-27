@@ -1709,26 +1709,47 @@ function renderAvatarComposite(containerEl){
   containerEl.innerHTML=`<div class="avatar-composite">${avatarLayerOrder.map(layerHTML).join('')}</div>`;
 }
 
-const wheelSegments=[5,10,10,15,20,20,25,25,50,50,100,250,1000];
-// Slice size (and therefore landing odds — the wedge angle IS the probability)
-// scales down as prize value climbs, so the wheel visually and mathematically
-// tells the truth about how rare a prize is: standard/-30%/-50%/-75% width.
-function wheelSliceWeight(val){
-  if(val>=1000) return 0.25;
-  if(val>=250) return 0.5;
-  if(val>=50) return 0.7;
-  return 1;
+// Round 18 — dimensional prize wheel art (LUA-Prize-Wheel asset pack),
+// same odds as before, not the pack's own proposed distribution. The
+// pack's rotor artwork bakes each wedge's exact position in as vector
+// paths, so it needs a fixed, precomputed segments table rather than
+// the old runtime wheelSliceAngles() — wheelConfig.segments below IS
+// that table, generated once (source/build_lua_current_odds.py, kept
+// outside the repo) from the exact same weights the old
+// wheelSliceWeight() used, then baked into both this config and the
+// wheel-rotor.svg artwork so the art and the odds can never drift
+// apart. Same 9 values/probabilities as the site always had:
+// old wheelSegments=[5,10,10,15,20,20,25,25,50,50,100,250,1000] with
+// wheelSliceWeight() (1/0.7/0.5/0.25 by tier) collapses to the exact
+// per-value probabilities below once the duplicate slices are summed.
+// Angle convention (matches wheel-plane's art): degrees clockwise from
+// 12 o'clock, pointerDeg 0 — ported from the pack's own wheel-math.js,
+// validated there against 216 targeted landings + 10,000 quantiles.
+const wheelConfig={pointerDeg:0,segments:[
+  {id:'xp-1000',value:1000,probability:0.02304147465437788,startDeg:-3.6,endDeg:4.69493088,centerDeg:0.54746544},
+  {id:'xp-5',value:5,probability:0.09216589861751152,startDeg:4.69493088,endDeg:37.87465438,centerDeg:21.28479263},
+  {id:'xp-100',value:100,probability:0.06451612903225806,startDeg:37.87465438,endDeg:61.10046083,centerDeg:49.4875576},
+  {id:'xp-10',value:10,probability:0.18433179723502305,startDeg:61.10046083,endDeg:127.45990783,centerDeg:94.28018433},
+  {id:'xp-250',value:250,probability:0.04608294930875576,startDeg:127.45990783,endDeg:144.04976959,centerDeg:135.75483871},
+  {id:'xp-15',value:15,probability:0.09216589861751152,startDeg:144.04976959,endDeg:177.22949309,centerDeg:160.63963134},
+  {id:'xp-20',value:20,probability:0.18433179723502305,startDeg:177.22949309,endDeg:243.58894009,centerDeg:210.40921659},
+  {id:'xp-25',value:25,probability:0.18433179723502305,startDeg:243.58894009,endDeg:309.9483871,centerDeg:276.76866359},
+  {id:'xp-50',value:50,probability:0.12903225806451613,startDeg:309.9483871,endDeg:356.4,centerDeg:333.17419355}
+]};
+const wheelMod=n=>((n%360)+360)%360;
+function wheelSelectSegment(u){
+  let sum=0;
+  for(const s of wheelConfig.segments){ sum+=s.probability; if(u<sum) return s; }
+  return wheelConfig.segments[wheelConfig.segments.length-1];
 }
-function wheelSliceAngles(){
-  const weights=wheelSegments.map(wheelSliceWeight);
-  const total=weights.reduce((a,b)=>a+b,0);
-  let acc=0;
-  return wheelSegments.map((val,i)=>{
-    const width=weights[i]/total*360;
-    const start=acc;
-    acc+=width;
-    return {value:val,width,start};
-  });
+function wheelSegmentAtRotation(rotation){
+  const angle=wheelMod(wheelConfig.pointerDeg-rotation);
+  return wheelConfig.segments.find(s=>wheelMod(angle-s.startDeg)<(s.endDeg-s.startDeg));
+}
+function wheelTargetRotation(currentRotation,segmentId,turns){
+  const s=wheelConfig.segments.find(s=>s.id===segmentId);
+  const finalPhase=wheelMod(wheelConfig.pointerDeg-s.centerDeg);
+  return currentRotation+turns*360+wheelMod(finalPhase-wheelMod(currentRotation));
 }
 
 const triviaQuestions=[
@@ -3142,35 +3163,15 @@ function todayTriviaIndex(){
   const days=Math.floor((new Date(todayISO()+'T00:00:00Z').getTime()-epoch)/86400000);
   return ((days%triviaQuestions.length)+triviaQuestions.length)%triviaQuestions.length;
 }
+// Dimensional wheel art (LUA-Prize-Wheel asset pack) — housing/lighting/
+// hub/pointer stay fixed; only #wheel-rotor (the numbered face) turns,
+// via its own SVG transform attribute, so the already-tilted projection
+// on wheel-plane doesn't wobble. Static markup: the wedges/labels are
+// precomputed vector paths matching wheelConfig.segments exactly (see
+// that const's comment), not runtime-drawn, so there's nothing to
+// regenerate here — just inject once.
 function buildWheelSVG(){
-  const cx=150,cy=150,r=145;
-  const palette=['#00E5FF','#FF9A45','#FF2E9A','#39FF88','#1F7AE0','#FFC98B'];
-  const slices=wheelSliceAngles();
-  let shapes='';
-  slices.forEach((s,i)=>{
-    const start=-90+s.start, end=start+s.width;
-    const x1=cx+r*Math.cos(start*Math.PI/180), y1=cy+r*Math.sin(start*Math.PI/180);
-    const x2=cx+r*Math.cos(end*Math.PI/180), y2=cy+r*Math.sin(end*Math.PI/180);
-    const largeArc=s.width>180?1:0;
-    const color=s.value>=250?'#F9FF3D':palette[i%palette.length];
-    shapes+=`<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${largeArc} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${color}" stroke="#161616" stroke-width="2"/>`;
-    const mid=start+s.width/2;
-    const lx=cx+(r*0.66)*Math.cos(mid*Math.PI/180), ly=cy+(r*0.66)*Math.sin(mid*Math.PI/180);
-    const fontSize=s.value>=1000?10:(s.value>=250?12:(s.value>=50?14:16));
-    shapes+=`<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" transform="rotate(${(mid+90).toFixed(2)},${lx.toFixed(2)},${ly.toFixed(2)})" text-anchor="middle" dominant-baseline="middle" font-family="Fredoka,sans-serif" font-weight="700" font-size="${fontSize}" fill="#161616">${s.value}</text>`;
-  });
-  return `<svg viewBox="0 0 300 300"><circle cx="150" cy="150" r="147" fill="#161616"/>${shapes}</svg>`;
-}
-// Picks a winning slice weighted by its angular width, so the odds of landing
-// on a prize always match how big its wedge looks on the wheel.
-function pickWeightedSlice(){
-  const slices=wheelSliceAngles();
-  let r=Math.random()*360;
-  for(let i=0;i<slices.length;i++){
-    if(r<slices[i].width) return i;
-    r-=slices[i].width;
-  }
-  return slices.length-1;
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" width="1200" height="1200" role="img" aria-labelledby="wheelTitle"><title id="wheelTitle">Level Up Athletics prize wheel</title><defs><linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5A5369"/><stop offset=".22" stop-color="#25232F"/><stop offset=".56" stop-color="#100F17"/><stop offset=".84" stop-color="#383044"/><stop offset="1" stop-color="#0D0D12"/></linearGradient><linearGradient id="gold" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#FFF6CA"/><stop offset=".35" stop-color="#FFD12F"/><stop offset=".72" stop-color="#F9B32E"/><stop offset="1" stop-color="#A86D18"/></linearGradient><linearGradient id="hub" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#39313F"/><stop offset="1" stop-color="#121116"/></linearGradient><linearGradient id="sheen" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#FFFFFF" stop-opacity=".23"/><stop offset=".43" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity=".10"/></linearGradient><radialGradient id="floor"><stop stop-color="#070710" stop-opacity=".45"/><stop offset="1" stop-color="#070710" stop-opacity="0"/></radialGradient></defs><g id="wheel-plane" transform="translate(0 60) scale(1 .90)"><g id="wheel-housing"><ellipse cx="600" cy="1139" rx="484" ry="38" fill="url(#floor)"/><circle cx="600" cy="642" r="508" fill="#090A0F"/><circle cx="600" cy="626" r="509" fill="#292231" stroke="#0A0B0F" stroke-width="6"/><circle cx="600" cy="613" r="508" fill="#433B4D"/><circle cx="600" cy="600" r="509" fill="url(#metal)" stroke="#0D0D12" stroke-width="8"/><circle cx="600" cy="600" r="497" fill="none" stroke="#766A83" stroke-width="3"/><circle cx="600" cy="600" r="486" fill="none" stroke="#00CEE8" stroke-width="4"/><circle cx="600" cy="600" r="450" fill="#111018" stroke="url(#gold)" stroke-width="8"/><circle cx="600.0" cy="130.0" r="6" fill="#FFF6DF"/><circle cx="599.0" cy="129.0" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="721.6449511981848" cy="146.0148616441379" r="6" fill="#00CEE8"/><circle cx="720.6449511981848" cy="145.0148616441379" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="835.0" cy="192.96806022131386" r="6" fill="#FFF6DF"/><circle cx="834.0" cy="191.96806022131386" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="932.3401871576773" cy="267.6598128423227" r="6" fill="#00CEE8"/><circle cx="931.3401871576773" cy="266.6598128423227" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="1007.0319397786861" cy="365.0" r="6" fill="#FFF6DF"/><circle cx="1006.0319397786861" cy="364.0" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="1053.985138355862" cy="478.35504880181526" r="6" fill="#00CEE8"/><circle cx="1052.985138355862" cy="477.35504880181526" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="1070.0" cy="600.0" r="6" fill="#FFF6DF"/><circle cx="1069.0" cy="599.0" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="1053.985138355862" cy="721.6449511981848" r="6" fill="#00CEE8"/><circle cx="1052.985138355862" cy="720.6449511981848" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="1007.0319397786861" cy="835.0" r="6" fill="#FFF6DF"/><circle cx="1006.0319397786861" cy="834.0" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="932.3401871576773" cy="932.3401871576773" r="6" fill="#00CEE8"/><circle cx="931.3401871576773" cy="931.3401871576773" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="835.0" cy="1007.0319397786861" r="6" fill="#FFF6DF"/><circle cx="834.0" cy="1006.0319397786861" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="721.6449511981848" cy="1053.985138355862" r="6" fill="#00CEE8"/><circle cx="720.6449511981848" cy="1052.985138355862" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="600.0" cy="1070.0" r="6" fill="#FFF6DF"/><circle cx="599.0" cy="1069.0" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="478.3550488018152" cy="1053.985138355862" r="6" fill="#00CEE8"/><circle cx="477.3550488018152" cy="1052.985138355862" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="365.0000000000001" cy="1007.0319397786861" r="6" fill="#FFF6DF"/><circle cx="364.0000000000001" cy="1006.0319397786861" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="267.6598128423227" cy="932.3401871576773" r="6" fill="#00CEE8"/><circle cx="266.6598128423227" cy="931.3401871576773" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="192.9680602213138" cy="835.0" r="6" fill="#FFF6DF"/><circle cx="191.9680602213138" cy="834.0" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="146.01486164413797" cy="721.6449511981849" r="6" fill="#00CEE8"/><circle cx="145.01486164413797" cy="720.6449511981849" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="130.0" cy="600.0000000000001" r="6" fill="#FFF6DF"/><circle cx="129.0" cy="599.0000000000001" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="146.0148616441379" cy="478.3550488018152" r="6" fill="#00CEE8"/><circle cx="145.0148616441379" cy="477.3550488018152" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="192.96806022131386" cy="364.99999999999994" r="6" fill="#FFF6DF"/><circle cx="191.96806022131386" cy="363.99999999999994" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="267.6598128423226" cy="267.6598128423227" r="6" fill="#00CEE8"/><circle cx="266.6598128423226" cy="266.6598128423227" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="364.9999999999998" cy="192.96806022131398" r="6" fill="#FFF6DF"/><circle cx="363.9999999999998" cy="191.96806022131398" r="2" fill="#FFFFFF" opacity=".7"/><circle cx="478.3550488018153" cy="146.0148616441379" r="6" fill="#00CEE8"/><circle cx="477.3550488018153" cy="145.0148616441379" r="2" fill="#FFFFFF" opacity=".7"/></g><g id="wheel-rotor"><circle cx="600" cy="600" r="446" fill="#101116"/><g id="slice-1000" data-value="1000"><path d="M600 600L572.37217 160.86824A440 440 0 0 1 636.01415 161.47636Z" fill="#FFD12F" stroke="#141414" stroke-width="4" stroke-linejoin="round"/><g aria-label="1000 XP" fill="#141414" transform="translate(600 600) rotate(-89.45253456221198) translate(354 0) rotate(0)"><g transform="scale(0.014843750000000001 -0.0185546875) translate(-2850.0 -745.5)"><path transform="translate(0 0)" d="M240 266H580V1231L231 1159V1421L578 1493H944V266H1284V0H240Z"/><path transform="translate(1425 0)" d="M942 748Q942 1028 889.5 1142.5Q837 1257 713 1257Q589 1257 536.0 1142.5Q483 1028 483 748Q483 465 536.0 349.0Q589 233 713 233Q836 233 889.0 349.0Q942 465 942 748ZM1327 745Q1327 374 1167.0 172.5Q1007 -29 713 -29Q418 -29 258.0 172.5Q98 374 98 745Q98 1117 258.0 1318.5Q418 1520 713 1520Q1007 1520 1167.0 1318.5Q1327 1117 1327 745Z"/><path transform="translate(2850 0)" d="M942 748Q942 1028 889.5 1142.5Q837 1257 713 1257Q589 1257 536.0 1142.5Q483 1028 483 748Q483 465 536.0 349.0Q589 233 713 233Q836 233 889.0 349.0Q942 465 942 748ZM1327 745Q1327 374 1167.0 172.5Q1007 -29 713 -29Q418 -29 258.0 172.5Q98 374 98 745Q98 1117 258.0 1318.5Q418 1520 713 1520Q1007 1520 1167.0 1318.5Q1327 1117 1327 745Z"/><path transform="translate(4275 0)" d="M942 748Q942 1028 889.5 1142.5Q837 1257 713 1257Q589 1257 536.0 1142.5Q483 1028 483 748Q483 465 536.0 349.0Q589 233 713 233Q836 233 889.0 349.0Q942 465 942 748ZM1327 745Q1327 374 1167.0 172.5Q1007 -29 713 -29Q418 -29 258.0 172.5Q98 374 98 745Q98 1117 258.0 1318.5Q418 1520 713 1520Q1007 1520 1167.0 1318.5Q1327 1117 1327 745Z"/></g></g></g><g id="slice-5" data-value="5"><path d="M600 600L636.01415 161.47636A440 440 0 0 1 870.13187 252.68347Z" fill="#00CEE8" stroke="#141414" stroke-width="4" stroke-linejoin="round"/><g aria-label="5 XP" fill="#141414" transform="translate(600 600) rotate(-68.71520737327188) translate(322 0) rotate(0)"><g transform="scale(0.024609375 -0.029296875) translate(-712.5 -732.0)"><path transform="translate(0 0)" d="M217 1493H1174V1210H524V979Q568 991 612.5 997.5Q657 1004 705 1004Q978 1004 1130.0 867.5Q1282 731 1282 487Q1282 245 1116.5 108.0Q951 -29 657 -29Q530 -29 405.5 -4.5Q281 20 158 70V373Q280 303 389.5 268.0Q499 233 596 233Q736 233 816.5 301.5Q897 370 897 487Q897 605 816.5 673.0Q736 741 596 741Q513 741 419.0 719.5Q325 698 217 653Z"/></g></g></g><g id="slice-100" data-value="100"><path d="M600 600L870.13187 252.68347A440 440 0 0 1 985.20610 387.35885Z" fill="#FF5364" stroke="#141414" stroke-width="4" stroke-linejoin="round"/><g aria-label="100 XP" fill="#141414" transform="translate(600 600) rotate(-40.51244239631336) translate(322 0) rotate(0)"><g transform="scale(0.024609375 -0.029296875) translate(-2137.5 -745.5)"><path transform="translate(0 0)" d="M240 266H580V1231L231 1159V1421L578 1493H944V266H1284V0H240Z"/><path transform="translate(1425 0)" d="M942 748Q942 1028 889.5 1142.5Q837 1257 713 1257Q589 1257 536.0 1142.5Q483 1028 483 748Q483 465 536.0 349.0Q589 233 713 233Q836 233 889.0 349.0Q942 465 942 748ZM1327 745Q1327 374 1167.0 172.5Q1007 -29 713 -29Q418 -29 258.0 172.5Q98 374 98 745Q98 1117 258.0 1318.5Q418 1520 713 1520Q1007 1520 1167.0 1318.5Q1327 1117 1327 745Z"/><path transform="translate(2850 0)" d="M942 748Q942 1028 889.5 1142.5Q837 1257 713 1257Q589 1257 536.0 1142.5Q483 1028 483 748Q483 465 536.0 349.0Q589 233 713 233Q836 233 889.0 349.0Q942 465 942 748ZM1327 745Q1327 374 1167.0 172.5Q1007 -29 713 -29Q418 -29 258.0 172.5Q98 374 98 745Q98 1117 258.0 1318.5Q418 1520 713 1520Q1007 1520 1167.0 1318.5Q1327 1117 1327 745Z"/></g></g></g><g id="slice-10" data-value="10"><path d="M600 600L985.20610 387.35885A440 440 0 0 1 949.26281 867.61070Z" fill="#FFC58A" stroke="#141414" stroke-width="4" stroke-linejoin="round"/><g aria-label="10 XP" fill="#141414" transform="translate(600 600) rotate(4.280184331797244) translate(322 0) rotate(0)"><g transform="scale(0.024609375 -0.029296875) translate(-1425.0 -745.5)"><path transform="translate(0 0)" d="M240 266H580V1231L231 1159V1421L578 1493H944V266H1284V0H240Z"/><path transform="translate(1425 0)" d="M942 748Q942 1028 889.5 1142.5Q837 1257 713 1257Q589 1257 536.0 1142.5Q483 1028 483 748Q483 465 536.0 349.0Q589 233 713 233Q836 233 889.0 349.0Q942 465 942 748ZM1327 745Q1327 374 1167.0 172.5Q1007 -29 713 -29Q418 -29 258.0 172.5Q98 374 98 745Q98 1117 258.0 1318.5Q418 1520 713 1520Q1007 1520 1167.0 1318.5Q1327 1117 1327 745Z"/></g></g></g><g id="slice-250" data-value="250"><path d="M600 600L949.26281 867.61070A440 440 0 0 1 858.31620 956.19200Z" fill="#FFD12F" stroke="#141414" stroke-width="4" stroke-linejoin="round"/><g aria-label="250 XP" fill="#141414" transform="translate(600 600) rotate(45.754838709677415) translate(346 0) rotate(0)"><g transform="scale(0.0196875 -0.0234375) translate(-2137.5 -745.5)"><path transform="translate(0 0)" d="M590 283H1247V0H162V283L707 764Q780 830 815.0 893.0Q850 956 850 1024Q850 1129 779.5 1193.0Q709 1257 592 1257Q502 1257 395.0 1218.5Q288 1180 166 1104V1432Q296 1475 423.0 1497.5Q550 1520 672 1520Q940 1520 1088.5 1402.0Q1237 1284 1237 1073Q1237 951 1174.0 845.5Q1111 740 909 563Z"/><path transform="translate(1425 0)" d="M217 1493H1174V1210H524V979Q568 991 612.5 997.5Q657 1004 705 1004Q978 1004 1130.0 867.5Q1282 731 1282 487Q1282 245 1116.5 108.0Q951 -29 657 -29Q530 -29 405.5 -4.5Q281 20 158 70V373Q280 303 389.5 268.0Q499 233 596 233Q736 233 816.5 301.5Q897 370 897 487Q897 605 816.5 673.0Q736 741 596 741Q513 741 419.0 719.5Q325 698 217 653Z"/><path transform="translate(2850 0)" d="M942 748Q942 1028 889.5 1142.5Q837 1257 713 1257Q589 1257 536.0 1142.5Q483 1028 483 748Q483 465 536.0 349.0Q589 233 713 233Q836 233 889.0 349.0Q942 465 942 748ZM1327 745Q1327 374 1167.0 172.5Q1007 -29 713 -29Q418 -29 258.0 172.5Q98 374 98 745Q98 1117 258.0 1318.5Q418 1520 713 1520Q1007 1520 1167.0 1318.5Q1327 1117 1327 745Z"/></g></g></g><g id="slice-15" data-value="15"><path d="M600 600L858.31620 956.19200A440 440 0 0 1 621.26768 1039.48571Z" fill="#00CEE8" stroke="#141414" stroke-width="4" stroke-linejoin="round"/><g aria-label="15 XP" fill="#141414" transform="translate(600 600) rotate(70.63963133640556) translate(322 0) rotate(0)"><g transform="scale(0.024609375 -0.029296875) translate(-1425.0 -732.0)"><path transform="translate(0 0)" d="M240 266H580V1231L231 1159V1421L578 1493H944V266H1284V0H240Z"/><path transform="translate(1425 0)" d="M217 1493H1174V1210H524V979Q568 991 612.5 997.5Q657 1004 705 1004Q978 1004 1130.0 867.5Q1282 731 1282 487Q1282 245 1116.5 108.0Q951 -29 657 -29Q530 -29 405.5 -4.5Q281 20 158 70V373Q280 303 389.5 268.0Q499 233 596 233Q736 233 816.5 301.5Q897 370 897 487Q897 605 816.5 673.0Q736 741 596 741Q513 741 419.0 719.5Q325 698 217 653Z"/></g></g></g><g id="slice-20" data-value="20"><path d="M600 600L621.26768 1039.48571A440 440 0 0 1 205.92460 795.71555Z" fill="#FF982D" stroke="#141414" stroke-width="4" stroke-linejoin="round"/><g aria-label="20 XP" fill="#141414" transform="translate(600 600) rotate(120.40921658986176) translate(322 0) rotate(180)"><g transform="scale(0.024609375 -0.029296875) translate(-1425.0 -745.5)"><path transform="translate(0 0)" d="M590 283H1247V0H162V283L707 764Q780 830 815.0 893.0Q850 956 850 1024Q850 1129 779.5 1193.0Q709 1257 592 1257Q502 1257 395.0 1218.5Q288 1180 166 1104V1432Q296 1475 423.0 1497.5Q550 1520 672 1520Q940 1520 1088.5 1402.0Q1237 1284 1237 1073Q1237 951 1174.0 845.5Q1111 740 909 563Z"/><path transform="translate(1425 0)" d="M942 748Q942 1028 889.5 1142.5Q837 1257 713 1257Q589 1257 536.0 1142.5Q483 1028 483 748Q483 465 536.0 349.0Q589 233 713 233Q836 233 889.0 349.0Q942 465 942 748ZM1327 745Q1327 374 1167.0 172.5Q1007 -29 713 -29Q418 -29 258.0 172.5Q98 374 98 745Q98 1117 258.0 1318.5Q418 1520 713 1520Q1007 1520 1167.0 1318.5Q1327 1117 1327 745Z"/></g></g></g><g id="slice-25" data-value="25"><path d="M600 600L205.92460 795.71555A440 440 0 0 1 262.68581 317.47719Z" fill="#FFF6DF" stroke="#141414" stroke-width="4" stroke-linejoin="round"/><g aria-label="25 XP" fill="#141414" transform="translate(600 600) rotate(186.76866359447) translate(322 0) rotate(180)"><g transform="scale(0.024609375 -0.029296875) translate(-1425.0 -745.5)"><path transform="translate(0 0)" d="M590 283H1247V0H162V283L707 764Q780 830 815.0 893.0Q850 956 850 1024Q850 1129 779.5 1193.0Q709 1257 592 1257Q502 1257 395.0 1218.5Q288 1180 166 1104V1432Q296 1475 423.0 1497.5Q550 1520 672 1520Q940 1520 1088.5 1402.0Q1237 1284 1237 1073Q1237 951 1174.0 845.5Q1111 740 909 563Z"/><path transform="translate(1425 0)" d="M217 1493H1174V1210H524V979Q568 991 612.5 997.5Q657 1004 705 1004Q978 1004 1130.0 867.5Q1282 731 1282 487Q1282 245 1116.5 108.0Q951 -29 657 -29Q530 -29 405.5 -4.5Q281 20 158 70V373Q280 303 389.5 268.0Q499 233 596 233Q736 233 816.5 301.5Q897 370 897 487Q897 605 816.5 673.0Q736 741 596 741Q513 741 419.0 719.5Q325 698 217 653Z"/></g></g></g><g id="slice-50" data-value="50"><path d="M600 600L262.68581 317.47719A440 440 0 0 1 572.37217 160.86824Z" fill="#FFB8D8" stroke="#141414" stroke-width="4" stroke-linejoin="round"/><g aria-label="50 XP" fill="#141414" transform="translate(600 600) rotate(243.17419354838705) translate(322 0) rotate(180)"><g transform="scale(0.024609375 -0.029296875) translate(-1425.0 -745.5)"><path transform="translate(0 0)" d="M217 1493H1174V1210H524V979Q568 991 612.5 997.5Q657 1004 705 1004Q978 1004 1130.0 867.5Q1282 731 1282 487Q1282 245 1116.5 108.0Q951 -29 657 -29Q530 -29 405.5 -4.5Q281 20 158 70V373Q280 303 389.5 268.0Q499 233 596 233Q736 233 816.5 301.5Q897 370 897 487Q897 605 816.5 673.0Q736 741 596 741Q513 741 419.0 719.5Q325 698 217 653Z"/><path transform="translate(1425 0)" d="M942 748Q942 1028 889.5 1142.5Q837 1257 713 1257Q589 1257 536.0 1142.5Q483 1028 483 748Q483 465 536.0 349.0Q589 233 713 233Q836 233 889.0 349.0Q942 465 942 748ZM1327 745Q1327 374 1167.0 172.5Q1007 -29 713 -29Q418 -29 258.0 172.5Q98 374 98 745Q98 1117 258.0 1318.5Q418 1520 713 1520Q1007 1520 1167.0 1318.5Q1327 1117 1327 745Z"/></g></g></g></g><g id="wheel-lighting"><circle cx="600" cy="600" r="438" fill="url(#sheen)"/><circle cx="600" cy="600" r="435" fill="none" stroke="#FFFFFF" stroke-opacity=".22" stroke-width="2"/></g><g id="wheel-hub"><circle cx="600" cy="609" r="116" fill="#08090E" opacity=".55"/><circle cx="600" cy="600" r="115" fill="url(#gold)" stroke="#151019" stroke-width="6"/><circle cx="600" cy="600" r="98" fill="url(#hub)" stroke="#FFF6CA" stroke-width="2"/><path d="M549 590 600 542 651 590V613L600 565 549 613ZM549 631 600 583 651 631V653L600 606 549 653Z" fill="url(#gold)"/></g><g id="wheel-pointer"><path d="M563 63H637Q649 63 645 77L608 168Q600 185 592 168L555 77Q551 63 563 63Z" fill="#0C0D11" transform="translate(4 8)" opacity=".8"/><path d="M563 60H637Q649 60 645 74L608 165Q600 182 592 165L555 74Q551 60 563 60Z" fill="url(#gold)" stroke="#141414" stroke-width="6"/><path d="M567 73H630L600 151Z" fill="#FFE992"/><circle cx="600" cy="87" r="9" fill="#141414"/></g></g></svg>';
 }
 let wheelRotation=0,wheelSpinning=false;
 function spinWheel(){
@@ -3180,23 +3181,22 @@ function spinWheel(){
     if($('#spinStatus')) $('#spinStatus').textContent='No spins left today — come back tomorrow!';
     return;
   }
-  const wheelEl=$('#wheelInner');
-  if(!wheelEl) return;
+  const rotorEl=document.getElementById('wheel-rotor');
+  if(!rotorEl) return;
   wheelSpinning=true;
   if($('#spinButton')) $('#spinButton').disabled=true;
   if($('#spinResult')) $('#spinResult').textContent='';
-  const idx=pickWeightedSlice();
-  const val=wheelSegments[idx];
-  const chosen=wheelSliceAngles()[idx];
-  const centerAngle=-90+chosen.start+chosen.width/2;
-  const targetMod=(((-90-centerAngle)%360)+360)%360;
-  const curMod=((wheelRotation%360)+360)%360;
-  let delta=targetMod-curMod;
-  if(delta<=0) delta+=360;
-  wheelRotation+=6*360+delta;
-  wheelEl.style.transform=`rotate(${wheelRotation}deg)`;
+  const segment=wheelSelectSegment(Math.random());
+  const val=segment.value;
+  wheelRotation=wheelTargetRotation(wheelRotation,segment.id,6);
+  rotorEl.style.transform=`rotate(${wheelRotation}deg)`;
   const onDone=async()=>{
-    wheelEl.removeEventListener('transitionend',onDone);
+    rotorEl.removeEventListener('transitionend',onDone);
+    // Cross-check the art actually landed where the awarded value says —
+    // matches the pack's own "face angle, pointer and server-awarded
+    // segment must agree" requirement.
+    const landed=wheelSegmentAtRotation(wheelRotation);
+    if(landed&&landed.value!==val) console.error('Wheel landing mismatch',landed.value,val);
     state.arcadeDaily.spinsUsed+=1;
     save();
     if(!activeAthlete){
@@ -3216,7 +3216,7 @@ function spinWheel(){
     renderArcadeExtras();
     render();
   };
-  wheelEl.addEventListener('transitionend',onDone,{once:true});
+  rotorEl.addEventListener('transitionend',onDone,{once:true});
 }
 function answerTrivia(choiceIdx){
   ensureArcadeDay();
