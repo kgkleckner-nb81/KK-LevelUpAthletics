@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">Level Up Athletics — Baller badge</title>
+<desc id="desc">Baller rank insignia. Flat #00CEE8 symbol on a black shield with a cream inset border. Transparent surroundings.</desc>
+<path fill="#141414" d="M256 24 462 94V332L256 484 50 332V94Z"/>
+<path fill="#FFF6DF" d="M256 42 446 106V324L256 464 66 324V106Z"/>
+<path fill="#141414" d="M256 60 430 118V316L256 444 82 316V118Z"/>
+<g fill="#00CEE8"><circle cx="256" cy="246" r="108"/><path d="M190 150C263 153 310 194 333 259M149 257C207 192 275 183 344 201M212 344C197 272 219 210 273 145" fill="none" stroke="#141414" stroke-width="15"/></g>
+</svg>

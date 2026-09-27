@@ -88,7 +88,7 @@ const tiers=[{name:'Rookie',min:0},{name:'Grinder',min:55},{name:'Baller',min:65
 // Real artwork is being sourced separately per tier — this is a swappable
 // slot lookup, not placeholder art. Missing files fall back to a plain
 // colored badge (see tierBadgeHTML) with zero code changes once files land.
-const tierBadges={Rookie:'assets/tier-rookie.png',Grinder:'assets/tier-grinder.png',Baller:'assets/tier-baller.png','All-Star':'assets/tier-allstar.png',Elite:'assets/tier-elite.png',Legend:'assets/tier-legend.png'};
+const tierBadges={Rookie:'assets/tier-rookie.svg',Grinder:'assets/tier-grinder.svg',Baller:'assets/tier-baller.svg','All-Star':'assets/tier-allstar.svg',Elite:'assets/tier-elite.svg',Legend:'assets/tier-legend.svg'};
 // Round 13 item 13: Body Control's benchmark is new — Single-Leg Balance
 // hold, seconds, same duration-metric shape as Plank. Starting tiers only
 // (no prior benchmark data existed for this axis) — flagged for re-tuning
@@ -648,12 +648,14 @@ function tierBadgeHTML(tierName){
   const initial=(tierName||'?').charAt(0);
   return `<div class="logo-frame tier-badge-slot"><img src="${src}" alt="${tierName} badge" onerror="this.style.display='none';this.nextElementSibling.classList.add('show')"><div class="tier-badge-fallback">${initial}</div></div>`;
 }
-// Round 6 item 3: the badge artwork carries the tier name as part of the
-// image itself, so the ladder cards no longer render a separate name banner
-// (unlike the status bar / Player Card, which still show tier name as text).
+// The rank badge artwork (Round 16 v2) is deliberately name-free — one
+// consistent shield shape, black + a single accent color, no baked-in
+// text — so unlike the old sticker-style art, the ladder needs its own
+// name label per card now. Reuses .tier-name-graffiti, the same gradient
+// treatment already shown as real text in the status bar / Player Card.
 function renderLadder(){
   const c=$('#ladderContainer'); if(!c) return;
-  c.innerHTML=tiers.map((t,i)=>`<div class="tier cardtier" id="tier${i}">${tierBadgeHTML(t.name)}</div>`).join('');
+  c.innerHTML=tiers.map((t,i)=>`<div class="tier cardtier" id="tier${i}">${tierBadgeHTML(t.name)}<span class="tier-name-graffiti tier-ladder-name">${t.name}</span></div>`).join('');
 }
 function renderHeroLadderPreview(){
   const c=$('#heroLadderPreview'); if(!c) return;

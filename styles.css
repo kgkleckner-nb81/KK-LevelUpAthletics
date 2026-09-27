@@ -653,10 +653,11 @@ footer{
   box-shadow:none;
 }
 
-/* Round 11: the Rookie badge art has more transparent margin around its
-   circular artwork than the shield-shaped badges have around theirs, so
-   object-fit:cover alone leaves a thin edge — nudge it in slightly. */
-#tier0 .logo-frame img{transform:scale(1.12)}
+/* Round 16 v2: rank badge name, shown as real text on the ladder now
+   that the badge artwork is deliberately name-free (see renderLadder in
+   app.js) — same .tier-name-graffiti gradient treatment already used in
+   the status bar / Player Card, just sized for this compact card. */
+.tier-ladder-name{display:block;font-size:13px;margin-top:6px}
 
 .tier.cardtier .tier-badge-fallback{
   width:100%;
