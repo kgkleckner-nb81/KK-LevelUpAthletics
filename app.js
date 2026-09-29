@@ -1192,18 +1192,21 @@ const categoryIcons={Strength:'💪',Core:'🧱',Speed:'⚡',Quickness:'🏃','J
 // icon (it's not one of the 8 goal tiles, only reachable via the hidden
 // #libraryCategory select) so it falls back to categoryIcons' emoji.
 const categoryIconImg={Strength:'assets/skill-lab-icons/lua-skill-stronger.png',Speed:'assets/skill-lab-icons/lua-skill-faster.png',Quickness:'assets/skill-lab-icons/lua-skill-quicker.png','Jumping/Plyometrics':'assets/skill-lab-icons/lua-skill-jump-higher.png',Core:'assets/skill-lab-icons/lua-skill-more-durable.png',Balance:'assets/skill-lab-icons/lua-skill-better-balance.png',Coordination:'assets/skill-lab-icons/lua-skill-better-coordination.png',Mobility:'assets/skill-lab-icons/lua-skill-more-flexible.png'};
-// Round 9 item 10 — goal-chip nav, one per non-Teamwork category. Labels
-// and mapping (including "More Durable"->Core) match the change-request
-// doc's explicit list verbatim.
+// Round 9 item 10 — goal-chip nav, one per non-Teamwork category. Tile
+// labels now match the category name itself (Kurt's rename request), not
+// the old "goal phrasing" (Stronger/Faster/...) — Jump Higher was kept
+// as-is since the raw category key ("Jumping/Plyometrics") is a bad
+// display label. Icon filenames still say lua-skill-stronger.png etc.
+// (unchanged, cosmetic-only rename would just be churn).
 const goalChipDefs=[
-  {category:'Strength',label:'Stronger',icon:'💪',img:'assets/skill-lab-icons/lua-skill-stronger.png'},
-  {category:'Speed',label:'Faster',icon:'⚡',img:'assets/skill-lab-icons/lua-skill-faster.png'},
-  {category:'Quickness',label:'Quicker',icon:'🏃',img:'assets/skill-lab-icons/lua-skill-quicker.png'},
+  {category:'Strength',label:'Strength',icon:'💪',img:'assets/skill-lab-icons/lua-skill-stronger.png'},
+  {category:'Speed',label:'Speed',icon:'⚡',img:'assets/skill-lab-icons/lua-skill-faster.png'},
+  {category:'Quickness',label:'Quickness',icon:'🏃',img:'assets/skill-lab-icons/lua-skill-quicker.png'},
   {category:'Jumping/Plyometrics',label:'Jump Higher',icon:'🚀',img:'assets/skill-lab-icons/lua-skill-jump-higher.png'},
-  {category:'Core',label:'More Durable',icon:'🛡',img:'assets/skill-lab-icons/lua-skill-more-durable.png'},
-  {category:'Balance',label:'Better Balance',icon:'⚖',img:'assets/skill-lab-icons/lua-skill-better-balance.png'},
-  {category:'Coordination',label:'Better Coordination',icon:'🎯',img:'assets/skill-lab-icons/lua-skill-better-coordination.png'},
-  {category:'Mobility',label:'More Flexible',icon:'🧘',img:'assets/skill-lab-icons/lua-skill-more-flexible.png'}
+  {category:'Core',label:'Core',icon:'🛡',img:'assets/skill-lab-icons/lua-skill-more-durable.png'},
+  {category:'Balance',label:'Balance',icon:'⚖',img:'assets/skill-lab-icons/lua-skill-better-balance.png'},
+  {category:'Coordination',label:'Coordination',icon:'🎯',img:'assets/skill-lab-icons/lua-skill-better-coordination.png'},
+  {category:'Mobility',label:'Mobility',icon:'🧘',img:'assets/skill-lab-icons/lua-skill-more-flexible.png'}
 ];
 
 // ---- Skills Lab activity catalog ----
