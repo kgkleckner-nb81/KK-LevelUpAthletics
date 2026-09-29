@@ -1187,18 +1187,26 @@ function best(m){let rows=[],b=m==='sprintSec'?Infinity:0;state.combine.filter(x
 // unrated recovery work — whyTrackLine() special-cases it instead.
 const categoryAxisMap={Strength:'strength',Core:'core',Speed:'speed',Quickness:'quickness','Jumping/Plyometrics':'jumpPower',Balance:'bodyControl',Coordination:'bodyControl',Teamwork:'consistency'};
 const categoryIcons={Strength:'💪',Core:'🧱',Speed:'⚡',Quickness:'🏃','Jumping/Plyometrics':'🚀',Balance:'⚖',Coordination:'🎯',Mobility:'🧘',Teamwork:'🤝'};
-// Round 9 item 10 — goal-chip nav, one per non-Teamwork category. Labels
-// and mapping (including "More Durable"->Core) match the change-request
-// doc's explicit list verbatim.
+// Illustrated Skill Lab category icons (LUA-Skill-Lab-Illustrated-Icons-v2).
+// Keyed by the same 8 goalChipDefs categories; Teamwork has no illustrated
+// icon (it's not one of the 8 goal tiles, only reachable via the hidden
+// #libraryCategory select) so it falls back to categoryIcons' emoji.
+const categoryIconImg={Strength:'assets/skill-lab-icons/lua-skill-stronger.png',Speed:'assets/skill-lab-icons/lua-skill-faster.png',Quickness:'assets/skill-lab-icons/lua-skill-quicker.png','Jumping/Plyometrics':'assets/skill-lab-icons/lua-skill-jump-higher.png',Core:'assets/skill-lab-icons/lua-skill-more-durable.png',Balance:'assets/skill-lab-icons/lua-skill-better-balance.png',Coordination:'assets/skill-lab-icons/lua-skill-better-coordination.png',Mobility:'assets/skill-lab-icons/lua-skill-more-flexible.png'};
+// Round 9 item 10 — goal-chip nav, one per non-Teamwork category. Tile
+// labels now match the category name itself (Kurt's rename request), not
+// the old "goal phrasing" (Stronger/Faster/...) — Jump Higher was kept
+// as-is since the raw category key ("Jumping/Plyometrics") is a bad
+// display label. Icon filenames still say lua-skill-stronger.png etc.
+// (unchanged, cosmetic-only rename would just be churn).
 const goalChipDefs=[
-  {category:'Strength',label:'Stronger',icon:'💪'},
-  {category:'Speed',label:'Faster',icon:'⚡'},
-  {category:'Quickness',label:'Quicker',icon:'🏃'},
-  {category:'Jumping/Plyometrics',label:'Jump Higher',icon:'🚀'},
-  {category:'Core',label:'More Durable',icon:'🛡'},
-  {category:'Balance',label:'Better Balance',icon:'⚖'},
-  {category:'Coordination',label:'Better Coordination',icon:'🎯'},
-  {category:'Mobility',label:'More Flexible',icon:'🧘'}
+  {category:'Strength',label:'Strength',icon:'💪',img:'assets/skill-lab-icons/lua-skill-stronger.png'},
+  {category:'Speed',label:'Speed',icon:'⚡',img:'assets/skill-lab-icons/lua-skill-faster.png'},
+  {category:'Quickness',label:'Quickness',icon:'🏃',img:'assets/skill-lab-icons/lua-skill-quicker.png'},
+  {category:'Jumping/Plyometrics',label:'Jump Higher',icon:'🚀',img:'assets/skill-lab-icons/lua-skill-jump-higher.png'},
+  {category:'Core',label:'Core',icon:'🛡',img:'assets/skill-lab-icons/lua-skill-more-durable.png'},
+  {category:'Balance',label:'Balance',icon:'⚖',img:'assets/skill-lab-icons/lua-skill-better-balance.png'},
+  {category:'Coordination',label:'Coordination',icon:'🎯',img:'assets/skill-lab-icons/lua-skill-better-coordination.png'},
+  {category:'Mobility',label:'Mobility',icon:'🧘',img:'assets/skill-lab-icons/lua-skill-more-flexible.png'}
 ];
 
 // ---- Skills Lab activity catalog ----
@@ -2114,12 +2122,13 @@ function renderExerciseLibrary(){
   if(!$('#libraryCategory'))return;
   if(!$('#libraryCategory').options.length)$('#libraryCategory').innerHTML=categoryOrder.map(c=>`<option>${c}</option>`).join('');
   const cat=$('#libraryCategory').value||categoryOrder[0];
-  if($('#goalChips'))$('#goalChips').innerHTML=goalChipDefs.map(g=>`<button type="button" class="goal-chip${g.category===cat?' active':''}" data-category="${g.category}">${g.icon} ${g.label}</button>`).join('');
+  if($('#goalChips'))$('#goalChips').innerHTML=goalChipDefs.map(g=>`<button type="button" class="goal-chip${g.category===cat?' active':''}" data-category="${g.category}"><img src="${g.img}" alt="" width="64" height="64"><span>${g.label}</span></button>`).join('');
   const draft=state.draftProgram;
+  const catIcon=categoryIconImg[cat]?`<img src="${categoryIconImg[cat]}" alt="" width="36" height="36">`:`<span>${categoryIcons[cat]||'⭐'}</span>`;
   $('#exerciseLibrary').innerHTML=activities.filter(a=>a.category===cat).map(a=>{
     const inDraft=!!(draft&&draft.activityIds.includes(a.id));
     const label=!draft?'Start a Program':(inDraft?'In Program':'Add');
-    return `<div class="library-card${inDraft?' active':''}"><span>${categoryIcons[cat]||'⭐'}</span><strong>${a.name}</strong><div class="library-card-actions"><button type="button" class="view-activity-btn" data-exercise="${a.name}">View</button><button type="button" class="add-exercise-btn" data-exercise="${a.name}" ${(!draft||inDraft)?'disabled':''}>${label}</button></div></div>`;
+    return `<div class="library-card${inDraft?' active':''}">${catIcon}<strong>${a.name}</strong><div class="library-card-actions"><button type="button" class="view-activity-btn" data-exercise="${a.name}">View</button><button type="button" class="add-exercise-btn" data-exercise="${a.name}" ${(!draft||inDraft)?'disabled':''}>${label}</button></div></div>`;
   }).join('');
 }
 function whyTrackLine(category){
