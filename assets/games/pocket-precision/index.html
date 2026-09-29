@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pocket Precision · Level Up Athletics</title><link rel="stylesheet" href="styles.css"></head><body><main>
+<header><div><span class="eyebrow">LEVEL UP ATHLETICS / ARCADE</span><h1>POCKET <em>PRECISION</em></h1></div><div><button id="sound">SOUND OFF</button><button id="pause">PAUSE</button></div></header>
+<section class="scoreboard"><div><small>THROW</small><b id="round">1 / 10</b></div><div><small>POINTS</small><b id="score">0</b></div><div><small>COMPLETIONS</small><b id="hits">0</b></div><div><small>PERSONAL BEST</small><b id="best">0</b></div></section>
+<div class="target-info"><strong id="target-name">10 YD · STATIONARY</strong><span id="value">100 POINTS</span><span id="size">WIDE OPENING</span></div>
+<div id="arena"><canvas id="game" width="900" height="506" tabindex="0" aria-label="Passing field. Set power, press and drag to aim, release to throw."></canvas><div id="feedback" role="status"></div><div id="modal"><div class="card"><span class="eyebrow">TEN THROWS. MAKE THEM COUNT.</span><h2 id="modal-title">READ IT.<br>LEAD IT.</h2><p id="modal-copy">Set power, then press and drag on the field to aim. Release to throw immediately. Lead moving rings: softer passes take longer to arrive.</p><p id="summary"></p><button id="start" class="primary" disabled>LOADING FIELD…</button><button id="finish" hidden>FINISH ROUND</button></div></div></div>
+<section class="controls"><label>THROW POWER <strong id="range-value">55% · DRIVE</strong><input id="range" type="range" min="0" max="100" value="55" step="1" aria-label="Throw power"></label><strong id="aim-status">DRAG ON THE FIELD TO AIM</strong></section>
+
+
+<div id="choice" hidden><span>FINAL THROW · CHOOSE YOUR RISK</span><button id="safe">25 YD · SAFE</button><button id="deep" class="selected">50 YD · DEEP</button></div>
+<p class="help">Set POWER · Press and drag on the field · Release to throw. Drag outside the field to cancel. <span>Arrow keys aim · Space throws · Esc pauses</span></p><div id="history" aria-label="Throw results"></div>
+</main><script src="engine.js"></script><script src="game.js"></script></body></html>
