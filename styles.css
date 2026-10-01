@@ -600,23 +600,66 @@ footer{
    with a full-bleed badge image (the artwork carries the tier name itself,
    see renderLadder()) — non-active cards get a warm peach border so they
    still read against the black background; the active tier's neon-blue
-   glow (below) is unchanged and is what visually says "you are here". */
+   glow (below) is unchanged and is what visually says "you are here".
+   Round 19: tap-to-flip. .tier.cardtier is now just a sizing/perspective
+   shell (no visual styling of its own) — the card-stock background,
+   border, radius and "CALL UP" tag that used to live directly on it have
+   moved onto .tier-face (shared by .tier-front and .tier-back) so BOTH
+   faces look like the same physical card stock; backface-visibility on
+   each face plus overflow:hidden per-face (instead of on the rotating
+   element) is what keeps the 3D flip from flattening. See .tier-inner/
+   .tier-front/.tier-back below. */
+/* .tier (base rule above) carries a dashed border/white background/
+   padding/box-shadow meant for the plain (non-card) tier look — before
+   this round, .tier.cardtier always redeclared every one of those
+   properties itself, fully masking the base rule. Now that the real
+   visuals live on .tier-face instead, .tier.cardtier must explicitly
+   zero them back out here, or the base .tier rule shows through as a
+   dashed border/white frame around the card (and .tier.active below
+   does the same for the cream/blue active look). */
 .tier.cardtier{
   position:relative;
   min-height:178px;
-  padding:12px 10px 0;
+  perspective:1200px;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:none;
+  box-shadow:none;
+}
+
+/* position:absolute;inset:0 (not width/height:100%) deliberately — a
+   percentage height on an auto-sized grid item creates a sizing
+   circularity (the item's own auto height depends on content that in
+   turn wants 100% of that still-unresolved height), which inflated
+   every card's grid row by ~30px in testing. Filling via inset against
+   .tier.cardtier's position:relative sidesteps that entirely. */
+.tier-inner{
+  position:absolute;
+  inset:0;
+  transition:transform .6s ease;
+  transform-style:preserve-3d;
+}
+.tier.cardtier.flipped .tier-inner{transform:rotateY(180deg)}
+
+.tier-face{
+  position:absolute;
+  inset:0;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
   border-radius:18px;
   overflow:hidden;
   background:var(--ink);
   border:3px solid var(--peach);
   box-shadow:var(--shadow);
-  transform:none;
+  padding:12px 10px 0;
   display:flex;
   flex-direction:column;
   justify-content:space-between;
 }
+.tier-back{transform:rotateY(180deg)}
 
-.tier.cardtier::before{
+.tier.cardtier .tier-front::before{
   content:"CALL UP";
   position:absolute;
   top:8px;
@@ -632,19 +675,37 @@ footer{
   letter-spacing:.16em;
 }
 
-.tier.cardtier .logo-frame{
+/* min-height:0 overrides the flex-item default of min-height:auto,
+   which otherwise refuses to shrink a flex item below its content's
+   intrinsic size — since the badge <img> is a replaced element with a
+   1:1 aspect ratio, that default was holding .logo-frame open to a full
+   square (e.g. 269x269) even inside a much shorter card on tablet/phone
+   widths, overflowing the card and pushing .tier-ladder-name out of
+   view below it entirely. */
+.tier.cardtier .tier-front .logo-frame{
   position:relative;
   z-index:1;
   flex:1;
+  min-height:0;
 }
 
-.tier.cardtier .logo-frame img,
-.tier.cardtier img{
+/* .tier.cardtier prefix kept (not just .tier-front) to stay at least as
+   specific as the old .ladder .tier img / :nth-child(5,6) rules above —
+   those are otherwise-dead leftovers this cascade has always beaten, and
+   dropping to a weaker selector here would let them win again. */
+/* object-fit:contain (not cover) — the badge art is a square shield
+   shape, but the card itself is a wide-short box on tablet/phone (single-
+   column layout), so cover was cropping the shield's top and bottom
+   points off. contain always shows the complete badge; the SVG's own
+   near-black shield fill (#141414, basically the same as the card's
+   --ink background) means the letterboxed gap is barely visible. */
+.tier.cardtier .tier-front .logo-frame img,
+.tier.cardtier .tier-front img{
   position:static;
   inset:auto;
   width:100%;
   height:100%;
-  object-fit:cover;
+  object-fit:contain;
   background:transparent;
   border:0;
   border-radius:0;
@@ -659,12 +720,75 @@ footer{
    the status bar / Player Card, just sized for this compact card. */
 .tier-ladder-name{display:block;font-size:13px;margin-top:6px}
 
-.tier.cardtier .tier-badge-fallback{
+.tier.cardtier .tier-front .tier-badge-fallback{
   width:100%;
   height:100%;
   min-height:0;
   border:0;
   border-radius:0;
+}
+
+/* Card back — "SCOUTING REPORT" baseball-card style, sized to fit the
+   same compact card (min-height:178px, 1/6 width on desktop; see the
+   850px media query below for the shorter tablet/phone card). Kept
+   tight (small font sizes, 1.15-1.25 line-height) since there's no
+   scroll affordance on a flipped card. */
+.tier-back{justify-content:flex-start;padding-top:14px;gap:6px}
+.tier-motto{
+  margin:0;
+  font-family:var(--display);
+  font-weight:800;
+  font-size:11px;
+  line-height:1.25;
+  color:#fff;
+  text-align:center;
+  text-transform:none;
+}
+.tier-report{margin-top:2px}
+.tier-report-label{
+  margin:0 0 3px;
+  font-family:var(--accent);
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.1em;
+  color:var(--peach);
+}
+.tier-report ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.tier-report li{
+  font-family:var(--accent);
+  font-weight:600;
+  font-size:9px;
+  line-height:1.2;
+  color:#fff;
+  text-transform:none;
+}
+.tier-earned,.tier-locked{
+  margin:4px 0 10px;
+  font-family:var(--accent);
+  font-weight:700;
+  font-size:9px;
+  letter-spacing:.06em;
+}
+.tier-earned{color:var(--neon-yellow)}
+.tier-locked{color:#9a9a9a}
+.tier:not(.active) .tier-earned{display:none}
+.tier.active .tier-locked{display:none}
+
+/* Keyboard affordance for the new role="button" flip tiles. */
+.tier.cardtier:focus-visible{
+  outline:3px solid var(--neon-yellow);
+  outline-offset:3px;
+  border-radius:18px;
+}
+
+@media(prefers-reduced-motion:reduce){
+  .tier-inner{transition:none}
+  .tier.cardtier.flipped .tier-inner{transform:none}
+  .tier-face{transition:opacity .2s ease;backface-visibility:visible;-webkit-backface-visibility:visible}
+  .tier-back{transform:none;opacity:0;z-index:1}
+  .tier-front{opacity:1;z-index:2}
+  .tier.cardtier.flipped .tier-front{opacity:0;z-index:1}
+  .tier.cardtier.flipped .tier-back{opacity:1;z-index:2}
 }
 
 /* Round 5 item 7: tier NAME text only — bold urban display font with a
@@ -708,6 +832,16 @@ footer{
 .path-checklist li.done{background:#eafff0;border-color:var(--success)}
 .tier.cardtier.active{
   transform:scale(1.045);
+  background:none;
+  border:0;
+  box-shadow:none;
+}
+/* Applied to the shared .tier-face (both front and back) rather than
+   just .tier.cardtier itself, so the active glow/border is "visible on
+   whichever face is showing" per the flip spec — front still looks
+   pixel-identical to before since it's the exact same declarations,
+   just reached through an extra .tier-face hop in the selector. */
+.tier.cardtier.active .tier-face{
   border-color:var(--neon-blue);
   background:var(--cream);
   box-shadow:
@@ -715,6 +849,13 @@ footer{
     0 0 24px rgba(0,229,255,.4),
     var(--shadow);
 }
+/* Card-back text is white/peach/yellow by default (readable on the
+   normal black card stock) — on the cream active background that's
+   nearly invisible, so swap to dark ink + a darker gold for contrast. */
+.tier.cardtier.active .tier-motto,
+.tier.cardtier.active .tier-report li{color:var(--ink)}
+.tier.cardtier.active .tier-report-label,
+.tier.cardtier.active .tier-earned{color:var(--creamsicle-dark)}
 
 @media(max-width:850px){
   .tier.cardtier{
