@@ -651,13 +651,26 @@ footer{
 }
 .tier.cardtier.flipped .tier-inner{transform:rotateY(180deg);-webkit-transform:rotateY(180deg)}
 
+/* overflow:hidden (not clip-path) was still breaking backface-
+   visibility on real Safari/iOS even with every -webkit-transform-
+   style/-webkit-perspective prefix in place — this is a separate,
+   well-documented WebKit bug: overflow:hidden on ANY element inside a
+   preserve-3d subtree (not just the element that's actually rotating)
+   makes Safari flatten that element out of 3D, so backface-visibility
+   stops hiding it and it shows through regardless of rotation.
+   clip-path produces the identical rounded-corner clipping without
+   triggering that flattening. z-index is a second, independent safety
+   net — if Safari's 3D still fails for some reason, plain 2D stacking
+   order now explicitly favors whichever face .flipped says is current,
+   instead of leaving it to source order. */
 .tier-face{
   position:absolute;
   inset:0;
   backface-visibility:hidden;
   -webkit-backface-visibility:hidden;
   border-radius:18px;
-  overflow:hidden;
+  clip-path:inset(0 round 18px);
+  -webkit-clip-path:inset(0 round 18px);
   background:var(--ink);
   border:3px solid var(--peach);
   box-shadow:var(--shadow);
@@ -665,8 +678,12 @@ footer{
   display:flex;
   flex-direction:column;
   justify-content:space-between;
+  z-index:1;
 }
 .tier-back{transform:rotateY(180deg);-webkit-transform:rotateY(180deg)}
+.tier.cardtier.flipped .tier-front{z-index:1}
+.tier.cardtier.flipped .tier-back{z-index:2}
+.tier.cardtier:not(.flipped) .tier-front{z-index:2}
 
 .tier.cardtier .tier-front::before{
   content:"CALL UP";
