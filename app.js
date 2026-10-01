@@ -2063,24 +2063,28 @@ function renderShoutouts(){
 function addShoutout(){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO(),source:'shoutout'});save();renderShoutouts()}
 function addReaction(text){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:text,from:'You',date:todayISO(),source:'reaction'});save();renderShoutouts()}
 // ---- Personal Programs ----
-// A Program is {id, name, activityIds[], preset?:true}. Preset programs ship
-// locked/read-only (seeded once by seedPresetPrograms) and can be used for
-// logging but never edited or deleted. Personal programs go through an
-// explicit draft/save workflow: state.draftProgram holds in-progress edits
-// (new or existing) and is only committed to state.programs on Save; the
-// Skill Lab Add button is only enabled while a draft is active.
+// A Program is {id, name, activityIds[], targets?:{activityId:{sets,value,unit}},
+// preset?:true}. Preset programs ship locked/read-only (always re-synced by
+// seedPresetPrograms) and can be used for logging but never edited or
+// deleted. Personal programs go through an explicit draft/save workflow:
+// state.draftProgram holds in-progress edits (new or existing) and is only
+// committed to state.programs on Save; the Skill Lab Add button is only
+// enabled while a draft is active. targets is optional per activity — an
+// athlete/parent can leave a sets/reps target blank, same as presets can
+// (formatProgramTarget/activitySetBlockHTML already treat a missing target
+// as "no guidance shown", not an error).
 function findProgram(id){return (state.programs||[]).find(p=>p.id===id)}
 function personalPrograms(){return (state.programs||[]).filter(p=>!p.preset)}
 function presetPrograms(){return (state.programs||[]).filter(p=>p.preset)}
 function startNewProgramDraft(){
-  state.draftProgram={id:null,name:'',activityIds:[]};
+  state.draftProgram={id:null,name:'',activityIds:[],targets:{}};
   renderProgramBuilder();
   renderExerciseLibrary();
 }
 function startEditProgramDraft(id){
   const p=findProgram(id);
   if(!p||p.preset) return;
-  state.draftProgram={id:p.id,name:p.name,activityIds:[...p.activityIds]};
+  state.draftProgram={id:p.id,name:p.name,activityIds:[...p.activityIds],targets:JSON.parse(JSON.stringify(p.targets||{}))};
   renderProgramBuilder();
   renderExerciseLibrary();
 }
@@ -2089,6 +2093,17 @@ function discardProgramDraft(){
   renderProgramBuilder();
   renderExerciseLibrary();
 }
+// Drops any target with no value typed in (sets alone isn't a target) and
+// clamps sets to a sane minimum — same "guidance only, never required"
+// rule as preset targets.
+function cleanDraftTargets(draft){
+  const cleaned={};
+  draft.activityIds.forEach(id=>{
+    const t=draft.targets&&draft.targets[id];
+    if(t&&t.value) cleaned[id]={sets:Math.max(1,Math.round(+t.sets||1)),value:+t.value,unit:t.unit||''};
+  });
+  return cleaned;
+}
 function saveProgramDraft(name){
   const draft=state.draftProgram;
   if(!draft) return;
@@ -2096,11 +2111,12 @@ function saveProgramDraft(name){
   if(!finalName){alert('Give your program a name before saving.');return}
   if(!draft.activityIds.length){alert('Add at least one activity before saving.');return}
   state.programs=state.programs||[];
+  const targets=cleanDraftTargets(draft);
   if(draft.id){
     const p=findProgram(draft.id);
-    if(p){p.name=finalName;p.activityIds=draft.activityIds}
+    if(p){p.name=finalName;p.activityIds=draft.activityIds;p.targets=targets}
   }else{
-    const p={id:'prog_'+Date.now()+'_'+Math.floor(Math.random()*1000),name:finalName,activityIds:draft.activityIds};
+    const p={id:'prog_'+Date.now()+'_'+Math.floor(Math.random()*1000),name:finalName,activityIds:draft.activityIds,targets};
     state.programs.push(p);
     if(!state.activeProgramId) state.activeProgramId=p.id;
   }
@@ -2117,6 +2133,8 @@ function addActivityToDraft(name){
   if(!a||!state.draftProgram) return;
   if(state.draftProgram.activityIds.includes(a.id)){alert(`${a.name} is already in this program.`);return}
   state.draftProgram.activityIds.push(a.id);
+  state.draftProgram.targets=state.draftProgram.targets||{};
+  state.draftProgram.targets[a.id]={sets:1,value:null,unit:a.metric.unit||''};
   renderProgramBuilder();
   renderExerciseLibrary();
   if($('#activityDetailModal')) $('#activityDetailModal').classList.add('hidden');
@@ -2124,6 +2142,7 @@ function addActivityToDraft(name){
 function removeActivityFromDraft(activityId){
   if(!state.draftProgram) return;
   state.draftProgram.activityIds=state.draftProgram.activityIds.filter(id=>id!==activityId);
+  if(state.draftProgram.targets) delete state.draftProgram.targets[activityId];
   renderProgramBuilder();
   renderExerciseLibrary();
 }
@@ -2153,7 +2172,18 @@ function renderProgramBuilder(){
     <div class="program-draft-editor">
       <p class="eyebrow dark">${draft.id?'Editing Program':'New Program'}</p>
       <label class="wide">Program name<input type="text" id="draftProgramName" value="${draft.name||''}" placeholder="e.g. Baseball Exercise Program"></label>
-      <div id="draftActivityList" class="program-activity-list">${draft.activityIds.length?'<ul class="program-activity-items">'+draft.activityIds.map(id=>{const a=findActivityById(id);return a?`<li>${a.name}<button type="button" class="remove-draft-activity" data-activity="${id}">Remove</button></li>`:''}).join('')+'</ul>':'<p class="muted">No activities yet — use Add on any Skill Lab exercise below.</p>'}</div>
+      <div id="draftActivityList" class="program-activity-list">${draft.activityIds.length?'<ul class="program-activity-items">'+draft.activityIds.map(id=>{
+        const a=findActivityById(id); if(!a) return '';
+        const t=(draft.targets&&draft.targets[id])||{};
+        return `<li>
+          <div class="draft-activity-row"><span>${a.name}</span><button type="button" class="remove-draft-activity" data-activity="${id}">Remove</button></div>
+          <div class="draft-target-row">
+            <label>Sets<input type="number" min="1" step="1" inputmode="numeric" class="draft-target-sets" data-activity="${id}" value="${t.sets||1}"></label>
+            <label>Target<input type="number" min="0" step="1" inputmode="numeric" class="draft-target-value" data-activity="${id}" placeholder="optional" value="${t.value||''}"></label>
+            <span class="draft-target-unit">${a.metric.unit||''}</span>
+          </div>
+        </li>`;
+      }).join('')+'</ul>':'<p class="muted">No activities yet — use Add on any Skill Lab exercise below.</p>'}</div>
       <div class="program-draft-actions"><button type="button" id="saveProgramDraftBtn" class="primary">Save Program</button><button type="button" id="discardProgramDraftBtn">Discard</button></div>
     </div>`:'<button id="newProgramBtn" type="button">+ New Program</button>';
   body.innerHTML=presetHTML+personalHTML+draftHTML;
@@ -2298,6 +2328,19 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
   if(e.target.id==='dailyProgramSelect'){state.activeProgramId=e.target.value;save();renderDailyCustomFields()}
   if(e.target.id==='combineProgramSelect') renderCombineProgramFields();
+  // Draft program sets/target inputs — update state.draftProgram.targets
+  // in place with no re-render, so the field keeps focus while typing.
+  // cleanDraftTargets() (in saveProgramDraft) drops anything with no
+  // value typed in, so a blank Target field is just "no target set".
+  if(e.target.classList.contains('draft-target-sets')||e.target.classList.contains('draft-target-value')){
+    const draft=state.draftProgram; if(!draft) return;
+    const id=e.target.dataset.activity;
+    draft.targets=draft.targets||{};
+    const a=findActivityById(id);
+    draft.targets[id]=draft.targets[id]||{sets:1,value:null,unit:a?a.metric.unit:''};
+    if(e.target.classList.contains('draft-target-sets')) draft.targets[id].sets=Math.max(1,Math.round(+e.target.value||1));
+    else draft.targets[id].value=e.target.value?+e.target.value:null;
+  }
 });
 document.addEventListener('click',e=>{
   const addBtn=e.target.closest('.add-exercise-btn');
