@@ -1252,11 +1252,10 @@ const M=MetricBuilders;
 const activityDefs={
   Strength:[
     ['Push-ups',()=>M.reps(),{Strength:3,Core:1}],
-    ['Wide Push-ups',()=>M.reps(),{Strength:3,Core:1}],
     ['Squats',()=>M.reps(),{Strength:3,Jump:1}],
     ['Jump Squats',()=>M.reps(),{Strength:2,Jump:2}],
     ['Glute Bridge',()=>M.reps(),{Strength:3,Core:1}],
-    ['Drop Lunges',()=>M.reps('Reps (each leg)'),{Strength:3,Balance:1}],
+    ['Lunges',()=>M.reps('Reps (each leg)'),{Strength:3,Balance:1}],
     ['Pull-Ups',()=>M.reps(),{Strength:3}],
     ['Dead Hang',M.duration,{Strength:2,Core:1}]
   ],
@@ -1266,7 +1265,7 @@ const activityDefs={
     ['Hollow Hold',M.duration,{Core:3}],
     ['Dead Bugs',()=>M.reps(),{Core:3,Coordination:1}],
     ['Bird Dog',()=>M.reps(),{Core:3,Balance:1}],
-    ['Bear Crawl',M.duration,{Core:2,Coordination:2}]
+    ['Bear Crawl',()=>M.reps('Steps'),{Core:2,Coordination:2}]
   ],
   Speed:[
     ['10-yard Sprint',M.time,{Speed:3}],
@@ -1287,7 +1286,6 @@ const activityDefs={
     ['Broad Jump',M.distanceIn,{Jump:3,Speed:1}],
     ['Vertical Jump',M.distanceIn,{Jump:3,Strength:1}],
     ['Single-Leg Hops',()=>M.reps(),{Jump:2,Balance:2}],
-    ['Lateral Hops',()=>M.reps(),{Jump:2,Quickness:1}],
     ['Squat Jump',()=>M.reps(),{Jump:3,Strength:1}],
     ['Box Jump',()=>M.reps(),{Jump:3}],
     ['Tuck Jump',()=>M.reps(),{Jump:3,Core:1}],
@@ -1339,11 +1337,10 @@ const baseballSampleMedia={
 // sentences under a second heading just reads as repetition.
 const sampleMedia={
   'Push-ups':{instructionText:'Hands under shoulders, body in one straight line from head to heels. Squeeze your core and butt tight, lower your chest almost to the floor, elbows at about a 45° angle, then push back up.',formCues:[],commonFaults:['Don’t let your hips sag or pike up in the air — that’s cheating your core and can tweak your lower back.'],videoUrl:'assets/videos/push-ups-demo.mp4'},
-  'Wide Push-ups':{instructionText:'Same as a push-up, just set your hands out wider than shoulder-width. Keep that same straight-line body and control the lowering — don’t just drop.',formCues:[],commonFaults:['Don’t flare your elbows all the way out to 90° — a slight bend angle protects your shoulders.'],videoUrl:'assets/videos/wide-push-ups-demo.mp4'},
   'Squats':{instructionText:'Feet shoulder-width, toes turned slightly out. Sit your hips back and down like you’re sitting in a chair. Chest up, knees tracking over your toes, go as low as you can control.',formCues:[],commonFaults:['Don’t let your knees cave inward — keep them pushed out in line with your feet the whole time.'],videoUrl:'assets/videos/squats-demo.mp4'},
   'Jump Squats':{instructionText:'Squat down like normal, then explode straight up as high as you can. Land soft with bent knees and reset right into the next rep.',formCues:[],commonFaults:['Don’t land stiff-legged — always land quiet and soft to protect your knees and ankles.'],videoUrl:'assets/videos/jump-squats-demo.mp4'},
   'Glute Bridge':{instructionText:'Lie on your back, knees bent, feet flat on the floor. Squeeze your glutes and lift your hips up until your body’s a straight line from shoulders to knees.',formCues:[],commonFaults:['Don’t overarch your lower back to get higher — squeeze your butt to lift, not your spine.'],videoUrl:'assets/videos/glute-bridge-demo.mp4'},
-  'Drop Lunges':{instructionText:'Step one leg back and slightly behind you, drop that back knee toward the ground, then push back up to standing. Alternate legs each rep.',formCues:[],commonFaults:['Don’t let your front knee cave inward or shoot way past your toes.'],videoUrl:'assets/videos/drop-lunges-demo.mp4'},
+  'Lunges':{instructionText:'Step one leg back and slightly behind you, drop that back knee toward the ground, then push back up to standing. Alternate legs each rep.',formCues:[],commonFaults:['Don’t let your front knee cave inward or shoot way past your toes.'],videoUrl:'assets/videos/drop-lunges-demo.mp4'},
   'Pull-Ups':{instructionText:'Grab the bar just outside shoulder-width, hang with arms fully straight, then pull your chin over the bar leading with your chest. Lower back down under control — don’t just drop.',formCues:[],commonFaults:['Don’t kip or swing wildly to "cheat" a rep up — that yanks on your shoulders. Full arm extension at the bottom, every rep.'],videoUrl:'assets/videos/pull-ups-demo.mp4'},
   'Dead Hang':{instructionText:'Grab the bar with a firm grip, feet off the ground, shoulders relaxed but engaged, and just hang there and breathe.',formCues:[],commonFaults:['Don’t hang until your grip suddenly gives out and you drop wrong — hop off and reset the second your hands start slipping.'],videoUrl:'assets/videos/dead-hang-demo.mp4'},
   'Plank':{instructionText:'Forearms and toes on the ground, body in one straight line, core braced tight, eyes down at the floor.',formCues:[],commonFaults:['Don’t let your hips sag toward the floor or pike up toward the ceiling.'],videoUrl:'assets/videos/plank-demo.mov'},
@@ -1366,7 +1363,6 @@ const sampleMedia={
   'Broad Jump':{instructionText:'Feet shoulder-width, swing your arms back then explosively forward as you jump out as far as you can. Land soft with bent knees, stay balanced.',formCues:[],commonFaults:['Don’t land stiff or fall backward — stick the landing balanced with your knees bent.']},
   'Vertical Jump':{instructionText:'Quick dip down, swing your arms up hard, jump straight up as high as you can.',formCues:[],commonFaults:['Don’t skip the landing — always absorb it through bent knees instead of just crashing down straight-legged.'],videoUrl:'assets/videos/vertical-jump-demo.mp4'},
   'Single-Leg Hops':{instructionText:'Balance on one leg, hop forward or in place with small, controlled hops, landing soft on that same leg each time.',formCues:[],commonFaults:['Don’t push through these if your balance feels shaky that day — do fewer reps and build up over time.'],videoUrl:'assets/videos/single-leg-hops-demo.mp4'},
-  'Lateral Hops':{instructionText:'Hop side to side over a line or small object, landing soft and quiet, staying light on your feet.',formCues:[],commonFaults:['Don’t let your knee cave inward when you land — keep it stacked right over your foot.']},
   'Squat Jump':{instructionText:'Squat down, then explode straight up as high as you can, landing back down into a soft, controlled squat.',formCues:[],commonFaults:['Don’t rush the landing — control it down into the next squat instead of just collapsing.']},
   'Box Jump':{instructionText:'Face a sturdy box that’s an appropriate height for you, swing your arms, and jump up landing with both feet fully on top, knees soft.',formCues:[],commonFaults:['Don’t jump onto a box too high to land on with full control — and always step back down, never jump down off the box.'],videoUrl:'assets/videos/box-jump-demo.mp4'},
   'Tuck Jump':{instructionText:'Jump straight up and pull both knees up toward your chest, landing soft and quiet.',formCues:[],commonFaults:['Don’t lean way forward or backward in the air — stay tall and controlled.'],videoUrl:'assets/videos/tuck-jump-demo.mp4'},
@@ -1427,20 +1423,64 @@ function computeAttributePointsDelta(custom){
 }
 function exerciseCategory(name){const a=findActivity(name);return a?a.category:null}
 // Three ready-made, locked programs so an athlete can start logging on day
-// one without building anything. Seeded once (state.presetsSeeded) so they
-// never duplicate on reload, and never re-seeded after an athlete deletes
-// their own programs — presets are a starting point, not a permanent fixture.
+// one without building anything. Each activity carries a prescribed target
+// (sets + a value, with a short unit string chosen per entry rather than
+// derived from the activity's own metric — e.g. Broad Jump's catalog
+// metric unit is "in", but the target here is "attempts", not inches) so
+// the program tile can show real guidance like "2 sets × 10 reps" instead
+// of just a bare exercise name. The target is display-only: the athlete
+// still logs however many sets they actually did via Add Set, same as
+// before — nothing here is enforced.
 const presetDefs=[
-  {name:'Level 1: Base Camp',activities:['Push-ups','Squats','Skater Jumps','Lateral Shuffle','Plank','Broad Jump','20-yard Sprint']},
-  {name:'Level 2: The Grind',activities:['Push-ups','Jump Squats','Skater Jumps','Hollow Hold','Plank','Drop Lunges']},
-  {name:'Level 3: Boss Level',activities:['Push-ups','Jump Squats','Skater Jumps','Hollow Hold','Plank','Drop Lunges','Dead Hang','Single-Leg Hops']}
+  {name:'Level 1: Base Camp',activities:[
+    {name:'Squats',sets:2,value:10,unit:'reps'},
+    {name:'Push-ups',sets:2,value:5,unit:'reps'},
+    {name:'Lunges',sets:1,value:5,unit:'reps each leg'},
+    {name:'Bear Crawl',sets:1,value:20,unit:'steps'},
+    {name:'Plank',sets:1,value:20,unit:'sec'}
+  ]},
+  {name:'Level 2: The Grind',activities:[
+    {name:'Jump Squats',sets:2,value:10,unit:'reps'},
+    {name:'Bird Dog',sets:1,value:8,unit:'reps each side'},
+    {name:'Push-ups',sets:1,value:10,unit:'reps'},
+    {name:'Lunges',sets:1,value:10,unit:'reps each leg'},
+    {name:'Plank',sets:2,value:20,unit:'sec'},
+    {name:'Pogo Jumps',sets:1,value:15,unit:'reps'},
+    {name:'Bear Crawl',sets:1,value:20,unit:'steps'}
+  ]},
+  {name:'Level 3: Boss Level',activities:[
+    {name:'Jump Squats',sets:2,value:15,unit:'reps'},
+    {name:'Push-ups',sets:2,value:10,unit:'reps'},
+    {name:'Lunges',sets:1,value:10,unit:'reps each leg'},
+    {name:'Plank',sets:1,value:45,unit:'sec'},
+    {name:'Broad Jump',sets:1,value:5,unit:'attempts'},
+    {name:'Single-Leg Reach',sets:1,value:10,unit:'reps'},
+    {name:'Side Plank',sets:1,value:20,unit:'sec each side'},
+    {name:'Tuck Jump',sets:2,value:8,unit:'reps'}
+  ]}
 ];
+function formatProgramTarget(t){
+  if(!t) return '';
+  return t.sets>1?`${t.sets} sets × ${t.value} ${t.unit}`:`${t.value} ${t.unit}`;
+}
+// Always re-syncs preset programs to the current presetDefs above, rather
+// than seeding once and leaving them stale (state.presetsSeeded is kept
+// only so personal-program defaults/reset logic elsewhere has it, not as
+// a seed guard here) — so editing presetDefs updates every athlete's
+// presets on next load, not just newly created athletes. Ids are
+// deterministic (preset_0/1/2, stable array order) so this never disturbs
+// activeProgramId or daily check-in history that reference a preset by id.
 function seedPresetPrograms(){
-  if(state.presetsSeeded) return;
-  state.programs=state.programs||[];
+  state.programs=(state.programs||[]).filter(p=>!p.preset);
   presetDefs.forEach((def,i)=>{
-    const activityIds=def.activities.map(n=>findActivity(n)).filter(Boolean).map(a=>a.id);
-    state.programs.push({id:'preset_'+i,name:def.name,activityIds,preset:true});
+    const activityIds=[],targets={};
+    def.activities.forEach(entry=>{
+      const a=findActivity(entry.name);
+      if(!a) return;
+      activityIds.push(a.id);
+      targets[a.id]={sets:entry.sets,value:entry.value,unit:entry.unit};
+    });
+    state.programs.push({id:'preset_'+i,name:def.name,activityIds,targets,preset:true});
   });
   state.presetsSeeded=true;
   save();
@@ -2023,24 +2063,28 @@ function renderShoutouts(){
 function addShoutout(){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO(),source:'shoutout'});save();renderShoutouts()}
 function addReaction(text){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:text,from:'You',date:todayISO(),source:'reaction'});save();renderShoutouts()}
 // ---- Personal Programs ----
-// A Program is {id, name, activityIds[], preset?:true}. Preset programs ship
-// locked/read-only (seeded once by seedPresetPrograms) and can be used for
-// logging but never edited or deleted. Personal programs go through an
-// explicit draft/save workflow: state.draftProgram holds in-progress edits
-// (new or existing) and is only committed to state.programs on Save; the
-// Skill Lab Add button is only enabled while a draft is active.
+// A Program is {id, name, activityIds[], targets?:{activityId:{sets,value,unit}},
+// preset?:true}. Preset programs ship locked/read-only (always re-synced by
+// seedPresetPrograms) and can be used for logging but never edited or
+// deleted. Personal programs go through an explicit draft/save workflow:
+// state.draftProgram holds in-progress edits (new or existing) and is only
+// committed to state.programs on Save; the Skill Lab Add button is only
+// enabled while a draft is active. targets is optional per activity — an
+// athlete/parent can leave a sets/reps target blank, same as presets can
+// (formatProgramTarget/activitySetBlockHTML already treat a missing target
+// as "no guidance shown", not an error).
 function findProgram(id){return (state.programs||[]).find(p=>p.id===id)}
 function personalPrograms(){return (state.programs||[]).filter(p=>!p.preset)}
 function presetPrograms(){return (state.programs||[]).filter(p=>p.preset)}
 function startNewProgramDraft(){
-  state.draftProgram={id:null,name:'',activityIds:[]};
+  state.draftProgram={id:null,name:'',activityIds:[],targets:{}};
   renderProgramBuilder();
   renderExerciseLibrary();
 }
 function startEditProgramDraft(id){
   const p=findProgram(id);
   if(!p||p.preset) return;
-  state.draftProgram={id:p.id,name:p.name,activityIds:[...p.activityIds]};
+  state.draftProgram={id:p.id,name:p.name,activityIds:[...p.activityIds],targets:JSON.parse(JSON.stringify(p.targets||{}))};
   renderProgramBuilder();
   renderExerciseLibrary();
 }
@@ -2049,6 +2093,17 @@ function discardProgramDraft(){
   renderProgramBuilder();
   renderExerciseLibrary();
 }
+// Drops any target with no value typed in (sets alone isn't a target) and
+// clamps sets to a sane minimum — same "guidance only, never required"
+// rule as preset targets.
+function cleanDraftTargets(draft){
+  const cleaned={};
+  draft.activityIds.forEach(id=>{
+    const t=draft.targets&&draft.targets[id];
+    if(t&&t.value) cleaned[id]={sets:Math.max(1,Math.round(+t.sets||1)),value:+t.value,unit:t.unit||''};
+  });
+  return cleaned;
+}
 function saveProgramDraft(name){
   const draft=state.draftProgram;
   if(!draft) return;
@@ -2056,11 +2111,12 @@ function saveProgramDraft(name){
   if(!finalName){alert('Give your program a name before saving.');return}
   if(!draft.activityIds.length){alert('Add at least one activity before saving.');return}
   state.programs=state.programs||[];
+  const targets=cleanDraftTargets(draft);
   if(draft.id){
     const p=findProgram(draft.id);
-    if(p){p.name=finalName;p.activityIds=draft.activityIds}
+    if(p){p.name=finalName;p.activityIds=draft.activityIds;p.targets=targets}
   }else{
-    const p={id:'prog_'+Date.now()+'_'+Math.floor(Math.random()*1000),name:finalName,activityIds:draft.activityIds};
+    const p={id:'prog_'+Date.now()+'_'+Math.floor(Math.random()*1000),name:finalName,activityIds:draft.activityIds,targets};
     state.programs.push(p);
     if(!state.activeProgramId) state.activeProgramId=p.id;
   }
@@ -2077,6 +2133,8 @@ function addActivityToDraft(name){
   if(!a||!state.draftProgram) return;
   if(state.draftProgram.activityIds.includes(a.id)){alert(`${a.name} is already in this program.`);return}
   state.draftProgram.activityIds.push(a.id);
+  state.draftProgram.targets=state.draftProgram.targets||{};
+  state.draftProgram.targets[a.id]={sets:1,value:null,unit:a.metric.unit||''};
   renderProgramBuilder();
   renderExerciseLibrary();
   if($('#activityDetailModal')) $('#activityDetailModal').classList.add('hidden');
@@ -2084,6 +2142,7 @@ function addActivityToDraft(name){
 function removeActivityFromDraft(activityId){
   if(!state.draftProgram) return;
   state.draftProgram.activityIds=state.draftProgram.activityIds.filter(id=>id!==activityId);
+  if(state.draftProgram.targets) delete state.draftProgram.targets[activityId];
   renderProgramBuilder();
   renderExerciseLibrary();
 }
@@ -2106,14 +2165,25 @@ function renderProgramBuilder(){
   const draft=state.draftProgram;
   const presets=presetPrograms();
   const personal=personalPrograms();
-  const programTile=(p,editable)=>`<div class="program-tile${p.preset?' preset':''}">${p.preset?'<span class="lock-badge">🔒 Preset</span>':''}<h3>${p.name}</h3><ul>${p.activityIds.map(id=>{const a=findActivityById(id);return a?`<li>${a.name}</li>`:''}).join('')}</ul>${editable?`<div class="program-tile-actions"><button type="button" class="edit-program-btn" data-program="${p.id}">Edit</button><button type="button" class="delete-program-btn" data-program="${p.id}">Delete</button></div>`:''}</div>`;
+  const programTile=(p,editable)=>`<div class="program-tile${p.preset?' preset':''}">${p.preset?'<span class="lock-badge">🔒 Preset</span>':''}<h3>${p.name}</h3><ul>${p.activityIds.map(id=>{const a=findActivityById(id);if(!a)return'';const target=p.targets&&p.targets[id];return`<li>${a.name}${target?`<span class="program-target">${formatProgramTarget(target)}</span>`:''}</li>`}).join('')}</ul>${editable?`<div class="program-tile-actions"><button type="button" class="edit-program-btn" data-program="${p.id}">Edit</button><button type="button" class="delete-program-btn" data-program="${p.id}">Delete</button></div>`:''}</div>`;
   const presetHTML=presets.length?`<p class="eyebrow dark">Preset Programs</p><div class="program-list">${presets.map(p=>programTile(p,false)).join('')}</div>`:'';
   const personalHTML=`<p class="eyebrow dark">Your Programs</p>${personal.length?`<div class="program-list">${personal.map(p=>programTile(p,true)).join('')}</div>`:'<p class="muted">No programs yet — click "+ New Program" to build one.</p>'}`;
   const draftHTML=draft?`
     <div class="program-draft-editor">
       <p class="eyebrow dark">${draft.id?'Editing Program':'New Program'}</p>
       <label class="wide">Program name<input type="text" id="draftProgramName" value="${draft.name||''}" placeholder="e.g. Baseball Exercise Program"></label>
-      <div id="draftActivityList" class="program-activity-list">${draft.activityIds.length?'<ul class="program-activity-items">'+draft.activityIds.map(id=>{const a=findActivityById(id);return a?`<li>${a.name}<button type="button" class="remove-draft-activity" data-activity="${id}">Remove</button></li>`:''}).join('')+'</ul>':'<p class="muted">No activities yet — use Add on any Skill Lab exercise below.</p>'}</div>
+      <div id="draftActivityList" class="program-activity-list">${draft.activityIds.length?'<ul class="program-activity-items">'+draft.activityIds.map(id=>{
+        const a=findActivityById(id); if(!a) return '';
+        const t=(draft.targets&&draft.targets[id])||{};
+        return `<li>
+          <div class="draft-activity-row"><span>${a.name}</span><button type="button" class="remove-draft-activity" data-activity="${id}">Remove</button></div>
+          <div class="draft-target-row">
+            <label>Sets<input type="number" min="1" step="1" inputmode="numeric" class="draft-target-sets" data-activity="${id}" value="${t.sets||1}"></label>
+            <label>Target<input type="number" min="0" step="1" inputmode="numeric" class="draft-target-value" data-activity="${id}" placeholder="optional" value="${t.value||''}"></label>
+            <span class="draft-target-unit">${a.metric.unit||''}</span>
+          </div>
+        </li>`;
+      }).join('')+'</ul>':'<p class="muted">No activities yet — use Add on any Skill Lab exercise below.</p>'}</div>
       <div class="program-draft-actions"><button type="button" id="saveProgramDraftBtn" class="primary">Save Program</button><button type="button" id="discardProgramDraftBtn">Discard</button></div>
     </div>`:'<button id="newProgramBtn" type="button">+ New Program</button>';
   body.innerHTML=presetHTML+personalHTML+draftHTML;
@@ -2180,10 +2250,11 @@ function setInputHTML(prefix,activityId,activityName,metric,index){
   const min=metric.min!=null?` min="${metric.min}"`:'';
   return `<div class="metric-field"><span class="metric-field-label">${activityName} · Set ${index+1}</span><div class="unit-input"><input type="number" name="${prefix}_${activityId}_${index}" step="${step}"${min} placeholder="0"><span class="unit-badge">${metric.unit||''}</span></div></div>`;
 }
-function activitySetBlockHTML(prefix,a,counts){
+function activitySetBlockHTML(prefix,a,counts,target){
   const n=counts[a.id]||1;
   const rows=Array.from({length:n},(_,i)=>setInputHTML(prefix,a.id,a.name,a.metric,i)).join('');
-  return `<div class="activity-set-block" data-activity="${a.id}"><h4>${a.name}</h4>${rows}<button type="button" class="add-set-btn" data-prefix="${prefix}" data-activity="${a.id}">+ Add Set</button></div>`;
+  const targetLine=target?`<p class="program-target-hint">Target: ${formatProgramTarget(target)}</p>`:'';
+  return `<div class="activity-set-block" data-activity="${a.id}"><h4>${a.name}</h4>${targetLine}${rows}<button type="button" class="add-set-btn" data-prefix="${prefix}" data-activity="${a.id}">+ Add Set</button></div>`;
 }
 // Daily Check-In: which personal (or preset) program is being logged today.
 function renderDailyProgramPicker(){
@@ -2207,7 +2278,7 @@ function renderDailyCustomFields(){
   if(!prog||!prog.activityIds.length){c.innerHTML='<p class="muted">Build a program in Skill Lab to see activities here.</p>';return}
   c.innerHTML=prog.activityIds.map(id=>{
     const a=findActivityById(id);
-    return a?activitySetBlockHTML('set',a,dailySetCounts):'';
+    return a?activitySetBlockHTML('set',a,dailySetCounts,prog.targets&&prog.targets[id]):'';
   }).join('');
 }
 // Combine Testing: a parent/coach picks which program is being tested, then
@@ -2257,6 +2328,19 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
   if(e.target.id==='dailyProgramSelect'){state.activeProgramId=e.target.value;save();renderDailyCustomFields()}
   if(e.target.id==='combineProgramSelect') renderCombineProgramFields();
+  // Draft program sets/target inputs — update state.draftProgram.targets
+  // in place with no re-render, so the field keeps focus while typing.
+  // cleanDraftTargets() (in saveProgramDraft) drops anything with no
+  // value typed in, so a blank Target field is just "no target set".
+  if(e.target.classList.contains('draft-target-sets')||e.target.classList.contains('draft-target-value')){
+    const draft=state.draftProgram; if(!draft) return;
+    const id=e.target.dataset.activity;
+    draft.targets=draft.targets||{};
+    const a=findActivityById(id);
+    draft.targets[id]=draft.targets[id]||{sets:1,value:null,unit:a?a.metric.unit:''};
+    if(e.target.classList.contains('draft-target-sets')) draft.targets[id].sets=Math.max(1,Math.round(+e.target.value||1));
+    else draft.targets[id].value=e.target.value?+e.target.value:null;
+  }
 });
 document.addEventListener('click',e=>{
   const addBtn=e.target.closest('.add-exercise-btn');
