@@ -89,6 +89,18 @@ const tiers=[{name:'Rookie',min:0},{name:'Grinder',min:55},{name:'Baller',min:65
 // slot lookup, not placeholder art. Missing files fall back to a plain
 // colored badge (see tierBadgeHTML) with zero code changes once files land.
 const tierBadges={Rookie:'assets/tier-rookie.svg',Grinder:'assets/tier-grinder.svg',Baller:'assets/tier-baller.svg','All-Star':'assets/tier-allstar.svg',Elite:'assets/tier-elite.svg',Legend:'assets/tier-legend.svg'};
+// Call-Up Ladder card-back content (tap-to-flip). Keyed by tile index
+// (0-5), deliberately separate from the `tiers` array above so copy can
+// be edited here without touching the tiers/thresholds that drive
+// render()'s .active toggle and rating math.
+const tierCardBacks=[
+  {motto:'Every great player started here.',report:['Learns the basics right','Listens to coaches','Ready to try new things']},
+  {motto:"Shows up and does the work — even when it's boring.",report:['Finishes every workout','Keeps the streak alive','Works on weaknesses']},
+  {motto:'Brings the practice work to game day.',report:['Wants the ball in big moments','Uses practice skills in games','Shakes off mistakes fast']},
+  {motto:'Makes everyone around them better.',report:['Picks up teammates',"Cheers others' wins loudly",'Leads by example']},
+  {motto:"Holds the standard when no one's watching.",report:['Trains without reminders','Takes coaching, no excuses','Helps Rookies learn']},
+  {motto:'Remembered for how they played — and who they lifted up.',report:['Leads every day','Mentors younger players','Respects everyone, win or lose']}
+];
 // Round 13 item 13: Body Control's benchmark is new — Single-Leg Balance
 // hold, seconds, same duration-metric shape as Plank. Starting tiers only
 // (no prior benchmark data existed for this axis) — flagged for re-tuning
@@ -653,9 +665,37 @@ function tierBadgeHTML(tierName){
 // text — so unlike the old sticker-style art, the ladder needs its own
 // name label per card now. Reuses .tier-name-graffiti, the same gradient
 // treatment already shown as real text in the status bar / Player Card.
+// Tap-to-flip: every .tier keeps the exact id/class/order render()'s
+// .active toggle already depends on ($$('.tier').forEach(...) at
+// app.js's render()) — the flip only adds a .tier-inner wrapper around
+// the existing front content plus a new .tier-back face, and card-stock
+// visual styling (background/border/the "CALL UP" tag) moves from
+// .tier.cardtier itself onto each face in styles.css so both faces still
+// look like the same physical card. EARNED ✓ / KEEP GRINDING TO UNLOCK
+// on the back is pure CSS (.tier.active .tier-locked / .tier:not(.active)
+// .tier-earned) rather than computed here, since renderLadder() only
+// runs once at boot while .active gets re-toggled on every render() —
+// baking the earned state into HTML here would go stale.
 function renderLadder(){
   const c=$('#ladderContainer'); if(!c) return;
-  c.innerHTML=tiers.map((t,i)=>`<div class="tier cardtier" id="tier${i}">${tierBadgeHTML(t.name)}<span class="tier-name-graffiti tier-ladder-name">${t.name}</span></div>`).join('');
+  c.innerHTML=tiers.map((t,i)=>{
+    const back=tierCardBacks[i]||{motto:'',report:[]};
+    return `<div class="tier cardtier" id="tier${i}" role="button" tabindex="0" aria-pressed="false" aria-label="${t.name} tier card. Press to flip for details.">
+      <div class="tier-inner">
+        <div class="tier-front tier-face">${tierBadgeHTML(t.name)}<span class="tier-name-graffiti tier-ladder-name">${t.name}</span></div>
+        <div class="tier-back tier-face">
+          <p class="tier-motto">“${back.motto}”</p>
+          <div class="tier-report"><p class="tier-report-label">Scouting Report</p><ul>${back.report.map(line=>`<li>${line}</li>`).join('')}</ul></div>
+          <p class="tier-earned">Earned ✓</p>
+          <p class="tier-locked">Keep grinding to unlock</p>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleTierFlip(el){
+  const flipped=el.classList.toggle('flipped');
+  el.setAttribute('aria-pressed',flipped?'true':'false');
 }
 function renderHeroLadderPreview(){
   const c=$('#heroLadderPreview'); if(!c) return;
@@ -3369,6 +3409,20 @@ function renderArcadeExtras(){
 document.addEventListener('click',e=>{
   const choiceBtn=e.target.closest('.trivia-choice');
   if(choiceBtn && !choiceBtn.disabled) answerTrivia(+choiceBtn.dataset.choice);
+});
+// Call-Up Ladder tap-to-flip. Click/tap anywhere on a card flips just
+// that card; Enter/Space does the same for keyboard users (the card
+// itself is the focusable role="button" element, set in renderLadder()).
+document.addEventListener('click',e=>{
+  const tierCard=e.target.closest('.tier.cardtier');
+  if(tierCard) toggleTierFlip(tierCard);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter' && e.key!==' ') return;
+  const tierCard=e.target.closest && e.target.closest('.tier.cardtier');
+  if(!tierCard) return;
+  e.preventDefault();
+  toggleTierFlip(tierCard);
 });
 
 seedPresetPrograms();
