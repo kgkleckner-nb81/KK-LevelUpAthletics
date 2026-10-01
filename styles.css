@@ -621,6 +621,7 @@ footer{
   position:relative;
   min-height:178px;
   perspective:1200px;
+  -webkit-perspective:1200px;
   padding:0;
   border:0;
   border-radius:0;
@@ -633,14 +634,22 @@ footer{
    circularity (the item's own auto height depends on content that in
    turn wants 100% of that still-unresolved height), which inflated
    every card's grid row by ~30px in testing. Filling via inset against
-   .tier.cardtier's position:relative sidesteps that entirely. */
+   .tier.cardtier's position:relative sidesteps that entirely.
+   -webkit-transform-style/-webkit-transform are required, not cosmetic
+   — Safari/iOS silently flattens the 3D context without the prefixed
+   transform-style, which also makes backface-visibility:hidden stop
+   fully hiding the away-facing side, so the front's badge art showed
+   through over the back's text on real devices even though it rendered
+   correctly in (unprefixed-only) desktop Chrome during testing. */
 .tier-inner{
   position:absolute;
   inset:0;
   transition:transform .6s ease;
   transform-style:preserve-3d;
+  -webkit-transform-style:preserve-3d;
+  will-change:transform;
 }
-.tier.cardtier.flipped .tier-inner{transform:rotateY(180deg)}
+.tier.cardtier.flipped .tier-inner{transform:rotateY(180deg);-webkit-transform:rotateY(180deg)}
 
 .tier-face{
   position:absolute;
@@ -657,7 +666,7 @@ footer{
   flex-direction:column;
   justify-content:space-between;
 }
-.tier-back{transform:rotateY(180deg)}
+.tier-back{transform:rotateY(180deg);-webkit-transform:rotateY(180deg)}
 
 .tier.cardtier .tier-front::before{
   content:"CALL UP";
