@@ -862,8 +862,17 @@ footer{
 .tier-badge-fallback.show{display:flex}
 .path-to-next-tier{margin-top:16px}
 .path-checklist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
-.path-checklist li{padding:10px 12px;background:var(--white);border:2px solid var(--ink);border-radius:10px;font-family:var(--accent);font-weight:600;font-size:14px}
-.path-checklist li.done{background:#eafff0;border-color:var(--success)}
+.path-checklist li{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--white);border:2px solid var(--ink);border-radius:10px;font-family:var(--accent);font-weight:600;font-size:14px}
+
+/* Shared simple checkbox: black outlined box, bold cyan checkmark when
+   done. The check is ink-outlined (.lua-check-outline) because cyan alone
+   on white is too low-contrast to read. */
+.lua-check{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:2.5px solid var(--ink);border-radius:7px;background:var(--white);box-sizing:border-box}
+.lua-check svg{width:165%;height:165%;flex:none;display:block;overflow:visible;transform:translate(9%,-3%)}
+.lua-check path{fill:none;stroke-linejoin:round;stroke-linecap:square}
+.lua-check-outline{stroke:var(--ink);stroke-width:7.6}
+.lua-check-mark{stroke:var(--neon-blue);stroke-width:4.6}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .tier.cardtier.active{
   transform:scale(1.045);
   background:none;

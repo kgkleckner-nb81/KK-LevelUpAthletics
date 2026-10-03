@@ -649,11 +649,20 @@ function pathToNextTier(){
     ]
   };
 }
+// Simple black checkbox; when done, a bold cyan marker-style checkmark
+// (constant-width, square-ended, ink-outlined so it stays readable on white) fills the box and
+// its long stroke sweeps out past the box edge. Pure inline SVG so it needs
+// no art files and scales crisply. Status is announced as text, not just
+// color/shape, via the visually-hidden span.
+function luaCheckHTML(done){
+  const mark=done?'<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lua-check-outline" d="M3.8 12.6L9 18Q13.6 10.6 21 3.6"/><path class="lua-check-mark" d="M3.8 12.6L9 18Q13.6 10.6 21 3.6"/></svg>':'';
+  return `<span class="lua-check${done?' done':''}" aria-hidden="true">${mark}</span><span class="sr-only">${done?'Done: ':'Not yet: '}</span>`;
+}
 function renderPathToNextTier(){
   const c=$('#pathToNextTier'); if(!c) return;
   const path=pathToNextTier();
   if(!path){c.innerHTML='<p class="muted">🏆 Top tier reached — Legend status confirmed.</p>';return}
-  c.innerHTML=`<p class="eyebrow dark">Path to ${path.nextTierName}</p><ul class="path-checklist">${path.items.map(i=>`<li class="${i.done?'done':''}">${i.done?'✅':'⏳'} ${i.label}</li>`).join('')}</ul>`;
+  c.innerHTML=`<p class="eyebrow dark">Path to ${path.nextTierName}</p><ul class="path-checklist">${path.items.map(i=>`<li class="${i.done?'done':''}">${luaCheckHTML(i.done)}<span>${i.label}</span></li>`).join('')}</ul>`;
 }
 // Real badge artwork is being sourced separately per tier (item 6) — this
 // renders whatever's at tierBadges[name] and falls back to a plain colored
