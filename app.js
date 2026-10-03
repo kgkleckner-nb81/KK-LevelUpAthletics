@@ -43,17 +43,21 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const metricNames={pushups:'Push-ups',squats:'Squats',plank:'Plank seconds',crunches:'Sit Ups',broadJumps:'Broad jumps',shuffleTouches:'Lateral shuffle touches',skaterJumps:'Skater jumps',sprints:'Sprints'};
 const combineNames={maxPushups:'Max push-ups',squat60:'Squats in 60 sec',plankMax:'Longest plank',broadJumpIn:'Broad jump',sprintSec:'20-yard sprint'};
 
+// brewers-callup keeps its original id on purpose: it's the FK in
+// quest_completions and the weekly-dedupe key, so renaming the id would
+// orphan history / allow duplicate awards. Only the display name and
+// objective changed (Brewers Call-Up -> Baller Call Up); see migration 0028.
 const quests=[
-  {id:'daily-double',type:'Quest',icon:'⚾',title:'Daily Double',desc:'Complete two short workouts in one day.',xp:40},
-  {id:'gold-glove',type:'Quest',icon:'🧤',title:'Gold Glove Drill',desc:'Complete 50 lateral shuffle touches.',xp:35},
-  {id:'base-stealer',type:'Quest',icon:'🏃',title:'Base Stealer Bonus',desc:'Complete 10 total 20-yard sprints.',xp:40},
-  {id:'iron-core',type:'Quest',icon:'🧱',title:'Iron Core',desc:'Hold a plank for 60 seconds.',xp:45},
-  {id:'power-hitter',type:'Quest',icon:'💥',title:'Power Hitter',desc:'Complete 15 broad jumps with good form.',xp:45},
-  {id:'dad-challenge',type:'Quest',icon:'👨‍👦',title:'Dad Challenge',desc:'Beat Dad in one approved challenge.',xp:60},
-  {id:'fastball-monster',type:'Boss Battle',icon:'👹',title:'Fastball Monster',desc:'15 push-ups, 45-sec plank, and 40 squats.',xp:100},
-  {id:'base-dragon',type:'Boss Battle',icon:'🐉',title:'Base-Stealing Dragon',desc:'8 sprints and 40 shuffle touches.',xp:100},
-  {id:'spartan-trial',type:'Boss Battle',icon:'⚔️',title:'Spartan Trial',desc:'Reach 60+ overall and complete a verified combine.',xp:125},
-  {id:'brewers-callup',type:'Boss Battle',icon:'🔵',title:'Brewers Call-Up',desc:'Reach Brewers Prospect tier.',xp:175}
+  {id:'daily-double',type:'Quest',img:'lua-quest-daily-double',title:'Daily Double',desc:'Complete two short workouts in one day.',xp:40},
+  {id:'gold-glove',type:'Quest',img:'lua-quest-gold-glove-drill',title:'Gold Glove Drill',desc:'Complete 50 lateral shuffle touches.',xp:35},
+  {id:'base-stealer',type:'Quest',img:'lua-quest-base-stealer-bonus',title:'Base Stealer Bonus',desc:'Complete 10 total 20-yard sprints.',xp:40},
+  {id:'iron-core',type:'Quest',img:'lua-quest-iron-core',title:'Iron Core',desc:'Hold a plank for 60 seconds.',xp:45},
+  {id:'power-hitter',type:'Quest',img:'lua-quest-power-hitter',title:'Power Hitter',desc:'Complete 15 broad jumps with good form.',xp:45},
+  {id:'dad-challenge',type:'Quest',img:'lua-quest-dad-challenge',title:'Dad Challenge',desc:'Beat Dad in one approved challenge.',xp:60},
+  {id:'fastball-monster',type:'Boss Battle',img:'lua-quest-fastball-monster',title:'Fastball Monster',desc:'15 push-ups, 45-sec plank, and 40 squats.',xp:100},
+  {id:'base-dragon',type:'Boss Battle',img:'lua-quest-base-stealing-dragon',title:'Base-Stealing Dragon',desc:'8 sprints and 40 shuffle touches.',xp:100},
+  {id:'spartan-trial',type:'Boss Battle',img:'lua-quest-spartan-trial',title:'Spartan Trial',desc:'Reach 60+ overall and complete a verified combine.',xp:125},
+  {id:'brewers-callup',type:'Boss Battle',img:'lua-quest-baller-call-up',title:'Baller Call Up',desc:'Reach Baller tier.',xp:175}
 ];
 
 // Tier labels reuse the same common/uncommon/rare/legendary "prize-giveaway
@@ -840,7 +844,7 @@ function renderQuests(){
     const doneThisWeek=completedThisWeek.has(q.id);
     const lifetimeCount=(state.quests||[]).filter(x=>x.id===q.id).length;
     return `<div class="quest-card ${q.type==='Boss Battle'?'battle':''} ${doneThisWeek?'complete':''}">
-      <div class="quest-icon">${q.icon}</div>
+      <img class="quest-art" src="assets/quests/${q.img}.webp" alt="" width="112" height="112" loading="lazy">
       <h3>${q.title}</h3>
       <p><strong>${q.type}</strong></p>
       <p>${q.desc}</p>
