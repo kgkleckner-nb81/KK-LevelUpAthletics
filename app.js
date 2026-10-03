@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{reaction:null,strike:0,homer:0},rainTokens:1,spinLog:[],arcadeGameLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null},pocketPrecision:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,webGem:0,clutchCatch:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0,pocketPrecision:0},attributePoints:{}};
+const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{homer:0},rainTokens:1,spinLog:[],arcadeGameLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null},pocketPrecision:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0,pocketPrecision:0},attributePoints:{}};
 let state=load();
 // account-layer equivalent of `state` — WHO is signed in and WHICH athlete
 // is selected, not athlete data itself (see refreshAthleteState()). Declared
@@ -156,11 +156,8 @@ function enterMode(mode){
   if(mode==='athlete') switchScreen('clubhouse');
   if(mode==='team') switchScreen('team');
   if(mode==='arcade'){
-    // Round 8: each arcade game's per-session difficulty ramp (Web Gem's
-    // delay/size, Clutch Catch's in-progress round) resets on a fresh
-    // visit to Arcade, not on every re-render. Home Run Hero's own
-    // difficulty/session state lives entirely inside its iframe now (v2).
-    resetWebGemSession();resetClutchSession();
+    // Every remaining arcade game keeps its own session state inside its
+    // iframe, so there's nothing to reset on entering Arcade.
     switchScreen('arcade');
   }
   if(mode==='coachhq') switchScreen('coachhq');
@@ -386,9 +383,9 @@ $('#resetData').onclick=()=>{
   state.activeProgramId=null;
   state.draftProgram=null;
   state.presetsSeeded=false;
-  state.arcadeScores={homeRunHero:{best:0,lastPlayed:null},webGem:{best:0,bestReaction:null,lastPlayed:null},clutchCatch:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null},pocketPrecision:{best:0,lastPlayed:null}};
-  state.arcadeMetrics={homeRunHero:0,webGem:0,clutchCatch:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0,pocketPrecision:0};
-  state.gameScores={reaction:null,strike:0,homer:0};
+  state.arcadeScores={homeRunHero:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null},pocketPrecision:{best:0,lastPlayed:null}};
+  state.arcadeMetrics={homeRunHero:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0,pocketPrecision:0};
+  state.gameScores={homer:0};
   state.rainTokens=1;
   state.spinLog=[];
   state.arcadeGameLog=[];
@@ -1913,8 +1910,7 @@ function todayISO(){return new Date().toISOString().slice(0,10)}
 // for the "Today's Game XP" stat tile. Not used to decide how much a round
 // SHOULD award — the RPC enforces the real 25/day cap server-side.
 function todayArcadeGameXP(){return (state.arcadeGameLog||[]).filter(x=>x.date===todayISO()).reduce((sum,x)=>sum+(+x.xp||0),0)}
-// Shared by all four arcade mini-games (Web Gem, Clutch Catch, Strike
-// Zone, Home Run Hero) — replaces the old local-only awardGameXP() with a
+// Shared by every arcade mini-game — replaces the old local-only awardGameXP() with a
 // server-enforced award via award_arcade_xp
 // (0017_arcade_game_xp_server_side.sql). Returns the actual credited
 // amount (may be less than requested once the 25/day cross-game cap is
@@ -1937,7 +1933,6 @@ async function awardArcadeXp(gameId,xp){
 // Supabase migration only has to change these functions' internals, not
 // every call site in each game's logic.
 function getArcadeBest(gameId){return (state.arcadeScores&&state.arcadeScores[gameId]&&state.arcadeScores[gameId].best)||0}
-function getWebGemBestReaction(){return state.arcadeScores&&state.arcadeScores.webGem?state.arcadeScores.webGem.bestReaction:null}
 function recordArcadeResult(gameId,result){
   state.arcadeScores=state.arcadeScores||{};
   const g=state.arcadeScores[gameId]=state.arcadeScores[gameId]||{best:0};
@@ -1947,13 +1942,6 @@ function recordArcadeResult(gameId,result){
   g.lastPlayed={...result,date:todayISO()};
   save();
   return {isNewBest,best:g.best,prevBest};
-}
-function updateWebGemReactionBest(ms){
-  if(ms==null) return;
-  state.arcadeScores=state.arcadeScores||{};
-  const g=state.arcadeScores.webGem=state.arcadeScores.webGem||{best:0};
-  if(g.bestReaction==null||ms<g.bestReaction) g.bestReaction=ms;
-  save();
 }
 // Round 8 item 21 — HARD CONSTRAINT: arcadeMetrics must never be read by
 // ratings()/pr()/score(). It exists only for a possible future "Arcade
@@ -2974,183 +2962,7 @@ async function renderLeagueHQ(){
   $('#leagueMeta').textContent=`${standings.length} Team${standings.length===1?'':'s'}${league.season?' · '+league.season:''}`;
   $('#leagueLeaderboardBody').innerHTML=standings.map(s=>`<tr><td>${s.team_name}</td><td>${s.athlete_count}</td><td>${s.team_xp}</td></tr>`).join('');
 }
-function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();if($('#gameXPToday'))$('#gameXPToday').textContent=todayArcadeGameXP();if($('#reactionBest'))$('#reactionBest').textContent=getWebGemBestReaction()??'—';if($('#strikeBest'))$('#strikeBest').textContent=state.gameScores?.strike??0;if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#clutchBest'))$('#clutchBest').textContent=getArcadeBest('clutchCatch');if($('#cannonArmBest'))$('#cannonArmBest').textContent=getArcadeBest('cannonArm');if($('#dugoutDisasterBest'))$('#dugoutDisasterBest').textContent=getArcadeBest('dugoutDisaster');if($('#ballparkBreakoutBest'))$('#ballparkBreakoutBest').textContent=getArcadeBest('ballparkBreakout');if($('#skylineSlamBest'))$('#skylineSlamBest').textContent=getArcadeBest('skylineSlam');if($('#pocketPrecisionBest'))$('#pocketPrecisionBest').textContent=getArcadeBest('pocketPrecision');renderArcadeExtras()}
-// ---- Web Gem (Round 8 glow-up of the old Reaction Catch) ----
-// Streak/combo model: a catch immediately queues the next ball at a
-// shorter delay and slightly smaller size; a miss or too-slow tap ends the
-// round. Session (delay/size ramp) resets on Arcade entry via
-// resetWebGemSession, same pattern as Home Run Hero.
-const WEBGEM_START_DELAY=1600,WEBGEM_DELAY_FLOOR=500,WEBGEM_DELAY_STEP=90,WEBGEM_REACT_WINDOW=1400;
-let webGemActive=false,webGemStreak=0,webGemDelay=WEBGEM_START_DELAY,webGemAppearAt=0,webGemBestReactionThisRound=null,webGemSpawnTimer=null,webGemTimeoutTimer=null;
-function resetWebGemSession(){
-  webGemActive=false;webGemStreak=0;webGemDelay=WEBGEM_START_DELAY;webGemBestReactionThisRound=null;
-  clearTimeout(webGemSpawnTimer);clearTimeout(webGemTimeoutTimer);
-}
-function startReactionGame(){
-  resetWebGemSession();
-  startWebGemRound();
-}
-function startWebGemRound(){
-  webGemActive=false;
-  $('#reactionResult').textContent=webGemStreak>0?`Streak: ${webGemStreak} — get ready...`:'Get ready...';
-  $('#reactionBall').classList.add('hidden');
-  clearTimeout(webGemSpawnTimer);clearTimeout(webGemTimeoutTimer);
-  const delay=webGemDelay*0.7+Math.random()*webGemDelay*0.6;
-  webGemSpawnTimer=setTimeout(()=>{
-    const b=$('#reactionBall');
-    const size=Math.max(40,64-Math.floor(webGemStreak/3)*3);
-    b.style.width=size+'px';b.style.height=size+'px';
-    b.style.left=(10+Math.random()*70)+'%';
-    b.style.top=(18+Math.random()*55)+'%';
-    b.classList.remove('hidden');
-    webGemAppearAt=performance.now();
-    webGemActive=true;
-    $('#reactionResult').textContent='TAP!';
-    webGemTimeoutTimer=setTimeout(()=>{if(webGemActive) endWebGemRound()},WEBGEM_REACT_WINDOW);
-  },delay);
-}
-function flashWebGemMilestone(streak){
-  const el=$('#reactionGame'); if(!el) return;
-  el.classList.add('milestone-flash');
-  setTimeout(()=>el.classList.remove('milestone-flash'),700);
-}
-function hitReactionBall(){
-  if(!webGemActive) return;
-  const ms=Math.round(performance.now()-webGemAppearAt);
-  webGemActive=false;
-  clearTimeout(webGemTimeoutTimer);
-  $('#reactionBall').classList.add('hidden');
-  webGemStreak++;
-  if(webGemBestReactionThisRound===null||ms<webGemBestReactionThisRound) webGemBestReactionThisRound=ms;
-  webGemDelay=Math.max(WEBGEM_DELAY_FLOOR,webGemDelay-WEBGEM_DELAY_STEP);
-  const milestone=[5,10,15].includes(webGemStreak);
-  if(milestone){
-    flashWebGemMilestone(webGemStreak);
-    $('#reactionResult').innerHTML=`🔥 <strong>${webGemStreak} in a row!</strong> Keep it up!`;
-  }else{
-    $('#reactionResult').textContent=`Caught! ${ms} ms · Streak: ${webGemStreak}`;
-  }
-  setTimeout(()=>startWebGemRound(),milestone?900:150);
-}
-async function endWebGemRound(){
-  webGemActive=false;
-  clearTimeout(webGemSpawnTimer);clearTimeout(webGemTimeoutTimer);
-  $('#reactionBall').classList.add('hidden');
-  const finalStreak=webGemStreak;
-  const xpEarned=Math.min(25,Math.round(finalStreak*1.5));
-  const e=await awardArcadeXp('webGem',xpEarned);
-  const res=recordArcadeResult('webGem',{score:finalStreak});
-  updateWebGemReactionBest(webGemBestReactionThisRound);
-  recordArcadeMetric('webGem',Math.min(100,finalStreak/20*100));
-  const bestReaction=getWebGemBestReaction();
-  const xpText=e===null?'Could not save XP — try again.':`+${e} XP`;
-  $('#reactionResult').innerHTML=`Streak ended at <strong>${finalStreak}</strong> · ${xpText}${res.isNewBest?' · New Best Streak! 🎉':''}<br><small>Best streak: ${res.best} · Best time: ${bestReaction!=null?bestReaction+' ms':'—'}</small>`;
-  webGemStreak=0;webGemDelay=WEBGEM_START_DELAY;webGemBestReactionThisRound=null;
-}
-// ---- Clutch Catch (Round 8 new game) ----
-// Several objects fall at once; one is the target (baseball), the rest are
-// decoys. Tap the target to score, tap a decoy or let the target fall
-// un-tapped and lose a life. Spawn rate and decoy ratio both increase over
-// the round. Plain absolutely-positioned DOM elements animated with CSS
-// transitions — no canvas/physics library, per Round 8's explicit scope.
-const CLUTCH_DECOYS=['🟠','⚽','🎾'];
-const CLUTCH_ROUND_MS=50000,CLUTCH_START_LIVES=3;
-let clutchActive=false,clutchLives=CLUTCH_START_LIVES,clutchScore=0,clutchStartTime=0,clutchSpawnTimer=null,clutchRoundTimer=null,clutchObjId=0;
-function resetClutchSession(){
-  clutchActive=false;
-  clearTimeout(clutchSpawnTimer);clearTimeout(clutchRoundTimer);
-  const arena=$('#clutchArena'); if(arena) arena.innerHTML='';
-  if($('#clutchLives')) $('#clutchLives').textContent='';
-}
-function clutchElapsedRatio(){return Math.min(1,(performance.now()-clutchStartTime)/CLUTCH_ROUND_MS)}
-function updateClutchHud(){
-  if(!$('#clutchLives')) return;
-  const lives=Math.max(0,clutchLives);
-  $('#clutchLives').textContent='❤️'.repeat(lives)+'🖤'.repeat(CLUTCH_START_LIVES-lives)+` · Score: ${clutchScore}`;
-}
-function flashClutchStage(cls){
-  const el=$('#clutchGame'); if(!el) return;
-  el.classList.add(cls);
-  setTimeout(()=>el.classList.remove(cls),300);
-}
-function scheduleClutchSpawn(){
-  if(!clutchActive) return;
-  const ratio=clutchElapsedRatio();
-  const interval=Math.max(450,1400-ratio*950);
-  clutchSpawnTimer=setTimeout(()=>{spawnClutchObject();scheduleClutchSpawn()},interval);
-}
-function spawnClutchObject(){
-  if(!clutchActive) return;
-  const arena=$('#clutchArena'); if(!arena) return;
-  const ratio=clutchElapsedRatio();
-  const decoyChance=Math.min(0.75,0.35+ratio*0.4);
-  const isTarget=Math.random()>decoyChance;
-  const el=document.createElement('button');
-  el.type='button';
-  el.className='clutch-object'+(isTarget?' target':' decoy');
-  el.textContent=isTarget?'⚾':CLUTCH_DECOYS[Math.floor(Math.random()*CLUTCH_DECOYS.length)];
-  el.dataset.id=++clutchObjId;
-  el.dataset.target=isTarget?'1':'0';
-  el.style.left=(6+Math.random()*82)+'%';
-  el.style.top='-12%';
-  arena.appendChild(el);
-  const fallMs=Math.max(1600,3000-ratio*1200);
-  requestAnimationFrame(()=>{
-    el.style.transition=`top ${fallMs}ms linear`;
-    el.style.top='108%';
-  });
-  const onExpire=()=>{
-    el.removeEventListener('transitionend',onExpire);
-    if(!el.isConnected) return;
-    if(el.dataset.target==='1'&&clutchActive){
-      clutchLives--;
-      flashClutchStage('clutch-miss-flash');
-      updateClutchHud();
-      if(clutchLives<=0){endClutchGame();return}
-    }
-    el.remove();
-  };
-  el.addEventListener('transitionend',onExpire);
-  el.onclick=()=>tapClutchObject(el);
-}
-function tapClutchObject(el){
-  if(!clutchActive||!el.isConnected) return;
-  const isTarget=el.dataset.target==='1';
-  el.remove();
-  if(isTarget){
-    clutchScore+=10;
-    flashClutchStage('clutch-hit-flash');
-    updateClutchHud();
-  }else{
-    clutchLives--;
-    flashClutchStage('clutch-miss-flash');
-    updateClutchHud();
-    if(clutchLives<=0){endClutchGame();return}
-  }
-}
-function startClutchGame(){
-  resetClutchSession();
-  clutchActive=true;
-  clutchLives=CLUTCH_START_LIVES;
-  clutchScore=0;
-  clutchStartTime=performance.now();
-  updateClutchHud();
-  $('#clutchResult').textContent='';
-  scheduleClutchSpawn();
-  clutchRoundTimer=setTimeout(()=>endClutchGame(),CLUTCH_ROUND_MS);
-}
-async function endClutchGame(){
-  clutchActive=false;
-  clearTimeout(clutchSpawnTimer);clearTimeout(clutchRoundTimer);
-  const arena=$('#clutchArena'); if(arena) arena.innerHTML='';
-  const xpEarned=Math.min(25,Math.round(clutchScore/4));
-  const e=await awardArcadeXp('clutchCatch',xpEarned);
-  const res=recordArcadeResult('clutchCatch',{score:clutchScore});
-  recordArcadeMetric('clutchCatch',clutchScore/150*100);
-  const xpText=e===null?'Could not save XP — try again.':`+${e} XP`;
-  $('#clutchResult').innerHTML=`Final score: <strong>${clutchScore}</strong> · ${xpText}${res.isNewBest?' · New Best! 🎉':''}`;
-}
-let strikeTarget=0,strikeRound=0,strikeScore=0;function startStrikeGame(){strikeRound=1;strikeScore=0;nextStrike()}function nextStrike(){strikeTarget=1+Math.floor(Math.random()*9);const names={1:'High & Inside',2:'High Center',3:'High & Away',4:'Middle Inside',5:'Middle',6:'Middle Away',7:'Low & Inside',8:'Low Center',9:'Low & Away'};$('#strikePrompt').textContent=`Round ${strikeRound}/5: ${names[strikeTarget]}`}async function chooseStrike(z){if(!strikeRound)return;if(z===strikeTarget){strikeScore+=100;$('#strikeResult').textContent='Correct! +100'}else $('#strikeResult').textContent='Missed. Keep learning the zone.';strikeRound++;if(strikeRound>5){state.gameScores=state.gameScores||{};state.gameScores.strike=Math.max(state.gameScores.strike||0,strikeScore);const finalScore=strikeScore;strikeRound=0;save();const e=await awardArcadeXp('strikeZone',10);const xpText=e===null?'Could not save XP — try again.':`+${e} XP`;$('#strikePrompt').textContent=`Final Score: ${finalScore} · ${xpText}`}else nextStrike()}
+function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();if($('#gameXPToday'))$('#gameXPToday').textContent=todayArcadeGameXP();if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#cannonArmBest'))$('#cannonArmBest').textContent=getArcadeBest('cannonArm');if($('#dugoutDisasterBest'))$('#dugoutDisasterBest').textContent=getArcadeBest('dugoutDisaster');if($('#ballparkBreakoutBest'))$('#ballparkBreakoutBest').textContent=getArcadeBest('ballparkBreakout');if($('#skylineSlamBest'))$('#skylineSlamBest').textContent=getArcadeBest('skylineSlam');if($('#pocketPrecisionBest'))$('#pocketPrecisionBest').textContent=getArcadeBest('pocketPrecision');renderArcadeExtras()}
 // ---- Home Run Hero (v2: embedded "Wild Home Run Derby" Phaser build) ----
 // The game itself lives entirely at assets/games/home-run-derby/ (a
 // self-contained Vite/Phaser build, no shared code with this file) and
@@ -3160,9 +2972,9 @@ let strikeTarget=0,strikeRound=0,strikeScore=0;function startStrikeGame(){strike
 // is 0-100 and explicitly marked non-authoritative by the game itself, so
 // XP is decided and awarded here, exactly the same way every other arcade
 // game's result is: through awardArcadeXp(), which enforces the real
-// 25/day cap server-side. XP formula mirrors the other full-round games
-// (Web Gem, Clutch Catch), which also let one good round hit the full
-// daily cap on its own: xp = round(score/100 * 25).
+// 25/day cap server-side. XP formula mirrors the other full-round games,
+// which also let one good round hit the full daily cap on its own:
+// xp = round(score/100 * 25).
 // ---- Game entry tiles / shared game modal ----
 // Home Run Hero, Cannon Arm, and Dugout Disaster used to be embedded
 // inline as full-width cards; they're now condensed clickable tiles
@@ -3459,10 +3271,6 @@ if($('#teamLogoUpload'))$('#teamLogoUpload').onchange=e=>handleTeamLogoUpload(e.
 if($('#joinTeamProgram'))$('#joinTeamProgram').onclick=joinTeamProgram;
 if($('#completeTeamProgram'))$('#completeTeamProgram').onclick=goToTeamProgramCheckIn;
 $$('.reaction-btn').forEach(b=>b.onclick=()=>addReaction(b.textContent));
-if($('#startReaction'))$('#startReaction').onclick=startReactionGame;
-if($('#reactionBall'))$('#reactionBall').onclick=hitReactionBall;
-if($('#startStrike'))$('#startStrike').onclick=startStrikeGame;
-$$('#strikeZone button').forEach(b=>b.onclick=()=>chooseStrike(+b.dataset.zone));
 window.addEventListener('message',handleHomerDerbyMessage);
 window.addEventListener('message',handleCannonArmMessage);
 window.addEventListener('message',handleDugoutDisasterMessage);
@@ -3475,7 +3283,6 @@ if($('#skylineSlamFrame')) $('#skylineSlamFrame').addEventListener('load',functi
 if($('#pocketPrecisionFrame')) $('#pocketPrecisionFrame').addEventListener('load',function(){
   try{ this.contentWindow.onLevelUpGameComplete=handlePocketPrecisionResult; }catch(e){}
 });
-if($('#startClutch'))$('#startClutch').onclick=startClutchGame;
 if($('#wheelInner'))$('#wheelInner').innerHTML=buildWheelSVG();
 if($('#spinButton'))$('#spinButton').onclick=spinWheel;
 if($('#buildYourAthleteBtn'))$('#buildYourAthleteBtn').onclick=buildYourAthlete;
