@@ -650,12 +650,12 @@ function pathToNextTier(){
   };
 }
 // Simple black checkbox; when done, a bold cyan marker-style checkmark
-// (tapered, ink-outlined so it stays readable on white) fills the box and
+// (constant-width, square-ended, ink-outlined so it stays readable on white) fills the box and
 // its long stroke sweeps out past the box edge. Pure inline SVG so it needs
 // no art files and scales crisply. Status is announced as text, not just
 // color/shape, via the visually-hidden span.
 function luaCheckHTML(done){
-  const mark=done?'<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lua-check-outline" d="M2.4 12.9C3.4 11.6 5 11.5 6.1 12.6L9.2 15.6C13 10.6 17.5 6 22.8 2.4C19.6 8.2 15.4 14.8 10.6 20.4C9.8 21.3 8.7 21.1 8 20.3L2.6 14.4C2.2 13.9 2.2 13.4 2.4 12.9Z"/><path class="lua-check-mark" d="M2.4 12.9C3.4 11.6 5 11.5 6.1 12.6L9.2 15.6C13 10.6 17.5 6 22.8 2.4C19.6 8.2 15.4 14.8 10.6 20.4C9.8 21.3 8.7 21.1 8 20.3L2.6 14.4C2.2 13.9 2.2 13.4 2.4 12.9Z"/></svg>':'';
+  const mark=done?'<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lua-check-outline" d="M3.8 12.6L9 18Q13.6 10.6 21 3.6"/><path class="lua-check-mark" d="M3.8 12.6L9 18Q13.6 10.6 21 3.6"/></svg>':'';
   return `<span class="lua-check${done?' done':''}" aria-hidden="true">${mark}</span><span class="sr-only">${done?'Done: ':'Not yet: '}</span>`;
 }
 function renderPathToNextTier(){

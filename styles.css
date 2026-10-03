@@ -869,9 +869,9 @@ footer{
    on white is too low-contrast to read. */
 .lua-check{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:2.5px solid var(--ink);border-radius:7px;background:var(--white);box-sizing:border-box}
 .lua-check svg{width:165%;height:165%;flex:none;display:block;overflow:visible;transform:translate(9%,-3%)}
-.lua-check path{stroke-linejoin:round}
-.lua-check-outline{fill:var(--ink);stroke:var(--ink);stroke-width:2.6}
-.lua-check-mark{fill:var(--neon-blue);stroke:none}
+.lua-check path{fill:none;stroke-linejoin:round;stroke-linecap:square}
+.lua-check-outline{stroke:var(--ink);stroke-width:7.6}
+.lua-check-mark{stroke:var(--neon-blue);stroke-width:4.6}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .tier.cardtier.active{
   transform:scale(1.045);
