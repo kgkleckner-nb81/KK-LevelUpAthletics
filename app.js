@@ -1,5 +1,5 @@
 const KEY='ethansBaseballHQ.logoParent.v1';
-const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{homer:0},rainTokens:1,spinLog:[],arcadeGameLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null},pocketPrecision:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0,pocketPrecision:0},attributePoints:{}};
+const defaults={athleteName:'Ethan',daily:[],combine:[],quests:[],bonuses:[],claimedRewards:[],inventory:['default'],equipped:{frame:'default',background:'default',outfit:'default',prop:'default',faceAccent:'default',title:'default'},gearPurchases:[],shoutouts:[],gameScores:{homer:0},rainTokens:1,spinLog:[],arcadeGameLog:[],arcadeDaily:{date:'',spinsUsed:0,spinsAvailable:1,triviaAnswered:false,triviaCorrect:null,triviaSelected:null},programs:[],activeProgramId:null,draftProgram:null,presetsSeeded:false,teamProgram:null,teamProgramOptIn:false,currentTierIndex:0,combineCheckpoints:[],team:null,teamIdentityJoined:false,arcadeScores:{homeRunHero:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null},pocketPrecision:{best:0,lastPlayed:null},turfTrouble:{best:0,lastPlayed:null}},arcadeMetrics:{homeRunHero:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0,pocketPrecision:0,turfTrouble:0},attributePoints:{}};
 let state=load();
 // account-layer equivalent of `state` — WHO is signed in and WHICH athlete
 // is selected, not athlete data itself (see refreshAthleteState()). Declared
@@ -383,8 +383,8 @@ $('#resetData').onclick=()=>{
   state.activeProgramId=null;
   state.draftProgram=null;
   state.presetsSeeded=false;
-  state.arcadeScores={homeRunHero:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null},pocketPrecision:{best:0,lastPlayed:null}};
-  state.arcadeMetrics={homeRunHero:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0,pocketPrecision:0};
+  state.arcadeScores={homeRunHero:{best:0,lastPlayed:null},cannonArm:{best:0,lastPlayed:null},dugoutDisaster:{best:0,lastPlayed:null},ballparkBreakout:{best:0,lastPlayed:null},skylineSlam:{best:0,lastPlayed:null},pocketPrecision:{best:0,lastPlayed:null},turfTrouble:{best:0,lastPlayed:null}};
+  state.arcadeMetrics={homeRunHero:0,cannonArm:0,dugoutDisaster:0,ballparkBreakout:0,skylineSlam:0,pocketPrecision:0,turfTrouble:0};
   state.gameScores={homer:0};
   state.rainTokens=1;
   state.spinLog=[];
@@ -2962,7 +2962,7 @@ async function renderLeagueHQ(){
   $('#leagueMeta').textContent=`${standings.length} Team${standings.length===1?'':'s'}${league.season?' · '+league.season:''}`;
   $('#leagueLeaderboardBody').innerHTML=standings.map(s=>`<tr><td>${s.team_name}</td><td>${s.athlete_count}</td><td>${s.team_xp}</td></tr>`).join('');
 }
-function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();if($('#gameXPToday'))$('#gameXPToday').textContent=todayArcadeGameXP();if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#cannonArmBest'))$('#cannonArmBest').textContent=getArcadeBest('cannonArm');if($('#dugoutDisasterBest'))$('#dugoutDisasterBest').textContent=getArcadeBest('dugoutDisaster');if($('#ballparkBreakoutBest'))$('#ballparkBreakoutBest').textContent=getArcadeBest('ballparkBreakout');if($('#skylineSlamBest'))$('#skylineSlamBest').textContent=getArcadeBest('skylineSlam');if($('#pocketPrecisionBest'))$('#pocketPrecisionBest').textContent=getArcadeBest('pocketPrecision');renderArcadeExtras()}
+function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();if($('#gameXPToday'))$('#gameXPToday').textContent=todayArcadeGameXP();if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#cannonArmBest'))$('#cannonArmBest').textContent=getArcadeBest('cannonArm');if($('#dugoutDisasterBest'))$('#dugoutDisasterBest').textContent=getArcadeBest('dugoutDisaster');if($('#ballparkBreakoutBest'))$('#ballparkBreakoutBest').textContent=getArcadeBest('ballparkBreakout');if($('#skylineSlamBest'))$('#skylineSlamBest').textContent=getArcadeBest('skylineSlam');if($('#pocketPrecisionBest'))$('#pocketPrecisionBest').textContent=getArcadeBest('pocketPrecision');if($('#turfTroubleBest'))$('#turfTroubleBest').textContent=getArcadeBest('turfTrouble');renderArcadeExtras()}
 // ---- Home Run Hero (v2: embedded "Wild Home Run Derby" Phaser build) ----
 // The game itself lives entirely at assets/games/home-run-derby/ (a
 // self-contained Vite/Phaser build, no shared code with this file) and
@@ -2991,7 +2991,8 @@ const GAME_MODAL_CONFIG={
   dugout:{wrap:'dugoutFrameWrap',frame:'dugoutDisasterFrame',title:'Dugout Disaster'},
   ballpark:{wrap:'ballparkFrameWrap',frame:'ballparkBreakoutFrame',title:'Ballpark Breakout'},
   skyline:{wrap:'skylineFrameWrap',frame:'skylineSlamFrame',title:'Skyline Slam'},
-  pocket:{wrap:'pocketFrameWrap',frame:'pocketPrecisionFrame',title:'Pocket Precision'}
+  pocket:{wrap:'pocketFrameWrap',frame:'pocketPrecisionFrame',title:'Pocket Precision'},
+  turf:{wrap:'turfFrameWrap',frame:'turfTroubleFrame',title:'Turf Trouble'}
 };
 function openGameModal(gameKey){
   const cfg=GAME_MODAL_CONFIG[gameKey];
@@ -3128,6 +3129,27 @@ async function handlePocketPrecisionResult(data){
   const deltaText=prevBest>0?(delta>=0?`+${delta} above your best`:`${Math.abs(delta)} below your best (${prevBest})`):(score>0?'First result logged!':'');
   const xpText=e===null?'Could not save XP — try again.':`+${e} XP`;
   if($('#pocketPrecisionResult')) $('#pocketPrecisionResult').innerHTML=`<strong>${score} / 100</strong> · ${xpText}${isNewBest?' · New Best! 🎉':''}${deltaText?`<br><small>${deltaText}</small>`:''}`;
+}
+// ---- Turf Trouble (embedded Canvas maze-chase build) ----
+// Same same-origin window.onLevelUpGameComplete contract as Pocket
+// Precision/Skyline Slam — see handleBallparkBreakoutResult's comment for
+// the full rationale. The game reports a normalized 0-100 score
+// (min(100, round(rawScore/100))) once per run, including when the
+// athlete ends a run early, and the standard round(score/100*25) XP
+// formula and server-side 25/day cap apply like every other game. Only the
+// iframe id, arcadeScores/arcadeMetrics key ('turfTrouble'), and result
+// element differ; the game lives at assets/games/turf-trouble/.
+async function handleTurfTroubleResult(data){
+  if(!data) return;
+  const score=Math.max(0,Math.min(100,Math.round(+data.score||0)));
+  const {isNewBest,prevBest}=recordArcadeResult('turfTrouble',{score});
+  const xpEarned=Math.round(score/100*25);
+  const e=await awardArcadeXp('turfTrouble',xpEarned);
+  recordArcadeMetric('turfTrouble',score);
+  const delta=score-prevBest;
+  const deltaText=prevBest>0?(delta>=0?`+${delta} above your best`:`${Math.abs(delta)} below your best (${prevBest})`):(score>0?'First result logged!':'');
+  const xpText=e===null?'Could not save XP — try again.':`+${e} XP`;
+  if($('#turfTroubleResult')) $('#turfTroubleResult').innerHTML=`<strong>${score} / 100</strong> · ${xpText}${isNewBest?' · New Best! 🎉':''}${deltaText?`<br><small>${deltaText}</small>`:''}`;
 }
 function ensureArcadeDay(){
   const today=todayISO();
@@ -3282,6 +3304,9 @@ if($('#skylineSlamFrame')) $('#skylineSlamFrame').addEventListener('load',functi
 });
 if($('#pocketPrecisionFrame')) $('#pocketPrecisionFrame').addEventListener('load',function(){
   try{ this.contentWindow.onLevelUpGameComplete=handlePocketPrecisionResult; }catch(e){}
+});
+if($('#turfTroubleFrame')) $('#turfTroubleFrame').addEventListener('load',function(){
+  try{ this.contentWindow.onLevelUpGameComplete=handleTurfTroubleResult; }catch(e){}
 });
 if($('#wheelInner'))$('#wheelInner').innerHTML=buildWheelSVG();
 if($('#spinButton'))$('#spinButton').onclick=spinWheel;

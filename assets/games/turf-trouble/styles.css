@@ -1,0 +1,40 @@
+@font-face{font-family:Teko;src:url('assets/Teko.ttf')}*{box-sizing:border-box}body{margin:0;background:#06131d;color:#e6f5ff;font-family:Arial,sans-serif;overscroll-behavior:none}main{max-width:1280px;margin:auto;padding:10px 18px}header{display:flex;align-items:center;gap:14px;min-height:75px}.brand{font-size:11px;letter-spacing:.1em;color:#82c9ea}h1{font:600 37px/.95 Teko;margin:5px 0 0;letter-spacing:.02em;white-space:nowrap}h1 span{color:#00b5ff}.stats{display:flex;justify-content:space-evenly;flex:1;gap:18px}.stats div{font-size:11px;color:#9cb7c8;letter-spacing:.07em}.stats b{display:block;color:#fff;font:600 31px/1 Teko;margin-top:5px}button{border:1px solid #315468;border-radius:9px;background:#152b39;color:#fff;padding:12px 15px;font-weight:bold;cursor:pointer;touch-action:manipulation}button:disabled{opacity:.5;cursor:default}button:focus-visible,canvas:focus-visible{outline:3px solid #ffd07a;outline-offset:2px}.primary{background:#00b5ff;color:#042139;border-color:#70dbff;font:600 24px Teko;letter-spacing:.04em}#arena{position:relative;width:min(100%,calc((100dvh - 193px)*1.375));margin:0 auto;background:#14462c;border:5px solid #694528;border-radius:15px;overflow:hidden;box-shadow:0 12px 45px #0006}canvas{display:block;width:100%;height:auto;touch-action:none}#overlay{position:absolute;inset:0;display:grid;place-items:center;background:#041a20a8;backdrop-filter:blur(3px);padding:20px}#overlay[hidden]{display:none}.panel{max-width:480px;text-align:center;background:#071c2af5;border:1px solid #3c7e98;border-radius:18px;padding:25px;box-shadow:0 15px 60px #0009}.eyebrow{color:#64d2ff;font-size:12px;font-weight:bold;letter-spacing:.13em}h2{font:600 45px/1 Teko;margin:13px 0;color:#fff}.panel p{font-size:15px;line-height:1.45;color:#bbd0dd}.panel .primary{width:100%;margin-top:16px}.legend{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;font-size:12px;color:#dfe8ef}#notice{position:absolute;top:15px;left:0;right:0;text-align:center;font:600 29px Teko;text-shadow:0 3px 6px #000;pointer-events:none}footer{display:flex;align-items:center;justify-content:center;gap:20px;margin-top:10px}.hint strong,.hint span{display:block}.hint strong{font:500 23px Teko}.hint span{font-size:12px;color:#88a6b8}#pad{text-align:center;line-height:1}#pad button{padding:7px 14px;min-width:44px;min-height:32px}#pad>button{margin-bottom:3px}#juke{min-width:135px}.phone-note{text-align:center;font-size:12px;color:#7093a6;margin:8px 0 0}#charges{background:#003652;color:#fff;border-radius:5px;padding:1px 7px;margin-left:8px}@media(max-width:850px){main{padding:5px 9px}header{gap:8px;min-height:63px}h1{font-size:28px}.brand{font-size:9px}.stats{gap:8px}.stats div{font-size:9px}.stats b{font-size:25px}header button{font-size:11px;padding:9px}#arena{width:min(100%,calc((100dvh - 180px)*1.375))}footer{gap:12px}.panel{padding:16px}.panel p{font-size:13px}h2{font-size:34px}}@media(max-width:600px){header{flex-wrap:wrap;padding:5px 0}.brand{flex:1}.stats{order:3;flex-basis:100%;padding:7px}.stats div{font-size:10px}#arena{width:100%}footer{gap:8px}.hint{display:none}#juke{min-width:90px}.panel{padding:10px}.panel p{font-size:12px;margin:7px 0}.panel h2{font-size:27px;margin:8px}.legend{font-size:10px}.eyebrow{display:none}.panel .primary{margin-top:7px;padding:6px}}@media(max-height:600px) and (orientation:landscape){header{min-height:46px}.brand{font-size:9px}h1{font-size:25px}.stats b{font-size:23px}#arena{width:min(100%,calc((100dvh - 122px)*1.375))}footer{margin-top:4px}#pad{display:none}.phone-note{display:none}.panel{padding:12px}.panel p{font-size:12px}.panel h2{font-size:30px}.panel .primary{margin-top:6px;padding:5px}}
+
+/* --- Level Up Athletics host fixes (not in the original game package) ---
+   The intro overlay was a fixed-height grid inside an overflow:hidden
+   field, so on a phone-sized field the panel (313px) was taller than the
+   field (247px) and the Start button was clipped and unreachable.
+   1) Scrollable flex overlay with margin:auto on the panel: centered when
+      it fits, top-aligned and scrollable (never cut off) when it doesn't.
+   2) Compact intro on phone widths and on short frames (small laptops,
+      under ~610px tall): drop the eyebrow, the redundant
+      intro sentence and the defender legend (the how-to-play lines
+      remain) and tighten spacing. */
+#overlay{display:flex;overflow:auto}
+#overlay .panel{margin:auto}
+@media(max-width:650px),(max-height:610px){
+  #overlay{padding:8px}
+  .panel{padding:12px}
+  .panel .eyebrow,#intro,.legend{display:none}
+  h2{font-size:34px;margin:2px 0 6px}
+  .panel p{font-size:12px;line-height:1.35;margin:5px 0}
+  .panel .primary{margin-top:8px;padding:9px 15px}
+}
+
+/* 3) The original sizing formula for desktop-width frames,
+   (100dvh - 193px) * 1.375, assumes 193px of header/footer chrome around
+   the field. Inside the site's modal the real figure is ~208px (the
+   "best played in landscape" note adds height), so the page overflowed
+   the frame by 7-11px and the Juke button sat partly below the fold.
+   Only >850px-wide frames are affected (the short-landscape override
+   below comes later and wins for <=600px-tall frames); the game's own
+   phone rules are left as shipped. */
+@media(min-width:851px){
+  #arena{width:min(100%,calc((100dvh - 208px)*1.375))}
+}
+/* Same miscount in the game's own short-landscape layout (<=600px tall),
+   which small desktop/laptop frames fall into: 122px assumed, ~134px real. */
+@media(min-width:851px) and (max-height:600px) and (orientation:landscape){
+  #arena{width:min(100%,calc((100dvh - 134px)*1.375))}
+}
+
