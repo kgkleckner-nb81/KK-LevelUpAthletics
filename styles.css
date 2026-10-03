@@ -963,23 +963,17 @@ footer{
 #arcade .stat{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2)}
 #arcade .stat span{color:rgba(255,255,255,.6)}
 #arcade .stat strong{color:var(--neon-yellow)}
+/* Top-scores tiles shrunk ~15% (padding, gaps, type, tile spacing) so the
+   scoreboard takes less of the arcade page. Scoped to .arcade-hero so the
+   same .stat tiles on other screens are untouched. */
+.arcade-hero .stats{gap:13.6px}
+.arcade-hero .stat{padding:17px;margin-bottom:13.6px}
+.arcade-hero .stat:before{left:11.9px;top:11.9px;width:28.9px;height:4.25px}
+.arcade-hero .stat span{font-size:10.2px}
+.arcade-hero .stat strong{font-size:42.5px;line-height:1.02}
+.arcade-hero .stat small{font-size:11.33px}
 #arcade .card:before{background:linear-gradient(90deg,var(--neon-blue),var(--neon-yellow))}
 .arcade-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.game-stage{position:relative;height:240px;border:2px dashed rgba(255,255,255,.3);border-radius:16px;overflow:hidden;display:grid;place-items:center}
-.reaction-ball{position:absolute;width:64px;height:64px;border-radius:50%;padding:0;background:#fff;font-size:34px;box-shadow:0 6px 14px rgba(0,0,0,.35)}
-.game-stage.milestone-flash{animation:milestone-pulse .7s ease-out 1}
-@keyframes milestone-pulse{0%{box-shadow:inset 0 0 0 0 rgba(57,255,136,.6)}30%{box-shadow:inset 0 0 30px 6px rgba(57,255,136,.7)}100%{box-shadow:inset 0 0 0 0 rgba(57,255,136,0)}}
-.clutch-stage{display:flex;flex-direction:column;gap:8px;padding:10px}
-.clutch-arena{position:relative;width:100%;height:180px;border-radius:12px;background:rgba(255,255,255,.06);overflow:hidden}
-.clutch-object{position:absolute;width:44px;height:44px;border-radius:50%;padding:0;border:0;font-size:26px;line-height:44px;text-align:center;background:transparent;box-shadow:none;transform:translate(-50%,0)}
-.clutch-object.target{filter:drop-shadow(0 0 6px rgba(0,229,255,.8))}
-#clutchLives{font-size:14px;letter-spacing:.05em}
-.game-stage.clutch-hit-flash{animation:clutch-hit-pulse .3s ease-out 1}
-.game-stage.clutch-miss-flash{animation:clutch-miss-pulse .3s ease-out 1}
-@keyframes clutch-hit-pulse{0%{box-shadow:inset 0 0 0 0 rgba(0,229,255,.7)}40%{box-shadow:inset 0 0 24px 6px rgba(0,229,255,.7)}100%{box-shadow:inset 0 0 0 0 rgba(0,229,255,0)}}
-@keyframes clutch-miss-pulse{0%{box-shadow:inset 0 0 0 0 rgba(255,46,154,.7)}40%{box-shadow:inset 0 0 24px 6px rgba(255,46,154,.7)}100%{box-shadow:inset 0 0 0 0 rgba(255,46,154,0)}}
-.strike-zone{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:280px;margin:16px auto}
-.strike-zone button{aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,.08);color:#fff;border:2px solid rgba(255,255,255,.3)}
 /* Home Run Hero, Cannon Arm, and Dugout Disaster are embedded games
    (Phaser.Scale.FIT for the first two, Canvas for Dugout Disaster),
    each internally locked to 16:9 — the frame just needs to hold that
