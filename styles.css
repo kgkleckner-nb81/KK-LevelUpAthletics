@@ -1011,6 +1011,13 @@ footer{
 @media(max-width:600px){
   .game-modal-card .game-frame{aspect-ratio:auto;height:70vh}
 }
+/* Pocket Precision is a full-page layout (header, scoreboard, field,
+   controls) built for roughly an 850px-tall iframe, not a 16:9 canvas
+   like the other games, so it gets a tall frame sized to the modal's own
+   86vh cap (minus the ~60px header) instead. The extra .game-modal-card
+   selector keeps this ahead of the <=600px 70vh rule above. */
+.game-frame.game-frame-tall,
+.game-modal-card .game-frame.game-frame-tall{aspect-ratio:auto;height:min(calc(86vh - 60px),880px)}
 #arcade #arcadeLeaderboard .table th,#arcade #arcadeLeaderboard .table td{color:#fff;border-color:rgba(255,255,255,.14)}
 #arcade .muted{color:rgba(255,255,255,.65)}
 
