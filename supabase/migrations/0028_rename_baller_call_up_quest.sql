@@ -1,0 +1,11 @@
+-- Level Up Athletics — rename the "Brewers Call-Up" boss battle to
+-- "Baller Call Up" (matches the new Quests & Battles artwork and the live
+-- Call-Up Ladder, which has no "Brewers Prospect" tier anymore).
+--
+-- Display name only. The id stays 'brewers-callup' on purpose: it's the
+-- foreign key in quest_completions and the key complete_quest() uses for
+-- its once-per-week check, so changing it would orphan past claims and
+-- let a quest be awarded twice in the same week. xp_value (175) and type
+-- are unchanged. The Completed history reads quests.name through that
+-- join, so this one UPDATE also relabels every past completion.
+update quests set name = 'Baller Call Up' where id = 'brewers-callup';

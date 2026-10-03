@@ -17,7 +17,7 @@ insert into quests (id, name, type, xp_value) values
   ('fastball-monster', 'Fastball Monster',        'battle', 100),
   ('base-dragon',      'Base-Stealing Dragon',    'battle', 100),
   ('spartan-trial',    'Spartan Trial',           'battle', 125),
-  ('brewers-callup',   'Brewers Call-Up',         'battle', 175)
+  ('brewers-callup',   'Baller Call Up',          'battle', 175)
 on conflict (id) do update set name = excluded.name, type = excluded.type, xp_value = excluded.xp_value;
 
 -- rewards.id is a generated uuid in the schema (unlike quests/gear_items,
