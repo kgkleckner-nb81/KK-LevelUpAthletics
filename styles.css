@@ -898,7 +898,17 @@ footer{
 }
 
 /* Workout History v2 enhancements */
+/* Date, check, and XP stay on one line; Program and Activities Logged
+   (columns 4-5) wrap so a long exercise list breaks onto new lines inside
+   its own cell instead of stretching the table past the card. */
 .workout-history td,.workout-history th{white-space:nowrap}
+.workout-history td:nth-child(n+4),.workout-history th:nth-child(n+4){white-space:normal}
+.workout-history td:nth-child(5){min-width:140px;overflow-wrap:anywhere}
+@media(max-width:600px){
+  .workout-history td,.workout-history th{white-space:normal;padding:9px 5px;font-size:13px}
+  .workout-history th:nth-child(2),.workout-history td:nth-child(2){padding-left:2px;padding-right:2px}
+  .workout-history td:nth-child(5){min-width:0}
+}
 .workout-row{cursor:pointer;transition:background .12s ease,transform .12s ease}
 .workout-row:hover{background:rgba(0,229,255,.14);transform:translateX(2px)}
 .pr-chip,.new-pr{display:inline-block;margin-left:6px;padding:3px 8px;border-radius:999px;font-family:var(--accent);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);background:var(--neon-green)}
@@ -914,7 +924,7 @@ footer{
 .total-xp{border-top:2px solid var(--line);padding-top:10px;font-size:20px}
 .detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 18px}
 .coach-report{font-size:16px;line-height:1.45}
-@media(max-width:850px){.detail-grid{grid-template-columns:1fr}.workout-history{display:block;overflow-x:auto}}
+@media(max-width:850px){.detail-grid{grid-template-columns:1fr}}
 
 .mission-card{background:linear-gradient(135deg,var(--cream),var(--white))}
 .streak-card{background:linear-gradient(135deg,var(--creamsicle),var(--peach))}
