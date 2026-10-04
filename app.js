@@ -64,13 +64,13 @@ const quests=[
 // hierarchy" language as the Arcade wheel's weighted tiers, just applied to
 // reward spacing instead of wheel wedge size.
 const rewardMilestones=[
-  {xp:250,title:'Ice Cream Single',icon:'🍦',desc:'Small surprise reward.',tier:'Common'},
-  {xp:500,title:'Batting Cage Trip',icon:'🥎',desc:'Parent-approved cage session or dad pitching session.',tier:'Common'},
-  {xp:750,title:'New Baseball Bonus',icon:'⚾',desc:'New baseball, eye black, or small gear item.',tier:'Uncommon'},
-  {xp:1000,title:'Baseball Store Visit',icon:'🧢',desc:'Trip to pick a small baseball item.',tier:'Uncommon'},
-  {xp:1500,title:'"The Show" Award',icon:'🔵',desc:'Favorite team themed surprise.',tier:'Rare'},
-  {xp:2000,title:'All-Star Outing',icon:'🏟️',desc:'Special baseball outing idea.',tier:'Rare'},
-  {xp:3000,title:'MVP Surprise',icon:'🏆',desc:'Big end-of-season reward.',tier:'Legendary'}
+  {xp:250,title:'Victory Treat',img:'lua-reward-victory-treat',desc:'A parent-approved dessert or sweet treat of the athlete\u2019s choice.',tier:'Common'},
+  {xp:500,title:'Bonus Round',img:'lua-reward-bonus-round',desc:'An extra play session at a parent-approved activity spot, such as a court, rink, cage, or mini-golf course.',tier:'Common'},
+  {xp:750,title:'Gear Grab',img:'lua-reward-gear-grab',desc:'A small sports or active-play gift chosen with a parent.',tier:'Uncommon'},
+  {xp:1000,title:'Gear Store Draft',img:'lua-reward-gear-store-draft',desc:'A trip to a gear store to choose one parent-approved item.',tier:'Uncommon'},
+  {xp:1500,title:'Fan Favorite',img:'lua-reward-fan-favorite',desc:'A surprise themed around the athlete\u2019s favorite team.',tier:'Rare'},
+  {xp:2000,title:'All-Star Adventure',img:'lua-reward-all-star-adventure',desc:'A special sports outing or activity chosen with a parent.',tier:'Rare'},
+  {xp:3000,title:'MVP Experience',img:'lua-reward-mvp-experience',desc:'A bigger, personalized end-of-season experience planned with a parent.',tier:'Legendary'}
 ];
 const bonusXPValues={
   'Great Effort Bonus':25,
@@ -807,7 +807,7 @@ function renderRewards(){
     return `<div class="reward-tile ${available?'unlocked':''}">
       <span class="reward-tier-badge tier-${r.tier.toLowerCase()}">${r.tier}</span>
       <img class="reward-status-icon" src="${available?'assets/xp/lua-reward-ready.svg':'assets/xp/lua-reward-locked.svg'}" alt="${available?'Ready to claim':'Locked'}" width="32" height="32">
-      <div class="quest-icon">${r.icon}</div>
+      <img class="reward-art" src="assets/rewards/${r.img}.webp" alt="" width="96" height="96" loading="lazy">
       <h3>${r.title}</h3>
       <p class="reward-price"><img src="assets/xp/lua-xp-coin.svg" alt="" width="22" height="22"><strong>${r.xp} XP</strong></p>
       <p>${r.desc}</p>
