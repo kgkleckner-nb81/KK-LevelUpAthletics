@@ -177,6 +177,51 @@ async function verifyApprovalPinRemote(pin){
   return !!data;
 }
 
+// ---------------- PIN guess-limiting (migration 0030) ----------------
+// attempt_approval_pin() is the ONLY place a real PIN is compared on the
+// server: 5 wrong guesses lock approvals for 15 minutes, and a correct PIN
+// returns a random 3-minute approval token. That token — not the PIN — is
+// what every gated RPC receives in its (unchanged) p_pin argument, and
+// verify_approval_pin() now validates it. showPinModal() does all of this,
+// so no call site changed.
+//
+// Returns one of:
+//   {ok:true, token}                      correct PIN
+//   {ok:false, attempts_left}             wrong PIN
+//   {ok:false, locked:true, retry_after_seconds}
+//   {ok:false, no_pin:true}               no PIN created yet
+//   {legacy:true}                         migration 0030 not applied yet
+async function attemptApprovalPin(pin){
+  const {data,error}=await supabase.rpc('attempt_approval_pin',{p_pin:pin});
+  if(error){
+    // Deploy-order safety: until 0030 is run, the function doesn't exist.
+    // Fall back to the old behavior (raw PIN straight to the gated RPCs)
+    // instead of breaking every approval screen.
+    if(error.code==='PGRST202'||/could not find the function/i.test(error.message||'')) return {legacy:true};
+    throw error;
+  }
+  return data;
+}
+
+function describePinFailure(r){
+  if(r.locked){
+    const mins=Math.max(1,Math.ceil((r.retry_after_seconds||900)/60));
+    return `Too many wrong tries. Approvals are paused for about ${mins} minute${mins===1?'':'s'}.`;
+  }
+  if(r.no_pin) return 'Set up your PIN in Settings first.';
+  const n=r.attempts_left;
+  return typeof n==='number'?`Incorrect PIN. ${n} ${n===1?'try':'tries'} left.`:'Incorrect PIN.';
+}
+
+// Resolves to {credential} (pass it as the p_pin of a gated RPC) or
+// {error} (a message to show the user).
+async function getApprovalCredential(pin){
+  const r=await attemptApprovalPin(pin);
+  if(r.legacy) return {credential:pin};
+  if(r.ok) return {credential:r.token};
+  return {error:describePinFailure(r)};
+}
+
 // ---------------- Athletes ----------------
 
 async function listAthletes(parentProfileId){
