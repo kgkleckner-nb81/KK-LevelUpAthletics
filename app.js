@@ -3471,10 +3471,26 @@ function showPinModal(actionLabel){
       submitBtn.onclick=null; closeBtn.onclick=null; input.onkeydown=null;
       resolve(val);
     };
-    submitBtn.onclick=()=>{
+    // The PIN is checked with the server here (attempt_approval_pin), which
+    // counts wrong guesses and locks after 5. A correct PIN resolves with a
+    // short-lived approval token instead of the PIN itself; every caller
+    // already just passes the resolved value on to its RPC.
+    let checking=false;
+    submitBtn.onclick=async()=>{
+      if(checking) return;
       const v=input.value.trim();
       if(!/^[0-9]{4,6}$/.test(v)){$('#pinModalStatus').textContent='Enter a 4-6 digit PIN.';return}
-      finish(v);
+      checking=true; submitBtn.disabled=true;
+      $('#pinModalStatus').textContent='Checking…';
+      try{
+        const r=await getApprovalCredential(v);
+        if(r.credential){submitBtn.disabled=false;finish(r.credential);return}
+        $('#pinModalStatus').textContent=r.error;
+        input.value=''; input.focus();
+      }catch(err){
+        $('#pinModalStatus').textContent='Could not check your PIN — check your connection and try again.';
+      }
+      checking=false; submitBtn.disabled=false;
     };
     closeBtn.onclick=()=>finish(null);
     input.onkeydown=e=>{if(e.key==='Enter') submitBtn.click();};
@@ -3721,9 +3737,12 @@ function initAuthUI(){
   };
   if($('#changePinBtn'))$('#changePinBtn').onclick=async()=>{
     const oldPin=$('#oldPinInput').value.trim(), newPin=$('#newPinInput2').value.trim();
+    if(!/^[0-9]{4,6}$/.test(oldPin)){$('#pinSetupStatus').textContent='Enter your current 4-6 digit PIN.';return}
     if(!/^[0-9]{4,6}$/.test(newPin)){$('#pinSetupStatus').textContent='Enter a 4-6 digit new PIN.';return}
     try{
-      await changeApprovalPinRemote(oldPin,newPin);
+      const cred=await getApprovalCredential(oldPin);
+      if(cred.error){$('#pinSetupStatus').textContent=cred.error;return}
+      await changeApprovalPinRemote(cred.credential,newPin);
       $('#oldPinInput').value='';
       $('#newPinInput2').value='';
       $('#pinSetupStatus').textContent='PIN changed.';
