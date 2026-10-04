@@ -26,13 +26,13 @@ on conflict (id) do update set name = excluded.name, type = excluded.type, xp_va
 insert into rewards (name, xp_cost, tier)
 select v.name, v.xp_cost, v.tier
 from (values
-  ('Ice Cream Single',        250,  'Common'),
-  ('Batting Cage Trip',       500,  'Common'),
-  ('New Baseball Bonus',      750,  'Uncommon'),
-  ('Baseball Store Visit',    1000, 'Uncommon'),
-  ('"The Show" Award',        1500, 'Rare'),
-  ('All-Star Outing',         2000, 'Rare'),
-  ('MVP Surprise',            3000, 'Legendary')
+  ('Victory Treat',            250,  'Common'),
+  ('Bonus Round',              500,  'Common'),
+  ('Gear Grab',                750,  'Uncommon'),
+  ('Gear Store Draft',         1000, 'Uncommon'),
+  ('Fan Favorite',            1500, 'Rare'),
+  ('All-Star Adventure',      2000, 'Rare'),
+  ('MVP Experience',          3000, 'Legendary')
 ) as v(name, xp_cost, tier)
 where not exists (select 1 from rewards r where r.name = v.name);
 

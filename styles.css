@@ -508,6 +508,14 @@ input:focus,textarea:focus{
   margin:0 auto 6px;
 }
 
+.reward-art{
+  display:block;
+  width:96px;
+  height:96px;
+  object-fit:contain;
+  margin:0 auto 6px;
+}
+
 .xp-pill{
   display:inline-block;
   border-radius:999px;
