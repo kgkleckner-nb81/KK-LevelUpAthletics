@@ -2076,13 +2076,14 @@ function renderGearLocker(){
 // aggregate XP/participation only, the narrowed coach-view data), cached by
 // refreshTeamMembershipUI() and repainted here synchronously so this can
 // stay in the render() chain without refetching on every render.
+function escapeHTML(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function renderLeaderboard(){
   if(!$('#teamLeaderboard')) return;
   const metric=$('#leaderboardMetric')?.value||'xp';
   const rows=(currentTeamRoster||[]).filter(r=>r.status==='approved');
   const sorted=[...rows].sort((a,b)=>metric==='workouts'?(b.workout_count||0)-(a.workout_count||0):(b.total_xp||0)-(a.total_xp||0));
   const label=metric==='workouts'?'Workouts':'XP';
-  $('#teamLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>${label}</th></tr></thead><tbody>${sorted.map((r,i)=>`<tr><td>${i+1}</td><td>${r.display_name}</td><td>${metric==='workouts'?(r.workout_count||0):(r.total_xp||0)}</td></tr>`).join('')}</tbody></table>`;
+  $('#teamLeaderboard').innerHTML=`<table class="table"><thead><tr><th>#</th><th>Athlete</th><th>${label}</th></tr></thead><tbody>${sorted.map((r,i)=>`<tr><td>${i+1}</td><td>${escapeHTML(r.display_name)}</td><td>${metric==='workouts'?(r.workout_count||0):(r.total_xp||0)}</td></tr>`).join('')}</tbody></table>`;
 }
 // Phase C: the old fake feed named specific "teammates" doing things that
 // never happened — misleading now that real teammates exist. No activity
@@ -2094,15 +2095,34 @@ function renderTeamFeed(){if(!$('#teamFeed'))return;$('#teamFeed').innerHTML='<p
 // `source` only for icon rendering.
 function renderShoutouts(){
   if(!$('#shoutouts'))return;
-  const demo=[{type:'Great Hustle',from:'Coach',date:'Today',source:'shoutout'},{type:'Great Attitude',from:'Dad',date:'Yesterday',source:'shoutout'}];
-  $('#shoutouts').innerHTML=[...demo,...(state.shoutouts||[])].slice(-8).reverse().map(x=>{
+  const entries=(state.shoutouts||[]).slice(-8).reverse();
+  $('#shoutouts').innerHTML=entries.length?entries.map(x=>{
     let icon='🏅',label=x.type;
-    if(x.source==='reaction'){const parts=x.type.split(' ');icon=parts[0];label=parts.slice(1).join(' ')}
-    return `<div class="shoutout"><span>${icon}</span><div><strong>${label}</strong><br><small>${x.from} · ${x.date}</small></div></div>`;
-  }).join('');
+    if(x.source==='reaction'){const parts=String(x.type).split(' ');icon=parts[0];label=parts.slice(1).join(' ')}
+    return `<div class="shoutout"><span>${escapeHTML(icon)}</span><div><strong>${escapeHTML(label)}</strong><br><small>${escapeHTML(x.from)} · ${escapeHTML(x.date)}</small></div></div>`;
+  }).join(''):'<p class="muted">Nothing here yet. Tap a reaction below to cheer on your team.</p>';
 }
-function addShoutout(){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO(),source:'shoutout'});save();renderShoutouts()}
-function addReaction(text){state.shoutouts=state.shoutouts||[];state.shoutouts.push({type:text,from:'You',date:todayISO(),source:'reaction'});save();renderShoutouts()}
+// Shout-outs are positive-only and device-local (no shared feed yet). Awards
+// are coach/parent actions, so they sit behind the approval PIN — a paired
+// kid device runs on the parent's session and can't be told apart otherwise.
+// Same entry on the same day is ignored so repeated taps can't flood the list.
+function pushShoutout(entry){
+  state.shoutouts=state.shoutouts||[];
+  if(state.shoutouts.some(x=>x.type===entry.type&&x.from===entry.from&&x.date===entry.date))return false;
+  state.shoutouts.push(entry);
+  if(state.shoutouts.length>50)state.shoutouts=state.shoutouts.slice(-50);
+  save();renderShoutouts();return true;
+}
+async function addShoutout(){
+  if(!currentProfile){alert('Sign in first.');return}
+  const pin=await showPinModal('give a team shout-out');
+  if(!pin)return;
+  let ok=false;
+  try{ok=await verifyApprovalPinRemote(pin)}catch(err){/* treat as failed */}
+  if(!ok){alert('Incorrect PIN.');return}
+  pushShoutout({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO(),source:'shoutout'});
+}
+function addReaction(text){pushShoutout({type:text,from:'You',date:todayISO(),source:'reaction'})}
 // ---- Personal Programs ----
 // A Program is {id, name, activityIds[], targets?:{activityId:{sets,value,unit}},
 // preset?:true}. Preset programs ship locked/read-only (always re-synced by
@@ -2412,6 +2432,9 @@ document.addEventListener('click',e=>{
 // person can be both a parent and a coach at once, and those are different
 // identities in the data model.
 let athleteTeamMembership=null, currentTeamXpTotals=null, currentTeamRank=null, currentTeamRankTotal=null, currentTeamRoster=[];
+// Clubhouse locker room: roster comes from get_clubhouse_roster() (approved members only).
+// status: idle | loading | ready | error. Fallback = migration 0032 not applied yet.
+let currentClubhouseRoster=[], clubhouseStatus='idle', clubhouseError='', clubhouseUsingFallback=false;
 // Team Streak & Team Challenge — see 0022_team_streak_and_challenges.sql.
 // currentTeamActiveDates is bare dates only (no athlete identity), fed
 // into teamStreak() below the same way personal streak() walks
@@ -2463,6 +2486,10 @@ function renderTeamIdentity(){
   if(heroCard) heroCard.classList.toggle('hidden',!approved);
   if(statsGrid) statsGrid.classList.toggle('hidden',!approved);
   if(boardsGrid) boardsGrid.classList.toggle('hidden',!approved);
+  const clubRoot=$('.lua-team-clubhouse');
+  if(clubRoot) clubRoot.dataset.state=approved?'approved':'preview';
+  ['#teamProgramSummaryCard','#clubhouseLower','#clubhouseManage'].forEach(sel=>{const el=$(sel); if(el) el.classList.toggle('hidden',!approved)});
+  renderClubhouse();
   if(!approved){
     const formFields=$('#teamJoinFormFields');
     if(m&&m.status==='pending'){
@@ -2489,6 +2516,128 @@ function renderTeamIdentity(){
   if($('#teamStatCompletion')) $('#teamStatCompletion').textContent=(approvedRoster.length?Math.round(activeThisWeek/approvedRoster.length*100):0)+'%';
   if($('#teamStatStreak')) $('#teamStatStreak').textContent=currentTeamStreak||0;
 }
+// ---- Team Clubhouse locker room ----
+// Layers: decorative room shell (CSS background) > locker bay art (CSS
+// background, one per member) > real HTML nameplate/avatar/stats > one
+// transparent button for the whole locker. Every name and number is text, so
+// if the artwork never loads the lockers still read as a plain roster.
+const fmtNum=n=>Number(n||0).toLocaleString();
+const workoutsLabel=n=>`${fmtNum(n)} ${Number(n)===1?'workout':'workouts'}`;
+function clubhouseMemberLabel(m,isYou){
+  return `${m.display_name||'Teammate'}${isYou?' (you)':''}: ${fmtNum(m.total_xp)} XP, ${workoutsLabel(m.workout_count)}`;
+}
+function clubhouseAvatarHTML(m,cls){
+  const name=m.display_name||'Teammate';
+  const mono=`<span class="clubhouse-monogram ${cls}" aria-hidden="true">${escapeHTML(name.trim().charAt(0).toUpperCase()||'?')}</span>`;
+  if(!m.avatar_url) return mono;
+  // On load failure, swap the broken image for the monogram.
+  return `<img class="clubhouse-avatar ${cls}" src="${escapeHTML(m.avatar_url)}" alt="${escapeHTML(name)}'s avatar" width="256" height="256" loading="lazy" data-fallback="${escapeHTML(name.trim().charAt(0).toUpperCase()||'?')}">`;
+}
+function renderClubhouse(){
+  const room=$('#clubhouseRoom'), roster=$('#clubhouseRoster'), note=$('#clubhouseRoomNote');
+  if(!room||!roster||!note) return;
+  const m=athleteTeamMembership;
+  const approved=!!(m&&m.status==='approved');
+  const viewAll=$('#clubhouseViewAll'), foot=$('#clubhouseRoomFoot');
+  const setNote=(html)=>{note.innerHTML=html; note.classList.toggle('hidden',!html)};
+  room.setAttribute('aria-busy',clubhouseStatus==='loading'?'true':'false');
+  roster.innerHTML=''; roster.classList.add('hidden');
+  if(viewAll) viewAll.classList.add('hidden');
+  if(foot) foot.classList.add('hidden');
+  room.classList.toggle('is-preview',!approved);
+  if(clubhouseStatus==='loading'){setNote('Loading your teammates…');return}
+  if(!activeAthlete){setNote('<strong>Preview</strong> — sign in and choose an athlete to see your team’s locker room.');return}
+  if(!approved){
+    setNote(m&&m.status==='pending'
+      ?'<strong>Preview</strong> — your join request is waiting for coach approval. Teammates’ lockers appear here once you’re approved.'
+      :'<strong>Preview</strong> — join a team with your coach’s code to see your teammates’ lockers here.');
+    return;
+  }
+  if(clubhouseStatus==='error'){
+    setNote(`Couldn’t load your teammates (${escapeHTML(clubhouseError)}). <button type="button" class="clubhouse-link" id="clubhouseRetry">Try again</button>`);
+    return;
+  }
+  const members=currentClubhouseRoster||[];
+  if(!members.length){setNote('No teammates to show yet.');return}
+  setNote('');
+  roster.classList.remove('hidden');
+  roster.innerHTML=members.map(mem=>{
+    const isYou=activeAthlete&&mem.athlete_id===activeAthlete.id;
+    const name=mem.display_name||'Teammate';
+    return `<div class="clubhouse-locker" role="listitem">
+      <div class="clubhouse-locker-art" aria-hidden="true"></div>
+      <span class="clubhouse-nameplate" aria-hidden="true">${escapeHTML(name)}</span>
+      <div class="clubhouse-player" aria-hidden="true">
+        ${clubhouseAvatarHTML(mem,'')}
+        <strong class="clubhouse-xp">${fmtNum(mem.total_xp)}</strong><span class="clubhouse-xp-label">XP</span>
+        <span class="clubhouse-workouts">${workoutsLabel(mem.workout_count)}</span>
+      </div>
+      ${isYou?'<span class="clubhouse-you" aria-hidden="true">YOU</span>':''}
+      <button type="button" class="clubhouse-locker-action" data-athlete="${escapeHTML(mem.athlete_id)}" aria-label="Open locker. ${escapeHTML(clubhouseMemberLabel(mem,isYou))}"></button>
+    </div>`;
+  }).join('');
+  if(viewAll) viewAll.classList.toggle('hidden',members.length<3);
+  if(foot){
+    foot.classList.toggle('hidden',!clubhouseUsingFallback);
+    foot.textContent=clubhouseUsingFallback?'Teammate avatars will appear after the clubhouse update finishes setting up.':'';
+  }
+}
+function openClubhouseDialog(html,returnFocusTo){
+  const dlg=$('#clubhouseDialog'); if(!dlg) return;
+  $('#clubhouseDialogBody').innerHTML=html;
+  if(typeof dlg.showModal==='function'){ if(!dlg.open) dlg.showModal() } else dlg.setAttribute('open','');
+  const title=$('#clubhouseDialogTitle'); if(title) title.setAttribute('tabindex','-1');
+  dlg._returnFocus=returnFocusTo||null;
+  $('#clubhouseDialogClose').focus();
+}
+function closeClubhouseDialog(){
+  const dlg=$('#clubhouseDialog'); if(!dlg) return;
+  if(typeof dlg.close==='function'){ if(dlg.open) dlg.close() } else dlg.removeAttribute('open');
+  if(dlg._returnFocus&&document.contains(dlg._returnFocus)) dlg._returnFocus.focus();
+}
+function showClubhouseMember(athleteId,trigger){
+  const mem=(currentClubhouseRoster||[]).find(x=>x.athlete_id===athleteId); if(!mem) return;
+  const isYou=activeAthlete&&mem.athlete_id===activeAthlete.id;
+  openClubhouseDialog(`
+    <div class="clubhouse-member">
+      <div class="clubhouse-member-photo">${clubhouseAvatarHTML(mem,'large')}</div>
+      <div>
+        <h2 id="clubhouseDialogTitle">${escapeHTML(mem.display_name||'Teammate')}${isYou?' <span class="clubhouse-you-tag">YOU</span>':''}</h2>
+        <dl class="clubhouse-member-stats"><div><dt>Career XP</dt><dd>${fmtNum(mem.total_xp)}</dd></div><div><dt>Workouts logged</dt><dd>${fmtNum(mem.workout_count)}</dd></div></dl>
+        ${isYou?'<button type="button" class="primary" id="clubhouseOpenMyCard">Open my Player Card</button>':'<p class="muted">Player cards are private to each athlete’s family.</p>'}
+      </div>
+    </div>`,trigger);
+}
+function showClubhouseRoster(trigger){
+  const rows=(currentClubhouseRoster||[]).map(mem=>{
+    const isYou=activeAthlete&&mem.athlete_id===activeAthlete.id;
+    return `<li>${escapeHTML(mem.display_name||'Teammate')}${isYou?' <span class="clubhouse-you-tag">YOU</span>':''}<span class="muted">${fmtNum(mem.total_xp)} XP · ${workoutsLabel(mem.workout_count)}</span></li>`;
+  }).join('');
+  openClubhouseDialog(`<h2 id="clubhouseDialogTitle">Teammates</h2><ul class="clubhouse-roster-list">${rows}</ul>`,trigger);
+}
+document.addEventListener('click',e=>{
+  const lock=e.target.closest('.clubhouse-locker-action');
+  if(lock){showClubhouseMember(lock.dataset.athlete,lock);return}
+  if(e.target.closest('#clubhouseViewAll')){showClubhouseRoster(e.target.closest('#clubhouseViewAll'));return}
+  if(e.target.closest('#clubhouseRetry')){refreshTeamMembershipUI();return}
+  if(e.target.closest('#clubhouseDialogClose')){closeClubhouseDialog();return}
+  if(e.target.closest('#clubhouseOpenMyCard')){closeClubhouseDialog();switchScreen('player');return}
+  const dlg=$('#clubhouseDialog');
+  if(dlg&&e.target===dlg) closeClubhouseDialog(); // click on the backdrop
+});
+// Native <dialog> handles Escape and focus trapping; restore focus to the
+// locker that opened it however the dialog was closed.
+if($('#clubhouseDialog')) $('#clubhouseDialog').addEventListener('close',()=>{const d=$('#clubhouseDialog'); if(d._returnFocus&&document.contains(d._returnFocus)) d._returnFocus.focus()});
+// A failed avatar swaps to the monogram so the locker never shows a broken image.
+document.addEventListener('error',e=>{
+  const img=e.target;
+  if(img&&img.classList&&img.classList.contains('clubhouse-avatar')){
+    const span=document.createElement('span');
+    span.className='clubhouse-monogram '+(img.classList.contains('large')?'large':'');
+    span.setAttribute('aria-hidden','true'); span.textContent=img.dataset.fallback||'?';
+    img.replaceWith(span);
+  }
+},true);
 // Active Team Challenge card — separate from renderTeamIdentity() so a
 // challenge-only repaint (e.g. after the coach saves a new one) doesn't
 // have to re-run the whole team-identity paint. Hidden entirely if the
@@ -2502,6 +2651,8 @@ function renderTeamChallenge(){
   if(!card) return;
   const approved=!!(athleteTeamMembership&&athleteTeamMembership.status==='approved');
   card.classList.toggle('hidden',!approved||!currentTeamChallenge);
+  const futureNote=$('#squadMissionFuture');
+  if(futureNote) futureNote.classList.toggle('hidden',!approved||!!currentTeamChallenge);
   if(!approved||!currentTeamChallenge) return;
   const c=currentTeamChallenge;
   if($('#teamChallengeKind')) $('#teamChallengeKind').textContent=c.kind==='coach'?'Coach Challenge':'Team Challenge';
@@ -2537,15 +2688,25 @@ async function refreshTeamMembershipUI(){
   if(!activeAthlete) return;
   const statusEl=$('#teamStatsStatus');
   if(statusEl) statusEl.textContent='';
+  clubhouseStatus='loading'; clubhouseError=''; renderClubhouse();
   try{
     athleteTeamMembership=await withTimeout(getAthleteTeamMembership(activeAthlete.id),10000,'Loading team membership');
     const approved=athleteTeamMembership&&athleteTeamMembership.status==='approved';
     if(approved){
       const teamId=athleteTeamMembership.teams.id;
-      const [totals,ranked,roster,activeDates,challenge]=await withTimeout(Promise.all([
+      // The locker-room roster is allowed to fail on its own (shown in the
+      // room) without taking the rest of the team stats down with it.
+      const [totals,ranked,roster,activeDates,challenge,clubhouse]=await withTimeout(Promise.all([
         loadTeamXpTotals(teamId), loadAllTeamXpTotalsRanked(), loadTeamRoster(teamId),
-        loadTeamActiveDates(teamId), loadTeamChallenge(teamId)
+        loadTeamActiveDates(teamId), loadTeamChallenge(teamId),
+        loadClubhouseRoster(teamId).then(r=>({rows:r}),e=>({error:e}))
       ]),10000,'Loading team stats');
+      if(clubhouse.error){clubhouseStatus='error'; clubhouseError=clubhouse.error.message||String(clubhouse.error); currentClubhouseRoster=[]; clubhouseUsingFallback=false}
+      else if(clubhouse.rows===null){
+        // 0032 not applied yet: same approved-only rows the page already had, without avatars.
+        clubhouseUsingFallback=true; clubhouseStatus='ready';
+        currentClubhouseRoster=(roster||[]).filter(r=>r.status==='approved').map(r=>({athlete_id:r.athlete_id,display_name:r.display_name,avatar_url:null,total_xp:r.total_xp,workout_count:r.workout_count}));
+      }else{clubhouseUsingFallback=false; clubhouseStatus='ready'; currentClubhouseRoster=clubhouse.rows}
       currentTeamXpTotals=totals;
       currentTeamRoster=roster;
       const rankIndex=ranked.findIndex(t=>t.team_id===teamId);
@@ -2557,10 +2718,12 @@ async function refreshTeamMembershipUI(){
     }else{
       currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
       currentTeamActiveDates=[]; currentTeamStreak=0; currentTeamChallenge=null;
+      currentClubhouseRoster=[]; clubhouseStatus='ready'; clubhouseUsingFallback=false;
     }
   }catch(err){
     currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
     currentTeamActiveDates=[]; currentTeamStreak=0; currentTeamChallenge=null;
+    currentClubhouseRoster=[]; clubhouseStatus='error'; clubhouseError=err&&err.message?err.message:String(err); clubhouseUsingFallback=false;
     if(statusEl) statusEl.textContent='Could not load team stats: '+(err&&err.message?err.message:String(err));
   }
   renderTeamIdentity();
@@ -2892,7 +3055,7 @@ function renderTeamProgramSummary(){
     return;
   }
   $('#teamProgramSummaryTitle').textContent=p.title;
-  $('#teamProgramActivityList').innerHTML='<ul>'+p.activity_names.map(n=>`<li>${n}</li>`).join('')+'</ul>'+(p.instructions?`<p class="muted team-program-notes"><strong>Coach note:</strong> ${p.instructions}</p>`:'');
+  $('#teamProgramActivityList').innerHTML='<ul>'+p.activity_names.map(n=>`<li>${escapeHTML(n)}</li>`).join('')+'</ul>'+(p.instructions?`<p class="muted team-program-notes"><strong>Coach note:</strong> ${escapeHTML(p.instructions)}</p>`:'');
   $('#joinTeamProgram').classList.remove('hidden');
   $('#joinTeamProgram').disabled=!!currentTeamProgramOptedIn;
   $('#joinTeamProgram').textContent=currentTeamProgramOptedIn?'Joined ✓':'Join Team Program';
@@ -3541,6 +3704,7 @@ function afterSignedOut(){
   currentTeamRank=null;
   currentTeamRankTotal=null;
   currentTeamRoster=[];
+  currentClubhouseRoster=[]; clubhouseStatus='idle'; clubhouseError=''; clubhouseUsingFallback=false;
   currentTeamProgram=null;
   currentTeamProgramOptedIn=false;
   updateAuthUI();
