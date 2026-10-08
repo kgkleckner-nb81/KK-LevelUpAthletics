@@ -1604,3 +1604,5 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .lua-team-clubhouse .recog-picker .recog-react{min-width:36px;min-height:32px;border-width:0;background:transparent;padding:0 6px;font-size:18px}
 .lua-team-clubhouse .recog-picker .recog-react:hover{background:var(--cream)}
 .lua-team-clubhouse .recog-picker .recog-react.on{background:var(--neon-blue)}
+
+.coach-team-tag{display:block;margin-top:4px;font-family:var(--accent);font-weight:700;font-size:.55em;text-transform:none;letter-spacing:0;color:var(--muted)}

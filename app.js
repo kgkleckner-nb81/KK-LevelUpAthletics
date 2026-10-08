@@ -2935,9 +2935,11 @@ function renderTeamSetupPanel(){
     const switcherWrap=$('#coachTeamSwitcherWrap'), switcher=$('#coachTeamSwitcher');
     if(switcherWrap&&switcher){
       switcherWrap.classList.toggle('hidden',coachTeams.length<2);
-      switcher.innerHTML=coachTeams.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+      switcher.innerHTML=coachTeams.map(t=>`<option value="${escapeHTML(t.id)}">${escapeHTML(t.name)}</option>`).join('');
       switcher.value=coachTeam.id;
     }
+    // Say which team the roster and shout-out cards are showing.
+    ['#teamRosterTeamName','#coachRecognitionsTeamName'].forEach(sel=>{const el=$(sel); if(el) el.textContent='— '+coachTeam.name});
   }else{
     if(existing) existing.classList.add('hidden');
   }
@@ -2978,7 +2980,7 @@ async function renderTeamRoster(){
   const list=$('#teamRosterList');
   if(!list||!coachTeam) return;
   const rows=(await loadTeamRoster(coachTeam.id)).filter(r=>r.status==='approved');
-  list.innerHTML=rows.length?rows.map(r=>`<div class="pending-request-row"><span>${escapeHTML(r.display_name)}</span><span class="roster-actions"><button class="primary" data-award-athlete="${escapeHTML(r.athlete_id)}" data-name="${escapeHTML(r.display_name)}" type="button">Shout-out</button><button class="danger" data-remove="${escapeHTML(r.athlete_id)}" data-name="${escapeHTML(r.display_name)}" type="button">Remove</button></span></div>`).join(''):'<p class="muted">No athletes on the roster yet.</p>';
+  list.innerHTML=rows.length?rows.map(r=>`<div class="pending-request-row"><span>${escapeHTML(r.display_name)}</span><span class="roster-actions"><button class="primary" data-award-athlete="${escapeHTML(r.athlete_id)}" data-name="${escapeHTML(r.display_name)}" type="button">Shout-out</button><button class="danger" data-remove="${escapeHTML(r.athlete_id)}" data-name="${escapeHTML(r.display_name)}" type="button">Remove</button></span></div>`).join(''):`<p class="muted">No approved athletes on ${escapeHTML(coachTeam.name)} yet.${coachTeams.length>1?' Use “Managing team” above to switch teams.':''}</p>`;
   renderCoachRecognitions();
 }
 // Sets team_members.status to 'left' — a soft removal, same tier as
@@ -3020,7 +3022,10 @@ async function refreshCoachTeamContext(){
     return;
   }
   coachTeams=await loadCoachTeams(currentProfile.id);
-  if(!coachTeam||!coachTeams.some(t=>t.id===coachTeam.id)) coachTeam=coachTeams[0]||null;
+  if(!coachTeam||!coachTeams.some(t=>t.id===coachTeam.id)){
+    let saved=null; try{saved=localStorage.getItem('lua.coachTeamId')}catch(e){}
+    coachTeam=coachTeams.find(t=>t.id===saved)||coachTeams[0]||null;
+  }
   renderCoachOnlyVisibility();
   renderTeamSetupPanel();
   if(coachTeam){
@@ -3033,6 +3038,7 @@ async function switchCoachTeam(teamId){
   const t=coachTeams.find(x=>x.id===teamId);
   if(!t) return;
   coachTeam=t;
+  try{localStorage.setItem('lua.coachTeamId',teamId)}catch(e){}
   renderTeamSetupPanel();
   await renderPendingTeamRequests();
   await renderTeamRoster();
