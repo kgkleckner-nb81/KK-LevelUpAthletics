@@ -2626,16 +2626,20 @@ const recogDate=iso=>{try{return new Date(iso).toLocaleDateString(undefined,{mon
 function recogItemHTML(r){
   const isAward=r.kind==='award';
   const counts=r.reaction_counts||{}, mine=r.my_reactions||[];
-  const buttons=RECOG_REACTIONS.map(x=>{
+  const btn=(x,withCount)=>{
     const n=counts[x.key]||0, on=mine.includes(x.key);
-    return `<button type="button" class="recog-react${on?' on':''}" data-rec="${escapeHTML(r.id)}" data-reaction="${x.key}" aria-pressed="${on}" aria-label="${x.label}${n?`, ${n}`:''}">${x.emoji}${n?` <span>${n}</span>`:''}</button>`;
-  }).join('');
+    return `<button type="button" class="recog-react${on?' on':''}" data-rec="${escapeHTML(r.id)}" data-reaction="${x.key}" aria-pressed="${on}" aria-label="${x.label}${withCount&&n?`, ${n}`:''}">${x.emoji}${withCount&&n?` <span>${n}</span>`:''}</button>`;
+  };
+  // Only reactions someone has actually picked show as chips; the full set
+  // lives behind the small + button (hover on desktop, tap on touch).
+  const chips=RECOG_REACTIONS.filter(x=>(counts[x.key]||0)>0).map(x=>btn(x,true)).join('');
+  const picker=RECOG_REACTIONS.map(x=>btn(x,false)).join('');
   return `<div class="recog-item${isAward?' is-award':''}">
     <span class="recog-icon" aria-hidden="true">${isAward?'🏅':'👏'}</span>
     <div class="recog-main">
       <p class="recog-line"><strong>${escapeHTML(r.recipient_name)}</strong> — ${escapeHTML(r.label)}</p>
       <small class="muted">${isAward?'Award from Coach':'Kudos from '+escapeHTML(r.giver_name)} · ${escapeHTML(recogDate(r.created_at))}</small>
-      <div class="recog-reactions" role="group" aria-label="React to this shout-out">${buttons}</div>
+      <div class="recog-reactions" role="group" aria-label="Reactions">${chips}<span class="recog-add"><button type="button" class="recog-add-btn" aria-label="Add a reaction" aria-haspopup="true" aria-expanded="false">+</button><span class="recog-picker" role="group" aria-label="Choose a reaction">${picker}</span></span></div>
     </div>
   </div>`;
 }
@@ -2735,7 +2739,16 @@ async function removeRecognition(id){
   catch(err){ if(status) status.textContent='Could not remove: '+((err&&err.message)||'unknown error') }
   await renderCoachRecognitions();
 }
+function closeRecogPickers(except){
+  $$('.recog-add.open').forEach(el=>{ if(el!==except){ el.classList.remove('open'); const b=el.querySelector('.recog-add-btn'); if(b) b.setAttribute('aria-expanded','false') } });
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const open=document.querySelector('.recog-add.open'); if(open){ const b=open.querySelector('.recog-add-btn'); closeRecogPickers(); if(b) b.focus() } } });
+// Keyboard users: leaving the picker (Tab away) closes it.
+document.addEventListener('focusout',e=>{ const add=e.target.closest&&e.target.closest('.recog-add'); if(add&&!add.contains(e.relatedTarget)) closeRecogPickers() });
 document.addEventListener('click',e=>{
+  const addBtn=e.target.closest('.recog-add-btn');
+  if(addBtn){ const wrap=addBtn.closest('.recog-add'); const open=!wrap.classList.contains('open'); closeRecogPickers(open?wrap:null); wrap.classList.toggle('open',open); addBtn.setAttribute('aria-expanded',String(open)); return }
+  if(!e.target.closest('.recog-add')) closeRecogPickers();
   const react=e.target.closest('.recog-react'); if(react){reactToRecognition(react);return}
   const kudos=e.target.closest('.kudos-btn'); if(kudos){giveKudos(kudos);return}
   const award=e.target.closest('[data-award-athlete]'); if(award){openAwardDialog(award.dataset.awardAthlete,award.dataset.name,award);return}
