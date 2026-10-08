@@ -2699,7 +2699,16 @@ async function giveKudos(btn){
     buttons.forEach(b=>b.disabled=false);
   }
 }
-// ---- Coach side (Coach HQ): give an award, review and remove ----
+// ---- Coach side (Settings → Coach Tools): give an award, review and remove ----
+function fillAwardForm(rows){
+  const sel=$('#awardAthleteSelect'), type=$('#awardTypeSelect'), form=$('#giveAwardForm');
+  if(!sel||!type||!form) return;
+  const prev=sel.value;
+  sel.innerHTML=rows.map(r=>`<option value="${escapeHTML(r.athlete_id)}">${escapeHTML(r.display_name)}</option>`).join('');
+  if(rows.some(r=>r.athlete_id===prev)) sel.value=prev;
+  if(!type.options.length) type.innerHTML=COACH_AWARDS.map(a=>`<option>${escapeHTML(a)}</option>`).join('');
+  form.classList.toggle('hidden',!rows.length);
+}
 function openAwardDialog(athleteId,name,trigger){
   openClubhouseDialog(`<h2 id="clubhouseDialogTitle">Shout-out for ${escapeHTML(name)}</h2>
     <p class="muted">Pick an award. It shows to the whole team in Around the Clubhouse. You’ll be asked for your approval PIN. No XP is awarded.</p>
@@ -2754,6 +2763,11 @@ document.addEventListener('click',e=>{
   const award=e.target.closest('[data-award-athlete]'); if(award){openAwardDialog(award.dataset.awardAthlete,award.dataset.name,award);return}
   const pick=e.target.closest('.award-btn'); if(pick){giveAward(pick.dataset.athlete,pick.dataset.name,pick.dataset.award);return}
   const rm=e.target.closest('[data-remove-rec]'); if(rm){removeRecognition(rm.dataset.removeRec);return}
+  if(e.target.closest('#giveAwardBtn')){
+    const sel=$('#awardAthleteSelect'), type=$('#awardTypeSelect');
+    if(sel&&sel.value&&type) giveAward(sel.value,sel.options[sel.selectedIndex].text,type.value);
+    return;
+  }
 });
 // Active Team Challenge card — separate from renderTeamIdentity() so a
 // challenge-only repaint (e.g. after the coach saves a new one) doesn't
@@ -2981,6 +2995,7 @@ async function renderTeamRoster(){
   if(!list||!coachTeam) return;
   const rows=(await loadTeamRoster(coachTeam.id)).filter(r=>r.status==='approved');
   list.innerHTML=rows.length?rows.map(r=>`<div class="pending-request-row"><span>${escapeHTML(r.display_name)}</span><span class="roster-actions"><button class="primary" data-award-athlete="${escapeHTML(r.athlete_id)}" data-name="${escapeHTML(r.display_name)}" type="button">Shout-out</button><button class="danger" data-remove="${escapeHTML(r.athlete_id)}" data-name="${escapeHTML(r.display_name)}" type="button">Remove</button></span></div>`).join(''):`<p class="muted">No approved athletes on ${escapeHTML(coachTeam.name)} yet.${coachTeams.length>1?' Use “Managing team” above to switch teams.':''}</p>`;
+  fillAwardForm(rows);
   renderCoachRecognitions();
 }
 // Sets team_members.status to 'left' — a soft removal, same tier as

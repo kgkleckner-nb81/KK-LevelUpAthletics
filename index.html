@@ -532,24 +532,6 @@
       <p id="pinSetupStatus" class="muted"></p>
     </div>
     <div class="card">
-      <h2>Parent Bonus XP</h2>
-      <p class="muted">Award bonus XP for effort, sportsmanship, coach feedback, or helping teammates.</p>
-      <form id="bonusForm" class="form-grid">
-        <label>Bonus type
-          <select name="bonusType">
-            <option value="Great Effort Bonus">Great Effort Bonus (+25 XP)</option>
-            <option value="Sportsmanship Bonus">Sportsmanship Bonus (+50 XP)</option>
-            <option value="Helping Teammate Bonus">Helping Teammate Bonus (+50 XP)</option>
-            <option value="Coach Compliment Bonus">Coach Compliment Bonus (+100 XP)</option>
-            <option value="Parent Wild Card">Parent Wild Card (+75 XP)</option>
-            <option value="Coach's Boost">Coach's Boost (+100 XP)</option>
-          </select>
-        </label>
-        <label class="wide">Reason<input type="text" name="reason" placeholder="Example: great hustle at practice"></label>
-        <button class="primary wide" type="submit">Award Parent Bonus XP</button>
-      </form>
-    </div>
-    <div class="card">
       <h2>Review Pending Combine Tests</h2>
       <p class="muted">Enter your PIN to approve any pending combine tests.</p>
       <button class="primary" id="approvePending">Approve Pending Tests</button>
@@ -594,7 +576,12 @@
   <div class="card hidden" id="coachRecognitionsCard" data-coach-only>
     <p class="eyebrow dark">Coach Tools</p>
     <h2>Team Shout-Outs <span class="coach-team-tag" id="coachRecognitionsTeamName"></span></h2>
-    <p class="muted">Use “Shout-out” beside an athlete in the roster above to give one of five preset awards. It shows in Around the Clubhouse and Team Spotlight for your team. Requires your approval PIN. No XP is awarded.</p>
+    <p class="muted">Give one of five preset awards to an athlete on this team. It shows in Around the Clubhouse and Team Spotlight. Requires your approval PIN. No XP is awarded.</p>
+    <div class="form-grid" id="giveAwardForm">
+      <label>Athlete<select id="awardAthleteSelect"></select></label>
+      <label>Award<select id="awardTypeSelect"></select></label>
+      <button id="giveAwardBtn" class="primary wide" type="button">Give Shout-Out</button>
+    </div>
     <p id="coachRecognitionStatus" class="muted" role="status"></p>
     <div id="coachRecognitionList"></div>
   </div>
@@ -640,6 +627,24 @@
       <button id="saveTeamChallenge" class="primary wide" type="button">Save Team Challenge</button>
     </div>
     <p id="teamChallengeSetupStatus" class="muted"></p>
+  </div>
+  <div class="card">
+    <h2>Parent Bonus XP</h2>
+    <p class="muted">Award bonus XP for effort, sportsmanship, coach feedback, or helping teammates.</p>
+    <form id="bonusForm" class="form-grid">
+      <label>Bonus type
+        <select name="bonusType">
+          <option value="Great Effort Bonus">Great Effort Bonus (+25 XP)</option>
+          <option value="Sportsmanship Bonus">Sportsmanship Bonus (+50 XP)</option>
+          <option value="Helping Teammate Bonus">Helping Teammate Bonus (+50 XP)</option>
+          <option value="Coach Compliment Bonus">Coach Compliment Bonus (+100 XP)</option>
+          <option value="Parent Wild Card">Parent Wild Card (+75 XP)</option>
+          <option value="Coach's Boost">Coach's Boost (+100 XP)</option>
+        </select>
+      </label>
+      <label class="wide">Reason<input type="text" name="reason" placeholder="Example: great hustle at practice"></label>
+      <button class="primary wide" type="submit">Award Parent Bonus XP</button>
+    </form>
   </div>
   <div class="card">
     <h2>Local Device Settings</h2>
