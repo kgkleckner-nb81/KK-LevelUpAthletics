@@ -2090,39 +2090,6 @@ function renderLeaderboard(){
 // feed table exists yet, so this is an honest placeholder, not a real
 // migration, until a future round adds one.
 function renderTeamFeed(){if(!$('#teamFeed'))return;$('#teamFeed').innerHTML='<p class="muted">Team activity feed is coming in a future update.</p>'}
-// Positive Reactions and Coach/Parent Shout-Outs are one unified feed —
-// both are positive-only entries in state.shoutouts, distinguished by
-// `source` only for icon rendering.
-function renderShoutouts(){
-  if(!$('#shoutouts'))return;
-  const entries=(state.shoutouts||[]).slice(-8).reverse();
-  $('#shoutouts').innerHTML=entries.length?entries.map(x=>{
-    let icon='🏅',label=x.type;
-    if(x.source==='reaction'){const parts=String(x.type).split(' ');icon=parts[0];label=parts.slice(1).join(' ')}
-    return `<div class="shoutout"><span>${escapeHTML(icon)}</span><div><strong>${escapeHTML(label)}</strong><br><small>${escapeHTML(x.from)} · ${escapeHTML(x.date)}</small></div></div>`;
-  }).join(''):'<p class="muted">Nothing here yet. Tap a reaction below to cheer on your team.</p>';
-}
-// Shout-outs are positive-only and device-local (no shared feed yet). Awards
-// are coach/parent actions, so they sit behind the approval PIN — a paired
-// kid device runs on the parent's session and can't be told apart otherwise.
-// Same entry on the same day is ignored so repeated taps can't flood the list.
-function pushShoutout(entry){
-  state.shoutouts=state.shoutouts||[];
-  if(state.shoutouts.some(x=>x.type===entry.type&&x.from===entry.from&&x.date===entry.date))return false;
-  state.shoutouts.push(entry);
-  if(state.shoutouts.length>50)state.shoutouts=state.shoutouts.slice(-50);
-  save();renderShoutouts();return true;
-}
-async function addShoutout(){
-  if(!currentProfile){alert('Sign in first.');return}
-  const pin=await showPinModal('give a team shout-out');
-  if(!pin)return;
-  let ok=false;
-  try{ok=await verifyApprovalPinRemote(pin)}catch(err){/* treat as failed */}
-  if(!ok){alert('Incorrect PIN.');return}
-  pushShoutout({type:$('#shoutoutType').value,from:$('#shoutoutFrom').value,date:todayISO(),source:'shoutout'});
-}
-function addReaction(text){pushShoutout({type:text,from:'You',date:todayISO(),source:'reaction'})}
 // ---- Personal Programs ----
 // A Program is {id, name, activityIds[], targets?:{activityId:{sets,value,unit}},
 // preset?:true}. Preset programs ship locked/read-only (always re-synced by
@@ -2435,6 +2402,8 @@ let athleteTeamMembership=null, currentTeamXpTotals=null, currentTeamRank=null, 
 // Clubhouse locker room: roster comes from get_clubhouse_roster() (approved members only).
 // status: idle | loading | ready | error. Fallback = migration 0032 not applied yet.
 let currentClubhouseRoster=[], clubhouseStatus='idle', clubhouseError='', clubhouseUsingFallback=false;
+// Shared recognitions (0033). status: idle | ready | error | unavailable (migration not applied).
+let currentRecognitions=[], currentSpotlight=null, recognitionsStatus='idle', recognitionsError='';
 // Team Streak & Team Challenge — see 0022_team_streak_and_challenges.sql.
 // currentTeamActiveDates is bare dates only (no athlete identity), fed
 // into teamStreak() below the same way personal streak() walks
@@ -2490,6 +2459,7 @@ function renderTeamIdentity(){
   if(clubRoot) clubRoot.dataset.state=approved?'approved':'preview';
   ['#teamProgramSummaryCard','#clubhouseLower','#clubhouseManage'].forEach(sel=>{const el=$(sel); if(el) el.classList.toggle('hidden',!approved)});
   renderClubhouse();
+  renderRecognitions();
   if(!approved){
     const formFields=$('#teamJoinFormFields');
     if(m&&m.status==='pending'){
@@ -2595,6 +2565,12 @@ function closeClubhouseDialog(){
   if(typeof dlg.close==='function'){ if(dlg.open) dlg.close() } else dlg.removeAttribute('open');
   if(dlg._returnFocus&&document.contains(dlg._returnFocus)) dlg._returnFocus.focus();
 }
+function kudosBoxHTML(mem){
+  if(recognitionsStatus!=='ready') return '<p class="muted">Player cards are private to each athlete’s family.</p>';
+  return `<div class="kudos-box"><p class="kudos-title">Give ${escapeHTML(mem.display_name||'your teammate')} kudos</p>
+    <div class="kudos-buttons">${KUDOS_LABELS.map(k=>`<button type="button" class="kudos-btn" data-recipient="${escapeHTML(mem.athlete_id)}" data-kudos="${escapeHTML(k)}">${escapeHTML(k)}</button>`).join('')}</div>
+    <p class="muted kudos-note" id="kudosStatus" role="status">Up to 3 a day, one per teammate.</p></div>`;
+}
 function showClubhouseMember(athleteId,trigger){
   const mem=(currentClubhouseRoster||[]).find(x=>x.athlete_id===athleteId); if(!mem) return;
   const isYou=activeAthlete&&mem.athlete_id===activeAthlete.id;
@@ -2604,7 +2580,7 @@ function showClubhouseMember(athleteId,trigger){
       <div>
         <h2 id="clubhouseDialogTitle">${escapeHTML(mem.display_name||'Teammate')}${isYou?' <span class="clubhouse-you-tag">YOU</span>':''}</h2>
         <dl class="clubhouse-member-stats"><div><dt>Career XP</dt><dd>${fmtNum(mem.total_xp)}</dd></div><div><dt>Workouts logged</dt><dd>${fmtNum(mem.workout_count)}</dd></div></dl>
-        ${isYou?'<button type="button" class="primary" id="clubhouseOpenMyCard">Open my Player Card</button>':'<p class="muted">Player cards are private to each athlete’s family.</p>'}
+        ${isYou?'<button type="button" class="primary" id="clubhouseOpenMyCard">Open my Player Card</button>':kudosBoxHTML(mem)}
       </div>
     </div>`,trigger);
 }
@@ -2638,6 +2614,147 @@ document.addEventListener('error',e=>{
     img.replaceWith(span);
   }
 },true);
+// ---- Recognitions: shared shout-outs (migration 0033) ----
+// Coach awards (PIN, 5 presets) and peer kudos (4 presets, capped server-side)
+// share one feed; preset reactions sit on each item. Cosmetic only — no XP.
+// Everything here renders server-checked data; the server decides who may
+// read, give, react or remove.
+const RECOG_REACTIONS=[{key:'clap',emoji:'👏',label:'Nice Work'},{key:'fire',emoji:'🔥',label:'Awesome'},{key:'raised',emoji:'🙌',label:'Great Job'},{key:'muscle',emoji:'💪',label:'Beast'},{key:'star',emoji:'⭐',label:'Let’s Go'}];
+const COACH_AWARDS=['Great Hustle','Best Teammate','Practice Leader','Sportsmanship','Never Quit'];
+const KUDOS_LABELS=['Nice Work','Awesome','Good Teammate','Keep Going'];
+const recogDate=iso=>{try{return new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric'})}catch(e){return ''}};
+function recogItemHTML(r){
+  const isAward=r.kind==='award';
+  const counts=r.reaction_counts||{}, mine=r.my_reactions||[];
+  const btn=(x,withCount)=>{
+    const n=counts[x.key]||0, on=mine.includes(x.key);
+    return `<button type="button" class="recog-react${on?' on':''}" data-rec="${escapeHTML(r.id)}" data-reaction="${x.key}" aria-pressed="${on}" aria-label="${x.label}${withCount&&n?`, ${n}`:''}">${x.emoji}${withCount&&n?` <span>${n}</span>`:''}</button>`;
+  };
+  // Only reactions someone has actually picked show as chips; the full set
+  // lives behind the small + button (hover on desktop, tap on touch).
+  const chips=RECOG_REACTIONS.filter(x=>(counts[x.key]||0)>0).map(x=>btn(x,true)).join('');
+  const picker=RECOG_REACTIONS.map(x=>btn(x,false)).join('');
+  return `<div class="recog-item${isAward?' is-award':''}">
+    <span class="recog-icon" aria-hidden="true">${isAward?'🏅':'👏'}</span>
+    <div class="recog-main">
+      <p class="recog-line"><strong>${escapeHTML(r.recipient_name)}</strong> — ${escapeHTML(r.label)}</p>
+      <small class="muted">${isAward?'Award from Coach':'Kudos from '+escapeHTML(r.giver_name)} · ${escapeHTML(recogDate(r.created_at))}</small>
+      <div class="recog-reactions" role="group" aria-label="Reactions">${chips}<span class="recog-add"><button type="button" class="recog-add-btn" aria-label="Add a reaction" aria-haspopup="true" aria-expanded="false">+</button><span class="recog-picker" role="group" aria-label="Choose a reaction">${picker}</span></span></div>
+    </div>
+  </div>`;
+}
+function renderRecognitions(){
+  const feed=$('#recognitionFeed'), spot=$('#clubhouseSpotlight');
+  if(!feed||!spot) return;
+  const approved=!!(athleteTeamMembership&&athleteTeamMembership.status==='approved');
+  const empty='<p class="muted">When a coach recognizes a teammate, the award is highlighted here for the week. No awards have been shared yet.</p>';
+  if(!approved){feed.innerHTML='';spot.innerHTML='';return}
+  if(recognitionsStatus==='unavailable'){
+    const m='<p class="muted">Shared shout-outs are almost ready — check back soon.</p>';
+    feed.innerHTML=m; spot.innerHTML=m; return;
+  }
+  if(recognitionsStatus==='error'){
+    feed.innerHTML=`<p class="muted">Couldn’t load shout-outs (${escapeHTML(recognitionsError)}).</p>`; spot.innerHTML=''; return;
+  }
+  if(recognitionsStatus!=='ready'){feed.innerHTML='<p class="muted">Loading…</p>'; spot.innerHTML=''; return}
+  feed.innerHTML=currentRecognitions.length
+    ?currentRecognitions.slice(0,8).map(recogItemHTML).join('')
+    :'<p class="muted">No shout-outs yet. When your coach recognizes someone or a teammate gives kudos, it shows up here.</p>';
+  const sp=currentSpotlight;
+  spot.innerHTML=sp?`<div class="spotlight-body">
+      <div class="spotlight-photo">${clubhouseAvatarHTML({display_name:sp.recipient_name,avatar_url:sp.recipient_avatar_url},'large')}</div>
+      <div><p class="spotlight-name">${escapeHTML(sp.recipient_name)}</p><p class="spotlight-award">🏅 ${escapeHTML(sp.label)}</p><small class="muted">Award from Coach · ${escapeHTML(recogDate(sp.created_at))}</small></div>
+    </div>`:empty;
+}
+// Re-reads just the feed + spotlight (after a reaction or new kudos) so the
+// rest of the page isn't repainted.
+async function refreshRecognitions(){
+  const m=athleteTeamMembership;
+  if(!activeAthlete||!m||m.status!=='approved'||!m.teams) return;
+  try{
+    const [rows,sp]=await Promise.all([loadTeamRecognitions(m.teams.id,activeAthlete.id,20),loadTeamSpotlight(m.teams.id)]);
+    if(rows===null||sp===null){recognitionsStatus='unavailable'}
+    else{recognitionsStatus='ready'; recognitionsError=''; currentRecognitions=rows; currentSpotlight=sp||null}
+  }catch(err){recognitionsStatus='error'; recognitionsError=err&&err.message?err.message:String(err)}
+  renderRecognitions();
+}
+async function reactToRecognition(btn){
+  if(!activeAthlete||btn.disabled) return;
+  btn.disabled=true;
+  try{ await reactToRecognitionRemote(activeAthlete.id,btn.dataset.rec,btn.dataset.reaction) }
+  catch(err){ alert('Could not react: '+(err.message||'unknown error')) }
+  await refreshRecognitions();
+}
+async function giveKudos(btn){
+  const status=$('#kudosStatus');
+  const m=athleteTeamMembership;
+  if(!activeAthlete||!m||!m.teams||btn.disabled) return;
+  const buttons=$$('.kudos-btn'); buttons.forEach(b=>b.disabled=true);
+  try{
+    await giveKudosRemote(m.teams.id,activeAthlete.id,btn.dataset.recipient,btn.dataset.kudos);
+    if(status) status.textContent='Kudos sent! 🎉';
+    await refreshRecognitions();
+  }catch(err){
+    if(status) status.textContent=(err&&err.message)||'Could not send kudos.';
+    buttons.forEach(b=>b.disabled=false);
+  }
+}
+// ---- Coach side (Coach HQ): give an award, review and remove ----
+function openAwardDialog(athleteId,name,trigger){
+  openClubhouseDialog(`<h2 id="clubhouseDialogTitle">Shout-out for ${escapeHTML(name)}</h2>
+    <p class="muted">Pick an award. It shows to the whole team in Around the Clubhouse. You’ll be asked for your approval PIN. No XP is awarded.</p>
+    <div class="award-buttons">${COACH_AWARDS.map(a=>`<button type="button" class="award-btn" data-athlete="${escapeHTML(athleteId)}" data-name="${escapeHTML(name)}" data-award="${escapeHTML(a)}">🏅 ${escapeHTML(a)}</button>`).join('')}</div>`,trigger);
+}
+async function giveAward(athleteId,name,award){
+  const status=$('#coachRecognitionStatus');
+  if(!coachTeam) return;
+  closeClubhouseDialog();
+  const pin=await showPinModal(`give “${award}” to ${name}`);
+  if(!pin) return;
+  try{
+    await giveTeamAwardRemote(coachTeam.id,athleteId,award,pin);
+    if(status) status.textContent=`“${award}” sent to ${name}.`;
+  }catch(err){
+    if(status) status.textContent='Could not give shout-out: '+((err&&err.message)||'unknown error');
+  }
+  await renderCoachRecognitions();
+}
+async function renderCoachRecognitions(){
+  const list=$('#coachRecognitionList');
+  if(!list||!coachTeam) return;
+  try{
+    const rows=await loadTeamRecognitions(coachTeam.id,null,15);
+    if(rows===null){list.innerHTML='<p class="muted">Shout-outs aren’t available yet — the database update hasn’t been applied.</p>';return}
+    list.innerHTML=rows.length?rows.map(r=>`<div class="pending-request-row"><span><strong>${escapeHTML(r.recipient_name)}</strong> — ${escapeHTML(r.label)}<br><small class="muted">${r.kind==='award'?'Award from Coach':'Kudos from '+escapeHTML(r.giver_name)} · ${escapeHTML(recogDate(r.created_at))}</small></span><button class="danger" type="button" data-remove-rec="${escapeHTML(r.id)}">Remove</button></div>`).join(''):'<p class="muted">No shout-outs yet.</p>';
+  }catch(err){
+    list.innerHTML=`<p class="muted">Couldn’t load shout-outs (${escapeHTML(err.message||'unknown error')}).</p>`;
+  }
+}
+async function removeRecognition(id){
+  const status=$('#coachRecognitionStatus');
+  if(!confirm('Remove this shout-out for the whole team?')) return;
+  const pin=await showPinModal('remove a team shout-out');
+  if(!pin) return;
+  try{ await removeTeamRecognitionRemote(id,pin); if(status) status.textContent='Removed.' }
+  catch(err){ if(status) status.textContent='Could not remove: '+((err&&err.message)||'unknown error') }
+  await renderCoachRecognitions();
+}
+function closeRecogPickers(except){
+  $$('.recog-add.open').forEach(el=>{ if(el!==except){ el.classList.remove('open'); const b=el.querySelector('.recog-add-btn'); if(b) b.setAttribute('aria-expanded','false') } });
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const open=document.querySelector('.recog-add.open'); if(open){ const b=open.querySelector('.recog-add-btn'); closeRecogPickers(); if(b) b.focus() } } });
+// Keyboard users: leaving the picker (Tab away) closes it.
+document.addEventListener('focusout',e=>{ const add=e.target.closest&&e.target.closest('.recog-add'); if(add&&!add.contains(e.relatedTarget)) closeRecogPickers() });
+document.addEventListener('click',e=>{
+  const addBtn=e.target.closest('.recog-add-btn');
+  if(addBtn){ const wrap=addBtn.closest('.recog-add'); const open=!wrap.classList.contains('open'); closeRecogPickers(open?wrap:null); wrap.classList.toggle('open',open); addBtn.setAttribute('aria-expanded',String(open)); return }
+  if(!e.target.closest('.recog-add')) closeRecogPickers();
+  const react=e.target.closest('.recog-react'); if(react){reactToRecognition(react);return}
+  const kudos=e.target.closest('.kudos-btn'); if(kudos){giveKudos(kudos);return}
+  const award=e.target.closest('[data-award-athlete]'); if(award){openAwardDialog(award.dataset.awardAthlete,award.dataset.name,award);return}
+  const pick=e.target.closest('.award-btn'); if(pick){giveAward(pick.dataset.athlete,pick.dataset.name,pick.dataset.award);return}
+  const rm=e.target.closest('[data-remove-rec]'); if(rm){removeRecognition(rm.dataset.removeRec);return}
+});
 // Active Team Challenge card — separate from renderTeamIdentity() so a
 // challenge-only repaint (e.g. after the coach saves a new one) doesn't
 // have to re-run the whole team-identity paint. Hidden entirely if the
@@ -2696,11 +2813,16 @@ async function refreshTeamMembershipUI(){
       const teamId=athleteTeamMembership.teams.id;
       // The locker-room roster is allowed to fail on its own (shown in the
       // room) without taking the rest of the team stats down with it.
-      const [totals,ranked,roster,activeDates,challenge,clubhouse]=await withTimeout(Promise.all([
+      const [totals,ranked,roster,activeDates,challenge,clubhouse,recs,spot]=await withTimeout(Promise.all([
         loadTeamXpTotals(teamId), loadAllTeamXpTotalsRanked(), loadTeamRoster(teamId),
         loadTeamActiveDates(teamId), loadTeamChallenge(teamId),
-        loadClubhouseRoster(teamId).then(r=>({rows:r}),e=>({error:e}))
+        loadClubhouseRoster(teamId).then(r=>({rows:r}),e=>({error:e})),
+        loadTeamRecognitions(teamId,activeAthlete.id,20).then(r=>({rows:r}),e=>({error:e})),
+        loadTeamSpotlight(teamId).then(r=>({row:r}),e=>({error:e}))
       ]),10000,'Loading team stats');
+      if(recs.error||spot.error){recognitionsStatus='error'; recognitionsError=(recs.error||spot.error).message||'unknown error'; currentRecognitions=[]; currentSpotlight=null}
+      else if(recs.rows===null||spot.row===null){recognitionsStatus='unavailable'; currentRecognitions=[]; currentSpotlight=null}
+      else{recognitionsStatus='ready'; recognitionsError=''; currentRecognitions=recs.rows; currentSpotlight=spot.row||null}
       if(clubhouse.error){clubhouseStatus='error'; clubhouseError=clubhouse.error.message||String(clubhouse.error); currentClubhouseRoster=[]; clubhouseUsingFallback=false}
       else if(clubhouse.rows===null){
         // 0032 not applied yet: same approved-only rows the page already had, without avatars.
@@ -2719,11 +2841,13 @@ async function refreshTeamMembershipUI(){
       currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
       currentTeamActiveDates=[]; currentTeamStreak=0; currentTeamChallenge=null;
       currentClubhouseRoster=[]; clubhouseStatus='ready'; clubhouseUsingFallback=false;
+      currentRecognitions=[]; currentSpotlight=null; recognitionsStatus='idle'; recognitionsError='';
     }
   }catch(err){
     currentTeamXpTotals=null; currentTeamRoster=[]; currentTeamRank=null; currentTeamRankTotal=null;
     currentTeamActiveDates=[]; currentTeamStreak=0; currentTeamChallenge=null;
     currentClubhouseRoster=[]; clubhouseStatus='error'; clubhouseError=err&&err.message?err.message:String(err); clubhouseUsingFallback=false;
+    currentRecognitions=[]; currentSpotlight=null; recognitionsStatus='error'; recognitionsError=clubhouseError;
     if(statusEl) statusEl.textContent='Could not load team stats: '+(err&&err.message?err.message:String(err));
   }
   renderTeamIdentity();
@@ -2854,7 +2978,8 @@ async function renderTeamRoster(){
   const list=$('#teamRosterList');
   if(!list||!coachTeam) return;
   const rows=(await loadTeamRoster(coachTeam.id)).filter(r=>r.status==='approved');
-  list.innerHTML=rows.length?rows.map(r=>`<div class="pending-request-row"><span>${r.display_name}</span><button class="danger" data-remove="${r.athlete_id}" data-name="${r.display_name}" type="button">Remove</button></div>`).join(''):'<p class="muted">No athletes on the roster yet.</p>';
+  list.innerHTML=rows.length?rows.map(r=>`<div class="pending-request-row"><span>${escapeHTML(r.display_name)}</span><span class="roster-actions"><button class="primary" data-award-athlete="${escapeHTML(r.athlete_id)}" data-name="${escapeHTML(r.display_name)}" type="button">Shout-out</button><button class="danger" data-remove="${escapeHTML(r.athlete_id)}" data-name="${escapeHTML(r.display_name)}" type="button">Remove</button></span></div>`).join(''):'<p class="muted">No athletes on the roster yet.</p>';
+  renderCoachRecognitions();
 }
 // Sets team_members.status to 'left' — a soft removal, same tier as
 // archiving an athlete. Nothing else (XP, workouts, combine tests, rewards,
@@ -2919,6 +3044,7 @@ function renderCoachOnlyVisibility(){
   if($('#leagueJoinCard')) $('#leagueJoinCard').classList.toggle('hidden',!isCoach||!coachTeam);
   if($('#pendingRequestsCard')) $('#pendingRequestsCard').classList.toggle('hidden',!isCoach||!coachTeam);
   if($('#teamRosterCard')) $('#teamRosterCard').classList.toggle('hidden',!isCoach||!coachTeam);
+  if($('#coachRecognitionsCard')) $('#coachRecognitionsCard').classList.toggle('hidden',!isCoach||!coachTeam);
 }
 
 // ---- Team Program (Phase C) ----
@@ -3125,7 +3251,7 @@ async function renderLeagueHQ(){
   $('#leagueMeta').textContent=`${standings.length} Team${standings.length===1?'':'s'}${league.season?' · '+league.season:''}`;
   $('#leagueLeaderboardBody').innerHTML=standings.map(s=>`<tr><td>${s.team_name}</td><td>${s.athlete_count}</td><td>${s.team_xp}</td></tr>`).join('');
 }
-function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderShoutouts();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();if($('#gameXPToday'))$('#gameXPToday').textContent=todayArcadeGameXP();if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#cannonArmBest'))$('#cannonArmBest').textContent=getArcadeBest('cannonArm');if($('#dugoutDisasterBest'))$('#dugoutDisasterBest').textContent=getArcadeBest('dugoutDisaster');if($('#ballparkBreakoutBest'))$('#ballparkBreakoutBest').textContent=getArcadeBest('ballparkBreakout');if($('#skylineSlamBest'))$('#skylineSlamBest').textContent=getArcadeBest('skylineSlam');if($('#pocketPrecisionBest'))$('#pocketPrecisionBest').textContent=getArcadeBest('pocketPrecision');if($('#turfTroubleBest'))$('#turfTroubleBest').textContent=getArcadeBest('turfTrouble');renderArcadeExtras()}
+function renderTeamEdition(){renderMission();renderLeaderboard();renderTeamFeed();renderRecognitions();renderExerciseLibrary();renderProgramBuilder();renderTeamProgramBuilder();renderTeamProgramSummary();renderClubhouseTeamProgram();renderTeamProgramLogFields();renderTeamIdentity();renderArcadeLeaderboard();if($('#gameXPToday'))$('#gameXPToday').textContent=todayArcadeGameXP();if($('#homerBest'))$('#homerBest').textContent=getArcadeBest('homeRunHero');if($('#cannonArmBest'))$('#cannonArmBest').textContent=getArcadeBest('cannonArm');if($('#dugoutDisasterBest'))$('#dugoutDisasterBest').textContent=getArcadeBest('dugoutDisaster');if($('#ballparkBreakoutBest'))$('#ballparkBreakoutBest').textContent=getArcadeBest('ballparkBreakout');if($('#skylineSlamBest'))$('#skylineSlamBest').textContent=getArcadeBest('skylineSlam');if($('#pocketPrecisionBest'))$('#pocketPrecisionBest').textContent=getArcadeBest('pocketPrecision');if($('#turfTroubleBest'))$('#turfTroubleBest').textContent=getArcadeBest('turfTrouble');renderArcadeExtras()}
 // ---- Home Run Hero (v2: embedded "Wild Home Run Derby" Phaser build) ----
 // The game itself lives entirely at assets/games/home-run-derby/ (a
 // self-contained Vite/Phaser build, no shared code with this file) and
@@ -3445,7 +3571,6 @@ if($('#useRainToken'))$('#useRainToken').onclick=useRainToken;
 if($('#leaderboardMetric'))$('#leaderboardMetric').onchange=renderLeaderboard;
 if($('#libraryCategory'))$('#libraryCategory').onchange=renderExerciseLibrary;
 if($('#goalChips'))$('#goalChips').onclick=e=>{const btn=e.target.closest('.goal-chip');if(!btn)return;$('#libraryCategory').value=btn.dataset.category;renderExerciseLibrary()};
-if($('#addShoutout'))$('#addShoutout').onclick=addShoutout;
 if($('#saveTeamProgram'))$('#saveTeamProgram').onclick=saveTeamProgram;
 if($('#saveTeamChallenge'))$('#saveTeamChallenge').onclick=saveTeamChallenge;
 $$('input[name=teamChallengeRewardType]').forEach(r=>r.onchange=toggleTeamChallengeRewardFields);
@@ -3455,7 +3580,6 @@ if($('#joinTeamIdentityBtn'))$('#joinTeamIdentityBtn').onclick=joinTeamIdentity;
 if($('#teamLogoUpload'))$('#teamLogoUpload').onchange=e=>handleTeamLogoUpload(e.target.files[0]);
 if($('#joinTeamProgram'))$('#joinTeamProgram').onclick=joinTeamProgram;
 if($('#completeTeamProgram'))$('#completeTeamProgram').onclick=goToTeamProgramCheckIn;
-$$('.reaction-btn').forEach(b=>b.onclick=()=>addReaction(b.textContent));
 window.addEventListener('message',handleHomerDerbyMessage);
 window.addEventListener('message',handleCannonArmMessage);
 window.addEventListener('message',handleDugoutDisasterMessage);
@@ -3705,6 +3829,7 @@ function afterSignedOut(){
   currentTeamRankTotal=null;
   currentTeamRoster=[];
   currentClubhouseRoster=[]; clubhouseStatus='idle'; clubhouseError=''; clubhouseUsingFallback=false;
+  currentRecognitions=[]; currentSpotlight=null; recognitionsStatus='idle'; recognitionsError='';
   currentTeamProgram=null;
   currentTeamProgramOptedIn=false;
   updateAuthUI();
