@@ -650,6 +650,37 @@ async function loadAllTeamXpTotalsRanked(){
   return data||[];
 }
 
+// ---------------- Team recognitions (shared shout-outs) ----------------
+// All access goes through SECURITY DEFINER functions (0033). A missing
+// function (PGRST202, migration not applied yet) returns null so the page can
+// show a quiet "almost ready" state instead of an error.
+async function loadTeamRecognitions(teamId,athleteId,limit){
+  const {data,error}=await supabase.rpc('get_team_recognitions',{p_team_id:teamId,p_athlete_id:athleteId||null,p_limit:limit||20});
+  if(error){ if(error.code==='PGRST202') return null; throw error; }
+  return data||[];
+}
+async function loadTeamSpotlight(teamId){
+  const {data,error}=await supabase.rpc('get_team_spotlight',{p_team_id:teamId});
+  if(error){ if(error.code==='PGRST202') return null; throw error; }
+  return (data&&data[0])||false; // false = nothing this week
+}
+async function giveTeamAwardRemote(teamId,recipientAthleteId,award,pin){
+  const {error}=await supabase.rpc('give_team_award',{p_team_id:teamId,p_recipient_athlete_id:recipientAthleteId,p_award:award,p_pin:pin});
+  if(error) throw error;
+}
+async function giveKudosRemote(teamId,giverAthleteId,recipientAthleteId,kudos){
+  const {error}=await supabase.rpc('give_kudos',{p_team_id:teamId,p_giver_athlete_id:giverAthleteId,p_recipient_athlete_id:recipientAthleteId,p_kudos:kudos});
+  if(error) throw error;
+}
+async function reactToRecognitionRemote(athleteId,recognitionId,reaction){
+  const {error}=await supabase.rpc('react_to_recognition',{p_athlete_id:athleteId,p_recognition_id:recognitionId,p_reaction:reaction});
+  if(error) throw error;
+}
+async function removeTeamRecognitionRemote(recognitionId,pin){
+  const {error}=await supabase.rpc('remove_team_recognition',{p_recognition_id:recognitionId,p_pin:pin});
+  if(error) throw error;
+}
+
 // ---------------- Team Streak & Team Challenge ----------------
 // get_team_active_dates returns `setof date` (a scalar set, not rows of a
 // composite type) — PostgREST hands supabase-js a plain array of

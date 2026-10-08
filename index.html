@@ -437,22 +437,13 @@
 <div class="clubhouse-social">
   <div class="card" id="clubhouseAroundCard">
     <h2>Around the Clubhouse</h2>
-    <p class="muted">Positive reactions and shout-outs only — no comments or direct messages. Entries below are saved on this device and are not yet shared with the team.</p>
-    <div id="shoutouts"></div>
-    <div class="reaction-row"><button type="button" class="reaction-btn">👏 Nice Work</button><button type="button" class="reaction-btn">🔥 Awesome</button><button type="button" class="reaction-btn">⚾ Great Job</button><button type="button" class="reaction-btn">💪 Beast</button><button type="button" class="reaction-btn">⭐ Let’s Go</button></div>
-    <details class="clubhouse-award">
-      <summary>Coach or parent: give a shout-out</summary>
-      <div class="form-grid">
-        <label>Award<select id="shoutoutType"><option>Great Hustle</option><option>Best Teammate</option><option>Practice Leader</option><option>Sportsmanship</option><option>Never Quit</option></select></label>
-        <label>From<select id="shoutoutFrom"><option>Coach</option><option>Parent</option></select></label>
-        <button id="addShoutout" class="primary wide" type="button">Add Shout-Out</button>
-      </div>
-      <p class="muted">Requires the parent approval PIN.</p>
-    </details>
+    <p class="muted">Shout-outs from your coach and kudos from teammates. Positive and preset only — no comments or direct messages. Tap a reaction to cheer someone on.</p>
+    <div id="recognitionFeed" aria-live="polite"></div>
+    <p class="muted recog-hint">Want to give a teammate kudos? Open their locker above.</p>
   </div>
-  <div class="card clubhouse-spotlight">
+  <div class="card clubhouse-spotlight" id="clubhouseSpotlightCard">
     <h2>Team Spotlight</h2>
-    <p class="muted">When a coach recognizes a teammate, the award will be highlighted here. No awards have been shared yet.</p>
+    <div id="clubhouseSpotlight" aria-live="polite"></div>
   </div>
 </div>
 
@@ -473,10 +464,7 @@
 </details>
 </div>
 
-<dialog id="clubhouseDialog" class="clubhouse-dialog" aria-labelledby="clubhouseDialogTitle">
-  <div class="clubhouse-dialog-body" id="clubhouseDialogBody"></div>
-  <button type="button" class="clubhouse-dialog-close" id="clubhouseDialogClose">Close</button>
-</dialog>
+
 </section>
 <section id="league" class="screen">
 <div class="card league-hero hidden" id="leagueHeroCard"><p class="eyebrow dark">League Home</p><h2 id="leagueName">Your League</h2><p id="leagueMeta" class="muted"></p></div>
@@ -602,6 +590,13 @@
     <p class="eyebrow dark">Coach Tools</p>
     <h2>Team Roster</h2>
     <div id="teamRosterList"></div>
+  </div>
+  <div class="card hidden" id="coachRecognitionsCard" data-coach-only>
+    <p class="eyebrow dark">Coach Tools</p>
+    <h2>Team Shout-Outs</h2>
+    <p class="muted">Use “Shout-out” beside an athlete in the roster above to give one of five preset awards. It shows in Around the Clubhouse and Team Spotlight for your team. Requires your approval PIN. No XP is awarded.</p>
+    <p id="coachRecognitionStatus" class="muted" role="status"></p>
+    <div id="coachRecognitionList"></div>
   </div>
   <div class="card" data-coach-only>
     <p class="eyebrow dark">Coach Tools</p>
@@ -800,5 +795,9 @@
 </footer>
 <script src="data.js"></script>
 <script src="app.js"></script>
+<dialog id="clubhouseDialog" class="clubhouse-dialog" aria-labelledby="clubhouseDialogTitle">
+  <div class="clubhouse-dialog-body" id="clubhouseDialogBody"></div>
+  <button type="button" class="clubhouse-dialog-close" id="clubhouseDialogClose">Close</button>
+</dialog>
 </body>
 </html>

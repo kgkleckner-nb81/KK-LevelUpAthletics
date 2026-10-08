@@ -1559,3 +1559,34 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
   .clubhouse-member{flex-direction:column;align-items:flex-start}
 }
 @media(prefers-reduced-motion:reduce){.lua-team-clubhouse .clubhouse-roster{scroll-behavior:auto}}
+
+/* ---- Recognitions: feed, reactions, spotlight, kudos, coach awards ---- */
+.lua-team-clubhouse .recog-item{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid rgba(0,0,0,.12)}
+.lua-team-clubhouse .recog-item:last-child{border-bottom:0}
+.lua-team-clubhouse .recog-icon{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--ink);border-radius:50%;background:var(--white)}
+.lua-team-clubhouse .recog-item.is-award .recog-icon{background:var(--peach)}
+.lua-team-clubhouse .recog-main{min-width:0;flex:1}
+.lua-team-clubhouse .recog-line{margin:0;overflow-wrap:anywhere}
+.lua-team-clubhouse .recog-reactions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.lua-team-clubhouse .recog-react{min-width:44px;min-height:34px;padding:2px 9px;border:2px solid var(--ink);border-radius:999px;background:var(--white);color:var(--ink);box-shadow:none;transform:none;font:inherit;font-size:15px;line-height:1;cursor:pointer}
+.lua-team-clubhouse .recog-react span{font-weight:800;font-size:13px}
+.lua-team-clubhouse .recog-react.on{background:var(--neon-blue)}
+.lua-team-clubhouse .recog-react:hover{transform:none;box-shadow:none;background:var(--cream)}
+.lua-team-clubhouse .recog-react.on:hover{background:var(--neon-blue)}
+.lua-team-clubhouse .recog-react:focus-visible,.clubhouse-dialog .kudos-btn:focus-visible,.clubhouse-dialog .award-btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.lua-team-clubhouse .recog-react:disabled{opacity:.55;cursor:wait}
+.lua-team-clubhouse .recog-hint{margin:10px 0 0;font-size:13px}
+.lua-team-clubhouse .spotlight-body{display:flex;gap:14px;align-items:center}
+.lua-team-clubhouse .spotlight-photo{flex:none;width:92px}
+.lua-team-clubhouse .spotlight-photo .clubhouse-avatar,.lua-team-clubhouse .spotlight-photo .clubhouse-monogram{width:92px;aspect-ratio:1/1;border-radius:50%;object-fit:cover;object-position:top center;border:3px solid var(--ink);background:#2c3036}
+.lua-team-clubhouse .spotlight-photo .clubhouse-monogram{display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:40px;color:var(--neon-blue)}
+.lua-team-clubhouse .spotlight-name{margin:0;font-family:var(--display);font-weight:800;font-size:22px;overflow-wrap:anywhere}
+.lua-team-clubhouse .spotlight-award{margin:2px 0 4px;font-weight:800}
+.clubhouse-dialog .kudos-box{margin-top:6px}
+.clubhouse-dialog .kudos-title{margin:0 0 8px;font-weight:800}
+.clubhouse-dialog .kudos-buttons,.clubhouse-dialog .award-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.clubhouse-dialog .kudos-btn,.clubhouse-dialog .award-btn{border:2px solid var(--ink);border-radius:999px;padding:8px 14px;background:var(--neon-blue);color:var(--ink);font:inherit;font-weight:800;box-shadow:none;cursor:pointer}
+.clubhouse-dialog .kudos-btn:disabled{opacity:.5;cursor:default}
+.clubhouse-dialog .kudos-note{margin:8px 0 0;font-size:13px}
+.roster-actions{display:inline-flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:480px){.lua-team-clubhouse .spotlight-body{flex-direction:column;align-items:flex-start}}
