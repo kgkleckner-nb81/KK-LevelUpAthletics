@@ -1499,17 +1499,19 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .lua-team-clubhouse .clubhouse-room-note .clubhouse-link{color:var(--neon-blue)}
 .lua-team-clubhouse .clubhouse-room.is-preview{min-height:180px;display:flex;align-items:center;justify-content:center}
 .lua-team-clubhouse .clubhouse-room-foot{margin:10px 0 0;font-size:13px}
-.lua-team-clubhouse .clubhouse-roster{display:flex;gap:0;width:fit-content;max-width:100%;margin:0 auto;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:thin;padding-bottom:4px}
-.lua-team-clubhouse .clubhouse-locker{position:relative;flex:0 0 clamp(150px,18vw,210px);aspect-ratio:1/2;scroll-snap-align:start;container-type:inline-size;border-radius:10px}
+.lua-team-clubhouse .clubhouse-roster{display:flex;gap:0;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:thin;padding-bottom:4px}
+.lua-team-clubhouse .clubhouse-locker:first-child{margin-left:auto}
+.lua-team-clubhouse .clubhouse-locker:last-child{margin-right:auto}
+.lua-team-clubhouse .clubhouse-locker{position:relative;width:180px;width:clamp(150px,18vw,210px);flex:0 0 auto;height:360px;height:calc(clamp(150px,18vw,210px) * 2);aspect-ratio:1/2;scroll-snap-align:start;container-type:inline-size;border-radius:10px}
 .lua-team-clubhouse .clubhouse-locker-art{position:absolute;inset:0;background:url('assets/clubhouse/clubhouse-locker-bay.webp') center/100% 100% no-repeat;pointer-events:none}
-.lua-team-clubhouse .clubhouse-nameplate{position:absolute;top:2.9%;left:22%;width:56%;height:5.7%;display:block;box-sizing:border-box;padding:0 3%;color:#fff;font-weight:800;font-size:max(10px,7.4cqw);line-height:11.4cqw;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;letter-spacing:.02em}
+.lua-team-clubhouse .clubhouse-nameplate{position:absolute;top:2.9%;left:22%;width:56%;height:5.7%;display:block;box-sizing:border-box;padding:0 3%;color:#fff;font-weight:800;font-size:11px;line-height:20px;font-size:max(10px,7.4cqw);line-height:11.4cqw;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;letter-spacing:.02em}
 .lua-team-clubhouse .clubhouse-player{position:absolute;left:26.5%;width:48.5%;top:14.4%;height:55%;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;color:#fff;text-align:center}
 .lua-team-clubhouse .clubhouse-avatar,.lua-team-clubhouse .clubhouse-monogram{width:100%;aspect-ratio:1/1;flex:none;border-radius:10px;object-fit:cover;object-position:top center;border:2px solid var(--neon-blue);background:#2c3036}
-.lua-team-clubhouse .clubhouse-monogram{display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:22cqw;color:var(--neon-blue)}
-.lua-team-clubhouse .clubhouse-xp{display:block;margin-top:6%;font-family:var(--display);font-weight:800;font-size:max(15px,12cqw);line-height:1}
-.lua-team-clubhouse .clubhouse-xp-label{font-size:max(10px,6.4cqw);font-weight:800;letter-spacing:.08em;color:var(--neon-blue);line-height:1}
-.lua-team-clubhouse .clubhouse-workouts{font-size:max(10px,6.4cqw);line-height:1.2;color:#d9dde2}
-.lua-team-clubhouse .clubhouse-you{position:absolute;top:15.2%;left:27.5%;border-radius:999px;padding:2px 7px;background:var(--neon-blue);color:var(--ink);font-size:max(10px,6.4cqw);font-weight:800;line-height:1.2;box-shadow:0 0 0 2px var(--ink)}
+.lua-team-clubhouse .clubhouse-monogram{display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:40px;font-size:22cqw;color:var(--neon-blue)}
+.lua-team-clubhouse .clubhouse-xp{display:block;margin-top:6%;font-family:var(--display);font-weight:800;font-size:20px;font-size:max(15px,12cqw);line-height:1}
+.lua-team-clubhouse .clubhouse-xp-label{font-size:11px;font-size:max(10px,6.4cqw);font-weight:800;letter-spacing:.08em;color:var(--neon-blue);line-height:1}
+.lua-team-clubhouse .clubhouse-workouts{font-size:11px;font-size:max(10px,6.4cqw);line-height:1.2;color:#d9dde2}
+.lua-team-clubhouse .clubhouse-you{position:absolute;top:15.2%;left:27.5%;border-radius:999px;padding:2px 7px;background:var(--neon-blue);color:var(--ink);font-size:11px;font-size:max(10px,6.4cqw);font-weight:800;line-height:1.2;box-shadow:0 0 0 2px var(--ink)}
 .lua-team-clubhouse .clubhouse-locker-action{position:absolute;inset:0;width:100%;height:100%;background:transparent;border:0;border-radius:10px;box-shadow:none;transform:none;padding:0;cursor:pointer}
 .lua-team-clubhouse .clubhouse-locker-action:hover{background:rgba(0,229,255,.08);transform:none;box-shadow:none}
 .lua-team-clubhouse .clubhouse-locker-action:focus-visible{outline:3px solid var(--neon-blue);outline-offset:-4px}
@@ -1550,7 +1552,7 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
   .lua-team-clubhouse .clubhouse-social,
   .lua-team-clubhouse .clubhouse-future{grid-template-columns:minmax(0,1fr)}
   .lua-team-clubhouse .clubhouse-mission{order:-1}
-  .lua-team-clubhouse .clubhouse-locker{flex-basis:clamp(150px,43vw,200px)}
+  .lua-team-clubhouse .clubhouse-locker{width:clamp(150px,43vw,200px);height:calc(clamp(150px,43vw,200px) * 2)}
   .lua-team-clubhouse .clubhouse-unlocks{flex-direction:column;align-items:flex-start}
 }
 @media(max-width:480px){
