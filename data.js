@@ -615,6 +615,19 @@ async function removeTeamMemberRemote(teamId,athleteId){
 // only, never raw workout/combine records. Used for both the coach's roster
 // and a teammate-parent's leaderboard view (same narrowed access for both).
 
+// Locker-room roster: approved, active members only, enforced in
+// get_clubhouse_roster() (0032), not by hiding rows in the browser. Returns
+// null when that function hasn't been created yet (PGRST202) so the page can
+// degrade instead of breaking while the migration is pending.
+async function loadClubhouseRoster(teamId){
+  const {data,error}=await supabase.rpc('get_clubhouse_roster',{p_team_id:teamId});
+  if(error){
+    if(error.code==='PGRST202') return null;
+    throw error;
+  }
+  return data||[];
+}
+
 async function loadTeamRoster(teamId){
   const {data,error}=await supabase.rpc('get_team_roster',{p_team_id:teamId});
   if(error) throw error;

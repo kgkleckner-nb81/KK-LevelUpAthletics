@@ -75,7 +75,7 @@
 </nav>
 
 <nav class="subnav hidden" id="teamSubnav">
-  <button class="tab" data-screen="team"><span class="lua-icon icon-team" aria-hidden="true"></span>Team Dashboard</button>
+  <button class="tab" data-screen="team"><span class="lua-icon icon-team" aria-hidden="true"></span>Team Clubhouse</button>
   <button class="tab" data-screen="league"><span class="lua-icon icon-leaderboards" aria-hidden="true"></span>League HQ</button>
 </nav>
 
@@ -377,35 +377,12 @@
 
 
 <section id="team" class="screen">
-<div class="card team-hero hidden" id="teamHeroCard"><div><p class="eyebrow dark">Team HQ</p><h2 id="teamHeroName">Your Team</h2><p id="teamHeroMeta" class="muted"></p><button class="danger" id="leaveTeamBtn" type="button">Leave Team</button></div><div id="teamHeroLogo"></div></div>
-<div class="grid stats hidden" id="teamStatsGrid"><div class="stat"><span>Team XP</span><strong id="teamStatXP">—</strong><small>points</small></div><div class="stat"><span>Weekly Completion</span><strong id="teamStatCompletion">—</strong><small>team</small></div><div class="stat"><span>Roster Size</span><strong id="teamStatRoster">—</strong><small>athletes</small></div><div class="stat"><span>Team Rank</span><strong id="teamStatRank">—</strong><small id="teamStatRankOf"></small></div><div class="stat"><span>Team Streak</span><strong id="teamStatStreak">—</strong><small>days</small></div></div>
-<p id="teamStatsStatus" class="muted"></p>
-<div class="card hidden" id="teamChallengeCard">
-  <p class="eyebrow dark" id="teamChallengeKind">Team Challenge</p>
-  <h2 id="teamChallengeTitle">—</h2>
-  <div class="meter large"><div id="teamChallengeMeterFill" style="width:0%"></div></div>
-  <p id="teamChallengeMeterText" class="muted"></p>
-  <p id="teamChallengeReward" class="muted"></p>
+<div class="lua-team-clubhouse">
+<div class="card team-hero clubhouse-header hidden" id="teamHeroCard">
+  <div id="teamHeroLogo" class="clubhouse-header-logo"></div>
+  <div class="clubhouse-header-text"><p class="eyebrow dark">Team Clubhouse</p><h2 id="teamHeroName">Your Team</h2><p id="teamHeroMeta" class="muted"></p></div>
 </div>
-<div class="grid two hidden" id="teamBoardsGrid"><div class="card"><h2>Team Leaderboards</h2><label>Sort by<select id="leaderboardMetric"><option value="xp">Total XP</option><option value="workouts">Workouts Logged</option></select></label><div id="teamLeaderboard"></div></div><div class="card"><h2>Team Feed</h2><div id="teamFeed"></div></div></div>
-<div class="card">
-  <h2>Team Shout-Outs</h2>
-  <p class="muted">No comments or direct messages — only positive reactions and shout-outs from teammates, coaches, and parents.</p>
-  <div id="shoutouts"></div>
-  <div class="reaction-row"><button class="reaction-btn">👏 Nice Work</button><button class="reaction-btn">🔥 Awesome</button><button class="reaction-btn">⚾ Great Job</button><button class="reaction-btn">💪 Beast</button><button class="reaction-btn">⭐ Let’s Go</button></div>
-  <div class="form-grid">
-    <label>Award<select id="shoutoutType"><option>Great Hustle</option><option>Best Teammate</option><option>Practice Leader</option><option>Sportsmanship</option><option>Never Quit</option></select></label>
-    <label>From<select id="shoutoutFrom"><option>Coach</option><option>Parent</option></select></label>
-    <button id="addShoutout" class="primary wide" type="button">Add Shout-Out</button>
-  </div>
-</div>
-
-<div class="card" id="teamProgramSummaryCard">
-  <p class="eyebrow dark">Team Assignment</p>
-  <h2 id="teamProgramSummaryTitle">No Team Program Yet</h2>
-  <div id="teamProgramActivityList"></div>
-  <button id="joinTeamProgram" class="primary hidden" type="button">Join Team Program</button>
-</div>
+<p id="teamStatsStatus" class="muted" role="status"></p>
 <div class="card hidden" id="teamJoinCard">
   <p class="eyebrow dark">Team HQ</p>
   <h2>Join Your Team</h2>
@@ -416,6 +393,90 @@
   </div>
   <p id="teamJoinStatus" class="muted"></p>
 </div>
+
+<div class="clubhouse-primary">
+  <div class="card clubhouse-room-card" id="clubhouseRoomCard">
+    <div class="clubhouse-room-head">
+      <h2>Team Locker Room</h2>
+      <button type="button" class="clubhouse-link hidden" id="clubhouseViewAll">View all teammates →</button>
+    </div>
+    <div class="clubhouse-room" id="clubhouseRoom" aria-busy="false">
+      <p class="clubhouse-room-note" id="clubhouseRoomNote" role="status"></p>
+      <div class="clubhouse-roster" id="clubhouseRoster" role="list" aria-label="Teammates"></div>
+    </div>
+    <p class="muted clubhouse-room-foot hidden" id="clubhouseRoomFoot"></p>
+  </div>
+  <div class="clubhouse-mission">
+    <div class="card hidden" id="teamChallengeCard">
+      <p class="eyebrow dark" id="teamChallengeKind">Team Challenge</p>
+      <h2 id="teamChallengeTitle">—</h2>
+      <div class="meter large"><div id="teamChallengeMeterFill" style="width:0%"></div></div>
+      <p id="teamChallengeMeterText" class="muted"></p>
+      <p id="teamChallengeReward" class="muted"></p>
+    </div>
+    <div class="card" id="teamProgramSummaryCard">
+      <p class="eyebrow dark">Team Assignment</p>
+      <h2 id="teamProgramSummaryTitle">No Team Program Yet</h2>
+      <div id="teamProgramActivityList"></div>
+      <button id="joinTeamProgram" class="primary hidden" type="button">Join Team Program</button>
+    </div>
+    <p class="muted clubhouse-future-note" id="squadMissionFuture"><strong>Squad missions:</strong> shared team goals are coming soon. Coach challenges appear above when your coach starts one.</p>
+  </div>
+</div>
+
+<div id="clubhouseLower" class="hidden clubhouse-lower">
+<div class="card clubhouse-unlocks">
+  <div>
+    <p class="eyebrow dark">Clubhouse Unlocks</p>
+    <h2>Unlocks are coming soon</h2>
+    <p class="muted">Banners, gear and clubhouse upgrades will unlock here as the team works together. Nothing is unlocked yet.</p>
+  </div>
+  <span class="clubhouse-soon-pill">Coming soon</span>
+</div>
+
+<div class="clubhouse-social">
+  <div class="card" id="clubhouseAroundCard">
+    <h2>Around the Clubhouse</h2>
+    <p class="muted">Positive reactions and shout-outs only — no comments or direct messages. Entries below are saved on this device and are not yet shared with the team.</p>
+    <div id="shoutouts"></div>
+    <div class="reaction-row"><button type="button" class="reaction-btn">👏 Nice Work</button><button type="button" class="reaction-btn">🔥 Awesome</button><button type="button" class="reaction-btn">⚾ Great Job</button><button type="button" class="reaction-btn">💪 Beast</button><button type="button" class="reaction-btn">⭐ Let’s Go</button></div>
+    <details class="clubhouse-award">
+      <summary>Coach or parent: give a shout-out</summary>
+      <div class="form-grid">
+        <label>Award<select id="shoutoutType"><option>Great Hustle</option><option>Best Teammate</option><option>Practice Leader</option><option>Sportsmanship</option><option>Never Quit</option></select></label>
+        <label>From<select id="shoutoutFrom"><option>Coach</option><option>Parent</option></select></label>
+        <button id="addShoutout" class="primary wide" type="button">Add Shout-Out</button>
+      </div>
+      <p class="muted">Requires the parent approval PIN.</p>
+    </details>
+  </div>
+  <div class="card clubhouse-spotlight">
+    <h2>Team Spotlight</h2>
+    <p class="muted">When a coach recognizes a teammate, the award will be highlighted here. No awards have been shared yet.</p>
+  </div>
+</div>
+
+<div class="clubhouse-future">
+  <div class="card"><h2>Weekly Matchup</h2><p class="muted">A friendly training or Arcade challenge between teams is planned. Nothing is scheduled yet.</p></div>
+  <div class="card clubhouse-trophies"><h2>Season Trophy Case</h2><img src="assets/clubhouse/clubhouse-trophy-shelf.webp" alt="" width="1774" height="887" loading="lazy" class="clubhouse-shelf"><p class="muted">Decorative shelf — no trophies earned yet. Team achievements will appear here once they are unlocked.</p></div>
+  <div class="card"><h2>Coach’s Board</h2><p class="muted">Tips, reminders and team updates from your coach will appear here later in the season.</p></div>
+</div>
+
+</div>
+<div class="grid hidden clubhouse-boards" id="teamBoardsGrid"><div class="card"><h2>Team Leaderboards</h2><label>Sort by<select id="leaderboardMetric"><option value="xp">Total XP</option><option value="workouts">Workouts Logged</option></select></label><div id="teamLeaderboard"></div></div></div>
+<div class="grid stats hidden" id="teamStatsGrid"><div class="stat"><span>Team XP</span><strong id="teamStatXP">—</strong><small>points</small></div><div class="stat"><span>Weekly Completion</span><strong id="teamStatCompletion">—</strong><small>team</small></div><div class="stat"><span>Roster Size</span><strong id="teamStatRoster">—</strong><small>athletes</small></div><div class="stat"><span>Team Rank</span><strong id="teamStatRank">—</strong><small id="teamStatRankOf"></small></div><div class="stat"><span>Team Streak</span><strong id="teamStatStreak">—</strong><small>days</small></div></div>
+
+<details class="card clubhouse-manage" id="clubhouseManage">
+  <summary>Team management</summary>
+  <p class="muted">Leaving removes your athlete from this team. Your XP, workouts and rewards stay with your athlete.</p>
+  <button class="danger" id="leaveTeamBtn" type="button">Leave Team</button>
+</details>
+</div>
+
+<dialog id="clubhouseDialog" class="clubhouse-dialog" aria-labelledby="clubhouseDialogTitle">
+  <div class="clubhouse-dialog-body" id="clubhouseDialogBody"></div>
+  <button type="button" class="clubhouse-dialog-close" id="clubhouseDialogClose">Close</button>
+</dialog>
 </section>
 <section id="league" class="screen">
 <div class="card league-hero hidden" id="leagueHeroCard"><p class="eyebrow dark">League Home</p><h2 id="leagueName">Your League</h2><p id="leagueMeta" class="muted"></p></div>
