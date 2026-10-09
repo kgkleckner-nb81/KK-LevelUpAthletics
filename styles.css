@@ -1609,12 +1609,12 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 
 .coach-team-tag{display:block;margin-top:4px;font-family:var(--accent);font-weight:700;font-size:.55em;text-transform:none;letter-spacing:0;color:var(--muted)}
 
-/* ---- Team Clubhouse heading icons (assets/team-icons). Decorative: the live heading text names the section. ---- */
-.lua-team-clubhouse .has-hicon{display:flex;align-items:center;gap:10px}
-.lua-team-clubhouse .hicon{width:32px;height:32px;object-fit:contain;flex:0 0 auto}
-.lua-team-clubhouse .hicon-row{display:flex;align-items:center;gap:12px;margin-top:6px}
-.lua-team-clubhouse .hicon-stack{min-width:0}
-.lua-team-clubhouse .hicon-stack .eyebrow{margin-bottom:2px}
-.lua-team-clubhouse .hicon-stack h2{margin-top:2px}
+/* ---- Team Clubhouse heading icons (assets/team-icons). Decorative: the live heading text names the section. ----
+   The icon lives inside the heading and is pinned to its FIRST line, centred on that line, so it stays level with
+   the title text even when a long title wraps onto a second line. */
+.lua-team-clubhouse .has-hicon{display:flex;align-items:flex-start;gap:10px}
+.lua-team-clubhouse .has-hicon>span{min-width:0}
+.lua-team-clubhouse .hicon{--hicon:32px;width:var(--hicon);height:var(--hicon);object-fit:contain;flex:0 0 auto;margin-top:calc((1.6em - var(--hicon)) / 2)}
+@supports (height:1lh){.lua-team-clubhouse .hicon{margin-top:calc((1lh - var(--hicon)) / 2)}}
 .lua-team-clubhouse .clubhouse-room-head h2.has-hicon{margin-top:8px}
-@media(max-width:600px){.lua-team-clubhouse .hicon{width:30px;height:30px}}
+@media(max-width:600px){.lua-team-clubhouse .hicon{--hicon:30px}}
