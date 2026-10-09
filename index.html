@@ -384,8 +384,8 @@
 </div>
 <p id="teamStatsStatus" class="muted" role="status"></p>
 <div class="card hidden" id="teamJoinCard">
-  <p class="eyebrow dark">Team HQ</p>
-  <h2>Join Your Team</h2>
+  <div class="hicon-row"><img class="hicon" src="assets/team-icons/join-your-team.webp" alt="" aria-hidden="true" width="32" height="32"><div class="hicon-stack"><p class="eyebrow dark">Team HQ</p>
+  <h2>Join Your Team</h2></div></div>
   <p class="muted">Enter the join code your coach shared. A coach will need to approve your request before your team shows up here.</p>
   <div class="form-grid" id="teamJoinFormFields">
     <label class="wide">Team join code<input id="teamJoinCodeInput" type="text" placeholder="Enter code from your coach"></label>
@@ -397,7 +397,7 @@
 <div class="clubhouse-primary">
   <div class="card clubhouse-room-card" id="clubhouseRoomCard">
     <div class="clubhouse-room-head">
-      <h2>Team Locker Room</h2>
+      <h2 class="has-hicon"><img class="hicon" src="assets/team-icons/team-locker-room.webp" alt="" aria-hidden="true" width="32" height="32"><span>Team Locker Room</span></h2>
       <button type="button" class="clubhouse-link hidden" id="clubhouseViewAll">View all teammates →</button>
     </div>
     <div class="clubhouse-room" id="clubhouseRoom" aria-busy="false">
@@ -408,15 +408,15 @@
   </div>
   <div class="clubhouse-mission">
     <div class="card hidden" id="teamChallengeCard">
-      <p class="eyebrow dark" id="teamChallengeKind">Team Challenge</p>
-      <h2 id="teamChallengeTitle">—</h2>
+      <div class="hicon-row"><img class="hicon" src="assets/team-icons/team-challenge.webp" alt="" aria-hidden="true" width="32" height="32"><div class="hicon-stack"><p class="eyebrow dark" id="teamChallengeKind">Team Challenge</p>
+      <h2 id="teamChallengeTitle">—</h2></div></div>
       <div class="meter large"><div id="teamChallengeMeterFill" style="width:0%"></div></div>
       <p id="teamChallengeMeterText" class="muted"></p>
       <p id="teamChallengeReward" class="muted"></p>
     </div>
     <div class="card" id="teamProgramSummaryCard">
-      <p class="eyebrow dark">Team Assignment</p>
-      <h2 id="teamProgramSummaryTitle">No Team Program Yet</h2>
+      <div class="hicon-row"><img class="hicon" src="assets/team-icons/team-assignment.webp" alt="" aria-hidden="true" width="32" height="32"><div class="hicon-stack"><p class="eyebrow dark">Team Assignment</p>
+      <h2 id="teamProgramSummaryTitle">No Team Program Yet</h2></div></div>
       <div id="teamProgramActivityList"></div>
       <button id="joinTeamProgram" class="primary hidden" type="button">Join Team Program</button>
     </div>
@@ -427,8 +427,8 @@
 <div id="clubhouseLower" class="hidden clubhouse-lower">
 <div class="card clubhouse-unlocks">
   <div>
-    <p class="eyebrow dark">Clubhouse Unlocks</p>
-    <h2>Unlocks are coming soon</h2>
+    <div class="hicon-row"><img class="hicon" src="assets/team-icons/clubhouse-unlocks.webp" alt="" aria-hidden="true" width="32" height="32"><div class="hicon-stack"><p class="eyebrow dark">Clubhouse Unlocks</p>
+    <h2>Unlocks are coming soon</h2></div></div>
     <p class="muted">Banners, gear and clubhouse upgrades will unlock here as the team works together. Nothing is unlocked yet.</p>
   </div>
   <span class="clubhouse-soon-pill">Coming soon</span>
@@ -436,21 +436,21 @@
 
 <div class="clubhouse-social">
   <div class="card" id="clubhouseAroundCard">
-    <h2>Around the Clubhouse</h2>
+    <h2 class="has-hicon"><img class="hicon" src="assets/team-icons/around-the-clubhouse.webp" alt="" aria-hidden="true" width="32" height="32"><span>Around the Clubhouse</span></h2>
     <p class="muted">Shout-outs from your coach and kudos from teammates. Positive and preset only — no comments or direct messages. Tap the + on a shout-out to react.</p>
     <div id="recognitionFeed" aria-live="polite"></div>
     <p class="muted recog-hint">Want to give a teammate kudos? Open their locker above.</p>
   </div>
   <div class="card clubhouse-spotlight" id="clubhouseSpotlightCard">
-    <h2>Team Spotlight</h2>
+    <h2 class="has-hicon"><img class="hicon" src="assets/team-icons/team-spotlight.webp" alt="" aria-hidden="true" width="32" height="32"><span>Team Spotlight</span></h2>
     <div id="clubhouseSpotlight" aria-live="polite"></div>
   </div>
 </div>
 
 <div class="clubhouse-future">
-  <div class="card"><h2>Weekly Matchup</h2><p class="muted">A friendly training or Arcade challenge between teams is planned. Nothing is scheduled yet.</p></div>
-  <div class="card clubhouse-trophies"><h2>Season Trophy Case</h2><img src="assets/clubhouse/clubhouse-trophy-shelf.webp" alt="" width="1774" height="887" loading="lazy" class="clubhouse-shelf"><p class="muted">Decorative shelf — no trophies earned yet. Team achievements will appear here once they are unlocked.</p></div>
-  <div class="card"><h2>Coach’s Board</h2><p class="muted">Tips, reminders and team updates from your coach will appear here later in the season.</p></div>
+  <div class="card"><h2 class="has-hicon"><img class="hicon" src="assets/team-icons/weekly-matchup.webp" alt="" aria-hidden="true" width="32" height="32"><span>Weekly Matchup</span></h2><p class="muted">A friendly training or Arcade challenge between teams is planned. Nothing is scheduled yet.</p></div>
+  <div class="card clubhouse-trophies"><h2 class="has-hicon"><img class="hicon" src="assets/team-icons/season-trophy-case.webp" alt="" aria-hidden="true" width="32" height="32"><span>Season Trophy Case</span></h2><img src="assets/clubhouse/clubhouse-trophy-shelf.webp" alt="" width="1774" height="887" loading="lazy" class="clubhouse-shelf"><p class="muted">Decorative shelf — no trophies earned yet. Team achievements will appear here once they are unlocked.</p></div>
+  <div class="card"><h2 class="has-hicon"><img class="hicon" src="assets/team-icons/coachs-board.webp" alt="" aria-hidden="true" width="32" height="32"><span>Coach’s Board</span></h2><p class="muted">Tips, reminders and team updates from your coach will appear here later in the season.</p></div>
 </div>
 
 </div>

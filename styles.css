@@ -1608,3 +1608,13 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .lua-team-clubhouse .recog-picker .recog-react.on{background:var(--neon-blue)}
 
 .coach-team-tag{display:block;margin-top:4px;font-family:var(--accent);font-weight:700;font-size:.55em;text-transform:none;letter-spacing:0;color:var(--muted)}
+
+/* ---- Team Clubhouse heading icons (assets/team-icons). Decorative: the live heading text names the section. ---- */
+.lua-team-clubhouse .has-hicon{display:flex;align-items:center;gap:10px}
+.lua-team-clubhouse .hicon{width:32px;height:32px;object-fit:contain;flex:0 0 auto}
+.lua-team-clubhouse .hicon-row{display:flex;align-items:center;gap:12px;margin-top:6px}
+.lua-team-clubhouse .hicon-stack{min-width:0}
+.lua-team-clubhouse .hicon-stack .eyebrow{margin-bottom:2px}
+.lua-team-clubhouse .hicon-stack h2{margin-top:2px}
+.lua-team-clubhouse .clubhouse-room-head h2.has-hicon{margin-top:8px}
+@media(max-width:600px){.lua-team-clubhouse .hicon{width:30px;height:30px}}
