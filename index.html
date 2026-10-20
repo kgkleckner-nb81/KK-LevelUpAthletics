@@ -253,6 +253,41 @@
       </div>
     </div>
   </div>
+  <div class="card avatar-kit-card" id="avatarKitCard">
+    <p class="eyebrow dark">Preview</p>
+    <h2>Avatar Builder</h2>
+    <p class="muted">A first test of the build-your-own avatar. Your picks are saved on this device only for now.</p>
+    <div class="avatar-kit-grid">
+      <div class="avatar-kit-stage"><img id="avatarKitPreview" alt="Preview of your avatar" width="900" height="1200"></div>
+      <div class="avatar-kit-controls">
+        <fieldset><legend>Look</legend>
+          <div class="avatar-kit-opts" role="group" aria-label="Skin, hair and eyes">
+            <button type="button" data-kit="palette" data-val="A" aria-pressed="false">Light skin, brown hair, blue eyes</button>
+            <button type="button" data-kit="palette" data-val="B" aria-pressed="false">Deep skin, black hair, green eyes</button>
+          </div></fieldset>
+        <fieldset><legend>Team colors</legend>
+          <div class="avatar-kit-opts" role="group" aria-label="Team colors">
+            <button type="button" data-kit="team" data-val="green" aria-pressed="false">Green</button>
+            <button type="button" data-kit="team" data-val="blue" aria-pressed="false">Royal blue</button>
+          </div></fieldset>
+        <fieldset><legend>Uniform</legend>
+          <div class="avatar-kit-opts" role="group" aria-label="Uniform">
+            <button type="button" data-kit="outfit" data-val="baseball" aria-pressed="false">Baseball</button>
+            <button type="button" data-kit="outfit" data-val="basketball" aria-pressed="false">Basketball</button>
+          </div></fieldset>
+        <fieldset><legend>Hair and headwear</legend>
+          <div class="avatar-kit-opts" role="group" aria-label="Hair and headwear">
+            <button type="button" data-kit="hair" data-val="true" aria-pressed="false">Hair</button>
+            <button type="button" data-kit="cap" data-val="true" aria-pressed="false">Cap</button>
+          </div></fieldset>
+        <div class="avatar-kit-actions">
+          <button type="button" class="primary" id="avatarKitSave">Use on my Player Card</button>
+          <button type="button" id="avatarKitReset">Remove</button>
+        </div>
+        <p id="avatarKitStatus" class="muted" role="status"></p>
+      </div>
+    </div>
+  </div>
   <div class="card"><h2>Next Targets</h2><div id="targets"></div></div>
 </section>
 
@@ -799,6 +834,7 @@
   <p class="brand-signature">Level Up Athletics</p>
 </footer>
 <script src="data.js"></script>
+<script src="avatar-kit.js"></script>
 <script src="app.js"></script>
 <dialog id="clubhouseDialog" class="clubhouse-dialog" aria-labelledby="clubhouseDialogTitle">
   <div class="clubhouse-dialog-body" id="clubhouseDialogBody"></div>
