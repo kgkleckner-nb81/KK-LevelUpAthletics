@@ -211,6 +211,7 @@
           <img src="assets/cards/card-bananas.jpg" alt="Player card design 5">
           <img id="playerCardHeroAvatar" class="hidden" alt="Your athlete">
           <img id="playerCardGearOverlayFaceExtra" class="hidden" alt="">
+          <div id="playerCardKitText" class="kit-text-layer hidden"></div>
           <div id="playerCardNameplate" class="player-card-nameplate hidden">
             <strong id="playerCardName" class="editable-badge" title="Click to set a nickname">Ethan</strong>
             <span id="playerCardRealName" class="hidden"></span>
@@ -250,6 +251,44 @@
         <div class="rating-row"><span>Core</span><div class="bar"><div id="coreBar"></div></div><strong id="core">50</strong></div>
         <div class="rating-row"><span>Body Control</span><div class="bar"><div id="bodyControlBar"></div></div><strong id="bodyControl">50</strong></div>
         <div class="rating-row"><span>Consistency</span><div class="bar"><div id="consistencyBar"></div></div><strong id="consistency">50</strong></div>
+      </div>
+    </div>
+  </div>
+  <div class="card avatar-kit-card" id="avatarKitCard">
+    <p class="eyebrow dark">Preview</p>
+    <h2>Avatar Builder</h2>
+    <p class="muted">A first test of the build-your-own avatar and card. Your picks are saved on this device only for now. Every background works with every frame.</p>
+    <div class="avatar-kit-grid">
+      <div class="avatar-kit-stage" id="avatarKitStage"><img id="avatarKitPreview" alt="Preview of your Player Card" width="900" height="1200"><div id="avatarKitPreviewText" class="kit-text-layer"></div></div>
+      <div class="avatar-kit-controls">
+        <fieldset><legend>Background</legend><div class="avatar-kit-opts" id="avatarKitBgOpts" role="group" aria-label="Background"></div></fieldset>
+        <fieldset><legend>Frame: Classic</legend><div class="avatar-kit-opts" id="avatarKitFrameOptsClassic" role="group" aria-label="Classic frames"></div></fieldset>
+        <fieldset><legend>Frame: Heritage</legend><div class="avatar-kit-opts" id="avatarKitFrameOptsHeritage" role="group" aria-label="Heritage frames"></div></fieldset>
+        <fieldset><legend>Look</legend>
+          <div class="avatar-kit-opts" role="group" aria-label="Skin, hair and eyes">
+            <button type="button" data-kit="palette" data-val="A" aria-pressed="false">Light skin, brown hair, blue eyes</button>
+            <button type="button" data-kit="palette" data-val="B" aria-pressed="false">Deep skin, black hair, green eyes</button>
+          </div></fieldset>
+        <fieldset><legend>Team colors</legend>
+          <div class="avatar-kit-opts" role="group" aria-label="Team colors">
+            <button type="button" data-kit="team" data-val="green" aria-pressed="false">Green</button>
+            <button type="button" data-kit="team" data-val="blue" aria-pressed="false">Royal blue</button>
+          </div></fieldset>
+        <fieldset><legend>Uniform</legend>
+          <div class="avatar-kit-opts" role="group" aria-label="Uniform">
+            <button type="button" data-kit="outfit" data-val="baseball" aria-pressed="false">Baseball</button>
+            <button type="button" data-kit="outfit" data-val="basketball" aria-pressed="false">Basketball</button>
+          </div></fieldset>
+        <fieldset><legend>Hair and headwear</legend>
+          <div class="avatar-kit-opts" role="group" aria-label="Hair and headwear">
+            <button type="button" data-kit="hair" data-val="true" aria-pressed="false">Hair</button>
+            <button type="button" data-kit="cap" data-val="true" aria-pressed="false">Cap</button>
+          </div></fieldset>
+        <div class="avatar-kit-actions">
+          <button type="button" class="primary" id="avatarKitSave">Use on my Player Card</button>
+          <button type="button" id="avatarKitReset">Remove</button>
+        </div>
+        <p id="avatarKitStatus" class="muted" role="status"></p>
       </div>
     </div>
   </div>
@@ -799,6 +838,7 @@
   <p class="brand-signature">Level Up Athletics</p>
 </footer>
 <script src="data.js"></script>
+<script src="avatar-kit.js"></script>
 <script src="app.js"></script>
 <dialog id="clubhouseDialog" class="clubhouse-dialog" aria-labelledby="clubhouseDialogTitle">
   <div class="clubhouse-dialog-body" id="clubhouseDialogBody"></div>

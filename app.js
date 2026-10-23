@@ -971,6 +971,80 @@ function ratingTierClass(v){
   if(v>=50) return 'tier-amber';
   return 'tier-red';
 }
+// ---- Avatar kit and card (proof of concept) ----
+// A saved look is composed from the layered avatar renders plus the chosen
+// background, frame and name plate, and shown on the Player Card. Choices live in
+// this browser only for now; the real build will store them with the athlete and
+// tie backgrounds, frames and items to the Gear Locker.
+const kitUrlCache={};
+let kitDraft=null, kitDraftOwner=null;
+function kitOwnerId(){ return (activeAthlete&&activeAthlete.id)||'guest' }
+function kitDisplayName(){ return (activeAthlete&&activeAthlete.nickname)||state.athleteName||'Athlete' }
+function kitTeamText(){ const m=athleteTeamMembership; return (m&&m.status==='approved'&&m.teams&&m.teams.name)||'ALL-STARS' }
+function kitAvatarUrl(){
+  if(!window.AvatarKit) return null;
+  const cfg=AvatarKit.getSaved(kitOwnerId());
+  if(!cfg) return null;
+  const k=JSON.stringify(cfg);
+  if(kitUrlCache[k]) return kitUrlCache[k];
+  if(!kitUrlCache['pending:'+k]){
+    kitUrlCache['pending:'+k]=true;
+    AvatarKit.cardDataURL(cfg).then(u=>{kitUrlCache[k]=u; renderPlayerCardHero()}).catch(()=>{});
+  }
+  return null;
+}
+function kitCurrentDraft(){
+  const owner=kitOwnerId();
+  if(!kitDraft||kitDraftOwner!==owner){ kitDraft=AvatarKit.getSaved(owner)||AvatarKit.normalize({}); kitDraftOwner=owner }
+  return kitDraft;
+}
+// Name and headline text drawn live over a card image; refit when the size changes.
+function kitLayoutText(layer,cfg){ if(layer&&window.AvatarKit) AvatarKit.layoutText(layer,cfg,kitDisplayName(),kitTeamText()) }
+let kitResizeObserver=null;
+function kitWatchSize(el,fn){
+  if(!window.ResizeObserver||el._kitWatched) return;
+  el._kitWatched=true; new ResizeObserver(()=>fn()).observe(el);
+}
+function kitBuildOptionButtons(){
+  const fill=(id,items,kind)=>{ const box=$(id); if(!box||box.children.length) return;
+    box.innerHTML=items.map(x=>`<button type="button" data-kit="${kind}" data-val="${escapeHTML(x.id)}" aria-pressed="false" title="${escapeHTML(x.tier+' · '+x.xpCost+' XP (proposed)')}">${escapeHTML(x.name)}</button>`).join(''); };
+  fill('#avatarKitBgOpts',AvatarKit.BACKGROUNDS,'bg');
+  fill('#avatarKitFrameOptsClassic',AvatarKit.FRAMES.filter(f=>f.collection==='Classic'),'frame');
+  fill('#avatarKitFrameOptsHeritage',AvatarKit.FRAMES.filter(f=>f.collection==='Heritage'),'frame');
+}
+function renderAvatarKitBuilder(){
+  const card=$('#avatarKitCard'); if(!card||!window.AvatarKit) return;
+  kitBuildOptionButtons();
+  const d=kitCurrentDraft();
+  $$('#avatarKitCard [data-kit]').forEach(b=>{
+    const k=b.dataset.kit, v=b.dataset.val;
+    const on=(k==='hair'||k==='cap')?!!d[k]:String(d[k])===v;
+    b.setAttribute('aria-pressed',String(on));
+    if(k==='hair'||k==='cap') b.textContent=(k==='hair'?'Hair: ':'Cap: ')+(d[k]?'on':'off');
+  });
+  const stage=$('#avatarKitStage'), layer=$('#avatarKitPreviewText');
+  kitWatchSize(stage,()=>kitLayoutText(layer,kitCurrentDraft()));
+  AvatarKit.cardDataURL(d).then(u=>{ const i=$('#avatarKitPreview'); if(i) i.src=u; kitLayoutText(layer,d) })
+    .catch(()=>{ const s=$('#avatarKitStatus'); if(s) s.textContent='Could not load the card pieces.' });
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('#avatarKitCard [data-kit]');
+  if(b){
+    const d=kitCurrentDraft(), k=b.dataset.kit;
+    if(k==='hair'||k==='cap') d[k]=!d[k]; else d[k]=b.dataset.val;
+    kitDraft=AvatarKit.normalize(d); renderAvatarKitBuilder(); return;
+  }
+  if(e.target.closest('#avatarKitSave')){
+    const ok=AvatarKit.save(kitOwnerId(),kitCurrentDraft());
+    const s=$('#avatarKitStatus'); if(s) s.textContent=ok?'Saved. It now shows on your Player Card.':'Could not save on this device.';
+    renderPlayerCardHero(); return;
+  }
+  if(e.target.closest('#avatarKitReset')){
+    AvatarKit.clear(kitOwnerId()); kitDraft=null;
+    const s=$('#avatarKitStatus'); if(s) s.textContent='Removed. Your Player Card is back to its previous look.';
+    renderPlayerCardHero(); renderAvatarKitBuilder(); return;
+  }
+});
 function renderPlayerCardHero(){
   const name=state.athleteName||'Athlete';
   if($('#statusAthleteName')) $('#statusAthleteName').textContent=name.toUpperCase();
@@ -983,8 +1057,16 @@ function renderPlayerCardHero(){
   if($('#playerCardTeam')) $('#playerCardTeam').textContent=(athleteTeamMembership&&athleteTeamMembership.status==='approved'&&athleteTeamMembership.teams&&athleteTeamMembership.teams.name)||'Free Agent';
   if($('#playerCardAge')) $('#playerCardAge').textContent=(activeAthlete&&activeAthlete.age)||'—';
   if($('#playerCardHeroAvatar')){
-    const url=activeAthlete&&activeAthlete.avatar_url;
+    // Kit avatar (proof): a saved Avatar Builder look wins over the photo avatar.
+    const kitUrl=kitAvatarUrl();
+    const url=kitUrl||(activeAthlete&&activeAthlete.avatar_url);
     const heroImg=$('#playerCardHeroAvatar');
+    if($('#playerCardSlot')) $('#playerCardSlot').classList.toggle('kit-active',!!kitUrl);
+    const kitLayer=$('#playerCardKitText');
+    if(kitLayer){
+      kitLayer.classList.toggle('hidden',!kitUrl);
+      if(kitUrl){ const cfg=AvatarKit.getSaved(kitOwnerId()); kitLayoutText(kitLayer,cfg); kitWatchSize($('#playerCardSlot'),()=>{ const c=AvatarKit.getSaved(kitOwnerId()); if(c&&!kitLayer.classList.contains('hidden')) kitLayoutText(kitLayer,c) }); }
+    }
     const sampleImgs=$('#playerCardSlot')?[...$('#playerCardSlot').querySelectorAll('img:not(#playerCardHeroAvatar):not(#playerCardGearOverlayFaceExtra)')]:[];
     heroImg.src=url||'';
     heroImg.classList.toggle('hidden',!url);
@@ -994,7 +1076,7 @@ function renderPlayerCardHero(){
     // Nameplate only overlays the real generated photo — the rotating
     // sample cards already have their own baked-in captions, so showing
     // it there too would double up.
-    if($('#playerCardNameplate')) $('#playerCardNameplate').classList.toggle('hidden',!url);
+    if($('#playerCardNameplate')) $('#playerCardNameplate').classList.toggle('hidden',!url||!!kitUrl);
     // Real gear art layered on top of the real photo — only for slots
     // that have art (gearItemArt) and only once a real avatar exists.
     // Respects the same skin-hides-faceExtra rule as the Gear Locker's
@@ -1004,10 +1086,11 @@ function renderPlayerCardHero(){
       const skinActive=!!(equipped.skin&&equipped.skin!=='default');
       const faceExtraArt=!skinActive&&gearItemArt[equipped.faceExtra];
       const overlay=$('#playerCardGearOverlayFaceExtra');
-      overlay.src=(url&&faceExtraArt)||'';
-      overlay.classList.toggle('hidden',!(url&&faceExtraArt));
+      overlay.src=(url&&faceExtraArt&&!kitUrl)||'';
+      overlay.classList.toggle('hidden',!(url&&faceExtraArt&&!kitUrl));
     }
   }
+  renderAvatarKitBuilder();
   [...performanceAxisOrder,'consistency'].forEach(k=>{
     const bar=$('#'+k+'Bar');
     if(!bar) return;
