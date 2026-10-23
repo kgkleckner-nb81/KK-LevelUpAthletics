@@ -1620,10 +1620,8 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 @media(max-width:600px){.lua-team-clubhouse .hicon{--hicon:30px}}
 
 /* ---- Avatar kit proof: builder card and kit-styled Player Card ---- */
-.player-card-slot.kit-active{background:radial-gradient(ellipse at 50% 30%,#2a8fb5 0%,#14394a 55%,#0b1820 100%)}
-.player-card-slot.kit-active #playerCardHeroAvatar{object-position:center 2%}
 .avatar-kit-grid{display:grid;grid-template-columns:minmax(180px,300px) 1fr;gap:22px;align-items:start;margin-top:12px}
-.avatar-kit-stage{aspect-ratio:3/4;border-radius:16px;border:3px solid var(--ink);background:radial-gradient(ellipse at 50% 30%,#2a8fb5 0%,#14394a 55%,#0b1820 100%);overflow:hidden}
+.avatar-kit-stage{position:relative;aspect-ratio:3/4;border-radius:16px;border:3px solid var(--ink);background:#0b1820;overflow:hidden}
 .avatar-kit-stage img{display:block;width:100%;height:100%;object-fit:contain}
 .avatar-kit-controls fieldset{border:0;margin:0 0 14px;padding:0}
 .avatar-kit-controls legend{font-family:var(--accent);font-weight:700;font-size:13px;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;padding:0}
@@ -1633,3 +1631,26 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .avatar-kit-opts button:focus-visible,.avatar-kit-actions button:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 .avatar-kit-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
 @media(max-width:700px){.avatar-kit-grid{grid-template-columns:1fr}.avatar-kit-stage{max-width:300px;margin-inline:auto}}
+
+/* ---- Card kit: fonts, live name text, and the kit-styled Player Card ---- */
+@font-face{font-family:'KitTeko';src:url('assets/card-kit/fonts/Teko.woff') format('woff');font-weight:300 700;font-display:swap}
+@font-face{font-family:'KitRacing';src:url('assets/card-kit/fonts/BarlowCondensed-BlackItalic.woff') format('woff');font-weight:900;font-style:italic;font-display:swap}
+@font-face{font-family:'KitPower';src:url('assets/card-kit/fonts/Anton.woff') format('woff');font-weight:400;font-display:swap}
+@font-face{font-family:'KitHand';src:url('assets/card-kit/fonts/Caveat.woff') format('woff');font-weight:400 700;font-display:swap}
+@font-face{font-family:'KitRetro';src:url('assets/card-kit/fonts/Shrikhand-Regular.woff') format('woff');font-weight:400;font-display:swap}
+@font-face{font-family:'HeritageSlab';src:url('assets/card-kit/fonts/AlfaSlabOne-Regular.woff') format('woff');font-weight:400;font-display:swap}
+@font-face{font-family:'HeritageScript';src:url('assets/card-kit/fonts/Yellowtail-Regular.woff') format('woff');font-weight:400;font-display:swap}
+@font-face{font-family:'HeritageSerif';src:url('assets/card-kit/fonts/Cinzel.woff') format('woff');font-weight:400 900;font-display:swap}
+.kit-text-layer{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+.kit-text-layer.hidden{display:none}
+.kit-text{position:absolute;text-align:center;line-height:1.02;white-space:nowrap}
+.kit-name{position:absolute;left:24.5%;top:83%;width:51%;height:8%;display:flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;text-shadow:1px 2px 1px #05090d;font-family:'KitTeko',sans-serif;font-weight:700;color:#f1f4f8}
+.kit-name[data-style=charged]{font-family:'KitRacing',sans-serif;font-weight:900;font-style:italic;color:#d9f5ff;filter:drop-shadow(0 0 2px #00b5ff55)}
+.kit-name[data-style=magma]{font-family:'KitPower',sans-serif;font-weight:400;color:#ffe2a6;text-shadow:0 2px #371e13,0 0 3px #ff873c66}
+.kit-name[data-style=backstage]{color:#fff3d8}
+.kit-name[data-style=gold]{color:#fff0bb}
+.kit-name[data-style=sandlot]{font-family:'KitHand',cursive;font-weight:700;color:#19384c;text-shadow:none}
+.kit-name[data-style=retro]{font-family:'KitRetro',serif;font-weight:400;color:#60351e;text-shadow:none}
+.player-card-slot.kit-active{border:0;box-shadow:0 8px 22px rgba(0,0,0,.4);background:#0b1820}
+.player-card-slot.kit-active #playerCardHeroAvatar{object-fit:cover}
+.avatar-kit-opts button[title]{cursor:pointer}

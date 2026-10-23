@@ -211,6 +211,7 @@
           <img src="assets/cards/card-bananas.jpg" alt="Player card design 5">
           <img id="playerCardHeroAvatar" class="hidden" alt="Your athlete">
           <img id="playerCardGearOverlayFaceExtra" class="hidden" alt="">
+          <div id="playerCardKitText" class="kit-text-layer hidden"></div>
           <div id="playerCardNameplate" class="player-card-nameplate hidden">
             <strong id="playerCardName" class="editable-badge" title="Click to set a nickname">Ethan</strong>
             <span id="playerCardRealName" class="hidden"></span>
@@ -256,10 +257,13 @@
   <div class="card avatar-kit-card" id="avatarKitCard">
     <p class="eyebrow dark">Preview</p>
     <h2>Avatar Builder</h2>
-    <p class="muted">A first test of the build-your-own avatar. Your picks are saved on this device only for now.</p>
+    <p class="muted">A first test of the build-your-own avatar and card. Your picks are saved on this device only for now. Every background works with every frame.</p>
     <div class="avatar-kit-grid">
-      <div class="avatar-kit-stage"><img id="avatarKitPreview" alt="Preview of your avatar" width="900" height="1200"></div>
+      <div class="avatar-kit-stage" id="avatarKitStage"><img id="avatarKitPreview" alt="Preview of your Player Card" width="900" height="1200"><div id="avatarKitPreviewText" class="kit-text-layer"></div></div>
       <div class="avatar-kit-controls">
+        <fieldset><legend>Background</legend><div class="avatar-kit-opts" id="avatarKitBgOpts" role="group" aria-label="Background"></div></fieldset>
+        <fieldset><legend>Frame: Classic</legend><div class="avatar-kit-opts" id="avatarKitFrameOptsClassic" role="group" aria-label="Classic frames"></div></fieldset>
+        <fieldset><legend>Frame: Heritage</legend><div class="avatar-kit-opts" id="avatarKitFrameOptsHeritage" role="group" aria-label="Heritage frames"></div></fieldset>
         <fieldset><legend>Look</legend>
           <div class="avatar-kit-opts" role="group" aria-label="Skin, hair and eyes">
             <button type="button" data-kit="palette" data-val="A" aria-pressed="false">Light skin, brown hair, blue eyes</button>
