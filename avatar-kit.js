@@ -16,6 +16,7 @@
   // Rare 250, Legendary 400. free marks the starter items every athlete owns.
   const BACKGROUNDS=[
     {id:'sandlot',name:'Sandlot',file:'bg_sandlot',tier:'Common',xpCost:75,free:true},
+    {id:'daygame',name:'Day Game',file:'bg_daygame',tier:'Common',xpCost:75},
     {id:'stadium',name:'Baseball Stadium',file:'bg_stadium',tier:'Uncommon',xpCost:150},
     {id:'football',name:'Football Stadium',file:'bg_football',tier:'Uncommon',xpCost:150},
     {id:'concert',name:'Arena Concert',file:'bg_arena_concert',tier:'Rare',xpCost:250},
