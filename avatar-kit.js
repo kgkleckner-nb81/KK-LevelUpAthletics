@@ -47,8 +47,14 @@
       place:{bust:true,zoom:1.7,headTop:17.5},
       text:{family:'HeritageSerif',color:'#e7cf8b',x:50,y:71.8,w:58,size:4.5,rotation:0,weight:700}}
   ];
+  // Poses: each is a full set of avatar layers rendered from the same camera setup. The 3/4 pose is shot slightly off center.
+  const POSES=[
+    {id:'ready',name:'Ready Stance',dir:'',tier:'Common',xpCost:0,free:true},
+    {id:'hips',name:'Hands on Hips',dir:'pose-hips/',tier:'Common',xpCost:75}
+  ];
   const OPTIONS={palette:['A','B'],team:['green','blue'],outfit:['baseball','basketball']};
-  const DEFAULT={palette:'A',team:'green',outfit:'baseball',cap:true,hair:true,glasses:false,bg:'stadium',frame:'platinum'};
+  const DEFAULT={pose:'ready',palette:'A',team:'green',outfit:'baseball',cap:true,hair:true,glasses:false,bg:'stadium',frame:'platinum'};
+  const poseOf=id=>POSES.find(p=>p.id===id)||POSES[0];
   const bgOf=id=>BACKGROUNDS.find(b=>b.id===id)||BACKGROUNDS.find(b=>b.id===DEFAULT.bg);
   const frameOf=id=>FRAMES.find(f=>f.id===id)||FRAMES.find(f=>f.id===DEFAULT.frame);
 
@@ -63,7 +69,7 @@
   function normalize(c){
     const o=Object.assign({},DEFAULT,c||{});
     ['palette','team','outfit'].forEach(k=>{ if(!OPTIONS[k].includes(o[k])) o[k]=DEFAULT[k]; });
-    return {palette:o.palette,team:o.team,outfit:o.outfit,cap:!!o.cap,hair:!!o.hair,glasses:!!o.glasses,bg:bgOf(o.bg).id,frame:frameOf(o.frame).id};
+    return {pose:poseOf(o.pose).id,palette:o.palette,team:o.team,outfit:o.outfit,cap:!!o.cap,hair:!!o.hair,glasses:!!o.glasses,bg:bgOf(o.bg).id,frame:frameOf(o.frame).id};
   }
   // Avatar layers, bottom to top. Hair has two fits so it never pokes through the cap.
   function layersFor(c){
@@ -79,7 +85,7 @@
   async function compose(c){
     const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
     const g=cv.getContext('2d');
-    const imgs=await Promise.all(layersFor(c).map(n=>load(n,AV_BASE)));
+    const imgs=await Promise.all(layersFor(c).map(n=>load(n,AV_BASE+poseOf(normalize(c).pose).dir)));
     imgs.forEach(i=>g.drawImage(i,0,0,W,H));
     return cv;
   }
@@ -164,5 +170,5 @@
   function getSaved(id){ try{ const r=localStorage.getItem(key(id)); return r?normalize(JSON.parse(r)):null }catch(e){ return null } }
   function save(id,c){ try{ localStorage.setItem(key(id),JSON.stringify(normalize(c))); return true }catch(e){ return false } }
   function clear(id){ try{ localStorage.removeItem(key(id)) }catch(e){} }
-  window.AvatarKit={OPTIONS,DEFAULT,BACKGROUNDS,FRAMES,bgOf,frameOf,normalize,layersFor,compose,toDataURL,composeCard,cardDataURL,layoutText,getSaved,save,clear,W,H};
+  window.AvatarKit={OPTIONS,POSES,DEFAULT,BACKGROUNDS,FRAMES,bgOf,frameOf,normalize,layersFor,compose,toDataURL,composeCard,cardDataURL,layoutText,getSaved,save,clear,W,H};
 })();
