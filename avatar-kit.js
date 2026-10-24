@@ -48,7 +48,7 @@
       text:{family:'HeritageSerif',color:'#e7cf8b',x:50,y:71.8,w:58,size:4.5,rotation:0,weight:700}}
   ];
   const OPTIONS={palette:['A','B'],team:['green','blue'],outfit:['baseball','basketball']};
-  const DEFAULT={palette:'A',team:'green',outfit:'baseball',cap:true,hair:true,bg:'stadium',frame:'platinum'};
+  const DEFAULT={palette:'A',team:'green',outfit:'baseball',cap:true,hair:true,glasses:false,bg:'stadium',frame:'platinum'};
   const bgOf=id=>BACKGROUNDS.find(b=>b.id===id)||BACKGROUNDS.find(b=>b.id===DEFAULT.bg);
   const frameOf=id=>FRAMES.find(f=>f.id===id)||FRAMES.find(f=>f.id===DEFAULT.frame);
 
@@ -63,7 +63,7 @@
   function normalize(c){
     const o=Object.assign({},DEFAULT,c||{});
     ['palette','team','outfit'].forEach(k=>{ if(!OPTIONS[k].includes(o[k])) o[k]=DEFAULT[k]; });
-    return {palette:o.palette,team:o.team,outfit:o.outfit,cap:!!o.cap,hair:!!o.hair,bg:bgOf(o.bg).id,frame:frameOf(o.frame).id};
+    return {palette:o.palette,team:o.team,outfit:o.outfit,cap:!!o.cap,hair:!!o.hair,glasses:!!o.glasses,bg:bgOf(o.bg).id,frame:frameOf(o.frame).id};
   }
   // Avatar layers, bottom to top. Hair has two fits so it never pokes through the cap.
   function layersFor(c){
@@ -73,6 +73,7 @@
     else L.push('bottom_baseball','top_baseball_'+c.team);
     if(c.hair) L.push('hair_'+c.palette+(c.cap?'_cap':'_classic'));
     if(c.cap) L.push('cap_'+c.team);
+    if(c.glasses) L.push('glasses_neon');
     return L;
   }
   async function compose(c){

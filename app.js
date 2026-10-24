@@ -1018,9 +1018,9 @@ function renderAvatarKitBuilder(){
   const d=kitCurrentDraft();
   $$('#avatarKitCard [data-kit]').forEach(b=>{
     const k=b.dataset.kit, v=b.dataset.val;
-    const on=(k==='hair'||k==='cap')?!!d[k]:String(d[k])===v;
+    const tog=(k==='hair'||k==='cap'||k==='glasses'); const on=tog?!!d[k]:String(d[k])===v;
     b.setAttribute('aria-pressed',String(on));
-    if(k==='hair'||k==='cap') b.textContent=(k==='hair'?'Hair: ':'Cap: ')+(d[k]?'on':'off');
+    if(tog) b.textContent=({hair:'Hair: ',cap:'Cap: ',glasses:'Glasses: '})[k]+(d[k]?'on':'off');
   });
   const stage=$('#avatarKitStage'), layer=$('#avatarKitPreviewText');
   kitWatchSize(stage,()=>kitLayoutText(layer,kitCurrentDraft()));
@@ -1031,7 +1031,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('#avatarKitCard [data-kit]');
   if(b){
     const d=kitCurrentDraft(), k=b.dataset.kit;
-    if(k==='hair'||k==='cap') d[k]=!d[k]; else d[k]=b.dataset.val;
+    if(k==='hair'||k==='cap'||k==='glasses') d[k]=!d[k]; else d[k]=b.dataset.val;
     kitDraft=AvatarKit.normalize(d); renderAvatarKitBuilder(); return;
   }
   if(e.target.closest('#avatarKitSave')){
