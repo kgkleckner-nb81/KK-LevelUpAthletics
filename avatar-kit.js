@@ -8,6 +8,8 @@
 (function(){
   const W=900, H=1200;
   const AV_BASE='assets/avatar-kit/', CARD_BASE='assets/card-kit/';
+  // Bump when the avatar layers are re-rendered so browsers never mix old and new cached layers.
+  const AV_VER='final1';
   // Full-body reference extents inside a 900x1200 avatar layer (cap top to sole).
   const REF_TOP=44, REF_FEET=1010;
 
@@ -62,7 +64,7 @@
   function load(name,base){
     const key=base+name;
     if(!cache[key]) cache[key]=new Promise((res,rej)=>{
-      const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('missing '+key)); i.src=base+name+'.webp';
+      const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('missing '+key)); i.src=base+name+'.webp'+(base.indexOf(AV_BASE)===0?'?v='+AV_VER:'');
     });
     return cache[key];
   }

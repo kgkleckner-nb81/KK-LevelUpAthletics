@@ -981,9 +981,14 @@ let kitDraft=null, kitDraftOwner=null;
 function kitOwnerId(){ return (activeAthlete&&activeAthlete.id)||'guest' }
 function kitDisplayName(){ return (activeAthlete&&activeAthlete.nickname)||state.athleteName||'Athlete' }
 function kitTeamText(){ const m=athleteTeamMembership; return (m&&m.status==='approved'&&m.teams&&m.teams.name)||'ALL-STARS' }
-function kitAvatarUrl(){
+// The saved look, or the starter look when none is saved yet, so every athlete
+// sees a card portrait without having to build one first.
+function kitEffectiveConfig(){
   if(!window.AvatarKit) return null;
-  const cfg=AvatarKit.getSaved(kitOwnerId());
+  return AvatarKit.getSaved(kitOwnerId())||AvatarKit.normalize({});
+}
+function kitAvatarUrl(){
+  const cfg=kitEffectiveConfig();
   if(!cfg) return null;
   const k=JSON.stringify(cfg);
   if(kitUrlCache[k]) return kitUrlCache[k];
@@ -1041,7 +1046,7 @@ document.addEventListener('click',e=>{
   }
   if(e.target.closest('#avatarKitReset')){
     AvatarKit.clear(kitOwnerId()); kitDraft=null;
-    const s=$('#avatarKitStatus'); if(s) s.textContent='Removed. Your Player Card is back to its previous look.';
+    const s=$('#avatarKitStatus'); if(s) s.textContent='Removed. Your Player Card is back to the starter look.';
     renderPlayerCardHero(); renderAvatarKitBuilder(); return;
   }
 });
@@ -1065,7 +1070,7 @@ function renderPlayerCardHero(){
     const kitLayer=$('#playerCardKitText');
     if(kitLayer){
       kitLayer.classList.toggle('hidden',!kitUrl);
-      if(kitUrl){ const cfg=AvatarKit.getSaved(kitOwnerId()); kitLayoutText(kitLayer,cfg); kitWatchSize($('#playerCardSlot'),()=>{ const c=AvatarKit.getSaved(kitOwnerId()); if(c&&!kitLayer.classList.contains('hidden')) kitLayoutText(kitLayer,c) }); }
+      if(kitUrl){ const cfg=kitEffectiveConfig(); kitLayoutText(kitLayer,cfg); kitWatchSize($('#playerCardSlot'),()=>{ const c=kitEffectiveConfig(); if(c&&!kitLayer.classList.contains('hidden')) kitLayoutText(kitLayer,c) }); }
     }
     const sampleImgs=$('#playerCardSlot')?[...$('#playerCardSlot').querySelectorAll('img:not(#playerCardHeroAvatar):not(#playerCardGearOverlayFaceExtra)')]:[];
     heroImg.src=url||'';
@@ -1101,6 +1106,25 @@ function renderPlayerCardHero(){
 // Early access — gated server-side by ALLOWED_ATHLETE_IDS on the
 // generate-avatar-face Edge Function, so this is safe to expose to every
 // signed-in parent even though only approved athletes will succeed.
+// "Build Your Athlete" opens the Avatar Builder further down this page.
+function goToAvatarBuilder(){
+  const card=$('#avatarKitCard'); if(!card) return;
+  const calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Leave room for the stacked sticky header bars so the builder's title stays visible.
+  const bars=[];
+  document.querySelectorAll('body *').forEach(el=>{
+    const cs=getComputedStyle(el);
+    if((cs.position==='sticky'||cs.position==='fixed')&&cs.display!=='none'&&cs.visibility!=='hidden'){
+      const r=el.getBoundingClientRect();
+      if(r.height>0&&r.width>window.innerWidth*0.5) bars.push({top:r.top,bottom:r.bottom});
+    }
+  });
+  bars.sort((x,y)=>x.top-y.top);
+  let top=0; bars.forEach(b=>{ if(b.top<=top+2) top=Math.max(top,b.bottom) });
+  window.scrollTo({top:card.getBoundingClientRect().top+window.scrollY-top-12,behavior:calm?'auto':'smooth'});
+  card.classList.remove('avatar-kit-flash'); void card.offsetWidth; card.classList.add('avatar-kit-flash');
+}
+// Legacy photo-avatar flow (no longer linked from the Player Card).
 function buildYourAthlete(){
   if(!activeAthlete){alert('Sign in and select an athlete first.');return}
   $('#buildAvatarStepUpload').classList.remove('hidden');
@@ -3701,7 +3725,7 @@ if($('#turfTroubleFrame')) $('#turfTroubleFrame').addEventListener('load',functi
 });
 if($('#wheelInner'))$('#wheelInner').innerHTML=buildWheelSVG();
 if($('#spinButton'))$('#spinButton').onclick=spinWheel;
-if($('#buildYourAthleteBtn'))$('#buildYourAthleteBtn').onclick=buildYourAthlete;
+if($('#buildYourAthleteBtn'))$('#buildYourAthleteBtn').onclick=goToAvatarBuilder;
 initPlayerCardRotation();
 renderDailyProgramPicker();
 renderDailyCustomFields();
