@@ -1654,3 +1654,7 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .player-card-slot.kit-active{border:0;box-shadow:0 8px 22px rgba(0,0,0,.4);background:#0b1820}
 .player-card-slot.kit-active #playerCardHeroAvatar{object-fit:cover}
 .avatar-kit-opts button[title]{cursor:pointer}
+
+@keyframes avatarKitFlash{0%{box-shadow:0 0 0 0 rgba(31,122,90,0)}25%{box-shadow:0 0 0 6px rgba(255,205,60,.85)}100%{box-shadow:0 0 0 0 rgba(255,205,60,0)}}
+.avatar-kit-card.avatar-kit-flash{animation:avatarKitFlash 1.4s ease-out 1}
+@media (prefers-reduced-motion:reduce){.avatar-kit-card.avatar-kit-flash{animation:none}}
