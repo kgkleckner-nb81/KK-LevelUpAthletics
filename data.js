@@ -239,6 +239,18 @@ async function createAthlete(parentProfileId,displayName,age){
   return data;
 }
 
+// Saved Avatar Builder look (0034). Frictionless like age and nickname. Returns
+// false when the avatar_config column does not exist yet, so the page can keep
+// the look on this device until the migration is applied.
+async function saveAthleteAvatarConfig(athleteId,config){
+  const {error}=await supabase.from('athletes').update({avatar_config:config||null}).eq('id',athleteId);
+  if(error){
+    if(error.code==='PGRST204'||error.code==='42703'||/avatar_config/i.test(error.message||'')) return false;
+    throw error;
+  }
+  return true;
+}
+
 // Frictionless, same as creation — age isn't a PIN-gated field.
 async function updateAthleteAge(athleteId,age){
   const {error}=await supabase.from('athletes').update({age}).eq('id',athleteId);
@@ -621,6 +633,17 @@ async function removeTeamMemberRemote(teamId,athleteId){
 // degrade instead of breaking while the migration is pending.
 async function loadClubhouseRoster(teamId){
   const {data,error}=await supabase.rpc('get_clubhouse_roster',{p_team_id:teamId});
+  if(error){
+    if(error.code==='PGRST202') return null;
+    throw error;
+  }
+  return data||[];
+}
+
+// Teammates' saved looks for the locker room (0034). Same access rule as the
+// roster. Returns null while the function does not exist yet (PGRST202).
+async function loadClubhouseLooks(teamId){
+  const {data,error}=await supabase.rpc('get_clubhouse_looks',{p_team_id:teamId});
   if(error){
     if(error.code==='PGRST202') return null;
     throw error;

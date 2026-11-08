@@ -119,7 +119,21 @@
     if(plImg) g.drawImage(plImg,0,0,W,H);
     return cv;
   }
-  async function cardDataURL(c){ return (await composeCard(c)).toDataURL('image/png'); }
+  // opts.width gives a smaller, cached card (the lockers draw many at once).
+  const cardCache=new Map();
+  async function cardDataURL(c,opts){
+    const w=opts&&opts.width;
+    if(!w) return (await composeCard(c)).toDataURL('image/png');
+    const key=JSON.stringify(normalize(c))+'@'+w;
+    if(cardCache.has(key)) return cardCache.get(key);
+    const job=composeCard(c).then(cv=>{
+      const o=document.createElement('canvas'); o.width=w; o.height=Math.round(H*w/W);
+      const g=o.getContext('2d'); g.imageSmoothingQuality='high'; g.drawImage(cv,0,0,o.width,o.height);
+      return o.toDataURL('image/png');
+    });
+    cardCache.set(key,job); job.catch(()=>cardCache.delete(key));
+    return job;
+  }
 
   // ---- Live text on the card (position and size are percentages of the card) ----
   function fitLine(el,box,start,floor){
