@@ -1682,3 +1682,9 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .sport-chip{border:2px solid var(--line,#cfd8dc);background:#fff;color:inherit;border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;min-height:40px;cursor:pointer}
 .sport-chip.on{background:#0b3d2e;border-color:#0b3d2e;color:#fff}
 .sport-tag{display:inline-block;margin:6px 6px 0 0;padding:2px 9px;border-radius:999px;background:#e8f1ee;color:#0b3d2e;font-size:12px;font-weight:700;letter-spacing:.02em}
+
+/* Gear Locker: older gear shown as coming soon */
+.gear-soon-head{margin:22px 0 4px}
+.reward-tile.coming-soon{opacity:.72}
+.reward-tile.coming-soon .gear-tile-art{filter:grayscale(.6)}
+.soon-pill{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:999px;background:#eef1f3;color:#4b5a63;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}

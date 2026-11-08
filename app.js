@@ -824,25 +824,8 @@ document.addEventListener('click',e=>{
   if(claimBtn) claimReward(+claimBtn.dataset.xp,claimBtn.dataset.title);
   const buyBtn=e.target.closest('.buy-gear-btn');
   if(buyBtn) buyGearItem(buyBtn.dataset.item);
-  const equipBtn=e.target.closest('.gear-equip-btn');
-  if(equipBtn) equipGearItem(equipBtn.dataset.slot,equipBtn.dataset.item);
   if(e.target.closest('.open-builder-btn')){ switchScreen('player'); setTimeout(goToAvatarBuilder,150) }
 });
-document.addEventListener('change',e=>{
-  const colorInput=e.target.closest('.gear-color-input');
-  if(colorInput) setGearColor(colorInput.dataset.slot,colorInput.value);
-});
-async function setGearColor(slot,colorHex){
-  if(!activeAthlete) return;
-  try{
-    state.slotColors=await setGearColorRemote(activeAthlete.id,slot,colorHex,state.slotColors);
-  }catch(err){
-    alert('Could not save color: '+(err.message||'unknown error'));
-    return;
-  }
-  renderAvatarComposite($('#gearAvatarPreview'));
-}
-
 // ---- Sport tag -----------------------------------------------------------
 // A sport is a tag on content, athletes and teams - not a separate portal.
 // XP, ratings, tiers and leaderboards are identical for every sport. The tag
@@ -2260,7 +2243,7 @@ async function completeDailyMission(){
 async function buyGearItem(itemId){
   if(!activeAthlete){alert('Sign in and select an athlete before visiting the Gear Locker.');return}
   const item=findGearItem(itemId);
-  if(!item) return;
+  if(!item||!item.kit) return; // older gear is coming soon, not for sale yet
   if((state.inventory||['default']).includes(itemId)){alert(`${item.name} is already unlocked.`);return}
   const balance=availableBalance();
   if(balance<item.xpCost){alert(`Not enough balance to buy ${item.name}. You need ${item.xpCost} XP and have ${balance}.`);return}
@@ -2280,30 +2263,7 @@ async function buyGearItem(itemId){
     if(confirm(`${item.name} unlocked! -${item.xpCost} XP.\n\nOpen the Avatar Builder to use it now?`)){ switchScreen('player'); setTimeout(goToAvatarBuilder,150) }
     return;
   }
-  if(confirm(`${item.name} unlocked! -${item.xpCost} XP.\n\nWear it on your Player Card now?`)){
-    try{
-      await equipGearItemRemote(activeAthlete.id,item.slot,itemId);
-    }catch(err){
-      alert('Unlocked, but could not equip it: '+(err.message||'unknown error'));
-    }
-  }
   await refreshAthleteState(); // re-fetches inventory + equipped state, calls render()
-}
-async function equipGearItem(slot,itemId){
-  if(!activeAthlete) return;
-  if(itemId!=='default'){
-    const item=findGearItem(itemId);
-    if(!item||item.slot!==slot||!(state.inventory||[]).includes(itemId)) return;
-  }
-  try{
-    await equipGearItemRemote(activeAthlete.id,slot,itemId);
-  }catch(err){
-    alert('Could not update equipped gear: '+(err.message||'unknown error'));
-    return;
-  }
-  state.equipped=state.equipped||{...defaultEquipped};
-  state.equipped[slot]=itemId;
-  render();
 }
 function useRainToken(){state.rainTokens=state.rainTokens??1;if(state.rainTokens<=0){alert('No Rain Delay Tokens available.');return}state.rainTokens-=1;state.bonuses=state.bonuses||[];state.bonuses.push({date:todayISO(),type:'Rain Delay Token',xp:0,reason:'Streak protected'});save();alert('Streak protected for one missed day.');renderTeamEdition()}
 function renderMission(){const m=missionForToday();if($('#missionTitle'))$('#missionTitle').textContent=m.title;if($('#missionTasks'))$('#missionTasks').innerHTML='<ul>'+m.tasks.map(t=>`<li>☐ ${t}</li>`).join('')+'</ul>';if($('#missionReward'))$('#missionReward').textContent=m.reward;if($('#streakLarge'))$('#streakLarge').textContent=streak();if($('#rainTokens'))$('#rainTokens').textContent=state.rainTokens??1}
@@ -2314,39 +2274,38 @@ function renderMission(){const m=missionForToday();if($('#missionTitle'))$('#mis
 // #lockerInventory element that never existed anywhere in index.html.
 function renderGearLocker(){
   const inv=state.inventory||['default'];
-  const equipped=state.equipped||defaultEquipped;
   const balance=availableBalance();
-  renderAvatarComposite($('#gearAvatarPreview'));
-  if($('#gearShop')){
-    $('#gearShop').innerHTML=gearSlotOrder.map(slot=>{
-      if(gearShopHiddenSlots.includes(slot)) return '';
-      const items=lockerItems.filter(i=>i.slot===slot);
-      if(!items.length) return '';
-      return `<div class="gear-slot-group"><h4>${gearSlotLabels[slot]}</h4><div class="reward-grid">${items.map(item=>{
-        const owned=inv.includes(item.id);
-        const afford=balance>=item.xpCost;
-        const art=gearItemArt[item.id];
-        return `<div class="reward-tile ${owned?'unlocked':''}">
-          <span class="reward-tier-badge tier-${item.tier.toLowerCase()}">${item.tier}</span>
-          ${art?`<img class="gear-tile-art${item.kit?' kit':''}" src="${art}" alt="${item.name}" loading="lazy">`:''}
-          <h3>${item.name}${item.tintable?' 🎨':''}</h3>
-          <p class="reward-price"><img src="assets/xp/lua-xp-coin.svg" alt="" width="22" height="22"><strong>${item.xpCost} XP</strong></p>
-          ${owned?(item.kit?'<strong>Owned</strong><button type="button" class="link-btn open-builder-btn">Use it in the Avatar Builder</button>':'<strong>Owned</strong>'):`<button type="button" class="primary buy-gear-btn" data-item="${item.id}" ${afford?'':'disabled'}>${afford?'Buy':'Not enough XP'}</button>`}
-        </div>`;
-      }).join('')}</div></div>`;
-    }).join('');
-  }
-  if($('#gearEquip')){
-    const colors=state.slotColors||{};
-    $('#gearEquip').innerHTML=gearSlotOrder.filter(s=>!gearKitSlots.includes(s)).map(slot=>{
-      const ownedInSlot=lockerItems.filter(i=>i.slot===slot&&inv.includes(i.id));
-      const options=[{id:'default',name:'Default'},...ownedInSlot];
-      const equippedItem=findGearItem(equipped[slot]);
-      const colorPicker=equippedItem&&equippedItem.tintable
-        ?`<input type="color" class="gear-color-input" data-slot="${slot}" value="${colors[slot]||'#1F7AE0'}" title="Color for ${equippedItem.name}">`:'';
-      return `<div class="gear-equip-row"><span>${gearSlotLabels[slot]}</span><div class="gear-equip-options">${options.map(o=>`<button type="button" class="gear-equip-btn ${equipped[slot]===o.id?'active':''}" data-slot="${slot}" data-item="${o.id}">${o.name}</button>`).join('')}${colorPicker}</div></div>`;
-    }).join('');
-  }
+  if(!$('#gearShop')) return;
+  const group=(slot,tile)=>{
+    const items=lockerItems.filter(i=>i.slot===slot);
+    return items.length?`<div class="gear-slot-group"><h4>${gearSlotLabels[slot]}</h4><div class="reward-grid">${items.map(tile).join('')}</div></div>`:'';
+  };
+  // Card items: real, buyable, used in the Avatar Builder.
+  const liveTile=item=>{
+    const owned=inv.includes(item.id), afford=balance>=item.xpCost, art=gearItemArt[item.id];
+    return `<div class="reward-tile ${owned?'unlocked':''}">
+      <span class="reward-tier-badge tier-${item.tier.toLowerCase()}">${item.tier}</span>
+      ${art?`<img class="gear-tile-art kit" src="${art}" alt="${item.name}" loading="lazy">`:''}
+      <h3>${item.name}</h3>
+      <p class="reward-price"><img src="assets/xp/lua-xp-coin.svg" alt="" width="22" height="22"><strong>${item.xpCost} XP</strong></p>
+      ${owned?'<strong>Owned</strong><button type="button" class="link-btn open-builder-btn">Use it in the Avatar Builder</button>':`<button type="button" class="primary buy-gear-btn" data-item="${item.id}" ${afford?'':'disabled'}>${afford?'Unlock':'Not enough XP'}</button>`}
+    </div>`;
+  };
+  // Older gear: shown, not for sale, not tied to the avatar yet.
+  const soonTile=item=>{
+    const owned=inv.includes(item.id), art=gearItemArt[item.id];
+    return `<div class="reward-tile coming-soon ${owned?'unlocked':''}">
+      <span class="reward-tier-badge tier-${item.tier.toLowerCase()}">${item.tier}</span>
+      ${art?`<img class="gear-tile-art" src="${art}" alt="${item.name}" loading="lazy">`:''}
+      <h3>${item.name}</h3>
+      <span class="soon-pill">Coming soon</span>
+      ${owned?'<p class="muted">You own this one.</p>':''}
+    </div>`;
+  };
+  const live=gearSlotOrder.filter(s=>gearKitSlots.includes(s)).map(s=>group(s,liveTile)).join('');
+  const soon=gearSlotOrder.filter(s=>!gearKitSlots.includes(s)&&!gearShopHiddenSlots.includes(s)).map(s=>group(s,soonTile)).join('');
+  $('#gearShop').innerHTML=live
+    +(soon?`<h3 class="gear-soon-head">Coming Soon</h3><p class="muted">More gear is on the way. It will work with the Avatar Builder when it launches, and anything you already own will be waiting for you.</p>${soon}`:'');
 }
 // Phase C: sourced from currentTeamRoster (get_team_roster() RPC — name +
 // aggregate XP/participation only, the narrowed coach-view data), cached by
