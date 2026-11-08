@@ -983,9 +983,25 @@ function kitDisplayName(){ return (activeAthlete&&activeAthlete.nickname)||state
 function kitTeamText(){ const m=athleteTeamMembership; return (m&&m.status==='approved'&&m.teams&&m.teams.name)||'ALL-STARS' }
 // The saved look, or the starter look when none is saved yet, so every athlete
 // sees a card portrait without having to build one first.
+// When an athlete is chosen: keep a device copy of the account look, or send a
+// look that only exists on this device up to the account once.
+async function syncAthleteLook(){
+  const ath=activeAthlete; if(!ath||!window.AvatarKit) return;
+  if(ath.avatar_config){ AvatarKit.save(ath.id,ath.avatar_config); return }
+  if(!('avatar_config' in ath)) return; // column not created yet
+  const local=AvatarKit.getSaved(ath.id); if(!local) return;
+  try{ if(await saveAthleteAvatarConfig(ath.id,local)){ ath.avatar_config=local; if(activeAthlete===ath){ kitDraft=null; renderPlayerCardHero(); renderClubhouse() } } }catch(e){}
+}
+// The look saved with the athlete's account wins; otherwise the one saved on
+// this device (also used for guests).
+function kitSavedConfig(){
+  if(!window.AvatarKit) return null;
+  if(activeAthlete&&activeAthlete.avatar_config) return AvatarKit.normalize(activeAthlete.avatar_config);
+  return AvatarKit.getSaved(kitOwnerId());
+}
 function kitEffectiveConfig(){
   if(!window.AvatarKit) return null;
-  return AvatarKit.getSaved(kitOwnerId())||AvatarKit.normalize({});
+  return kitSavedConfig()||AvatarKit.normalize({});
 }
 function kitAvatarUrl(){
   const cfg=kitEffectiveConfig();
@@ -1000,7 +1016,7 @@ function kitAvatarUrl(){
 }
 function kitCurrentDraft(){
   const owner=kitOwnerId();
-  if(!kitDraft||kitDraftOwner!==owner){ kitDraft=AvatarKit.getSaved(owner)||AvatarKit.normalize({}); kitDraftOwner=owner }
+  if(!kitDraft||kitDraftOwner!==owner){ kitDraft=kitSavedConfig()||AvatarKit.normalize({}); kitDraftOwner=owner }
   return kitDraft;
 }
 // Name and headline text drawn live over a card image; refit when the size changes.
@@ -1040,14 +1056,26 @@ document.addEventListener('click',e=>{
     kitDraft=AvatarKit.normalize(d); renderAvatarKitBuilder(); return;
   }
   if(e.target.closest('#avatarKitSave')){
-    const ok=AvatarKit.save(kitOwnerId(),kitCurrentDraft());
-    const s=$('#avatarKitStatus'); if(s) s.textContent=ok?'Saved. It now shows on your Player Card.':'Could not save on this device.';
-    renderPlayerCardHero(); return;
+    const cfg=AvatarKit.normalize(kitCurrentDraft()); const ath=activeAthlete;
+    const ok=AvatarKit.save(kitOwnerId(),cfg);
+    const s=$('#avatarKitStatus'); const say=t=>{ if(s) s.textContent=t };
+    renderPlayerCardHero(); renderClubhouse();
+    if(!ok) { say('Could not save on this device.'); return }
+    if(!ath){ say('Saved on this device. Sign in and choose an athlete to keep it on your account.'); return }
+    say('Saving…');
+    saveAthleteAvatarConfig(ath.id,cfg).then(saved=>{
+      if(saved) ath.avatar_config=cfg;
+      if(activeAthlete===ath) say(saved?'Saved. It now shows on your Player Card and in your team’s locker room.':'Saved on this device. Saving to your account turns on after the next update.');
+      renderClubhouse();
+    }).catch(err=>{ if(activeAthlete===ath) say('Saved on this device, but could not save to your account ('+((err&&err.message)||'try again')+').') });
+    return;
   }
   if(e.target.closest('#avatarKitReset')){
+    const ath=activeAthlete; if(ath) ath.avatar_config=null;
     AvatarKit.clear(kitOwnerId()); kitDraft=null;
     const s=$('#avatarKitStatus'); if(s) s.textContent='Removed. Your Player Card is back to the starter look.';
-    renderPlayerCardHero(); renderAvatarKitBuilder(); return;
+    if(ath) saveAthleteAvatarConfig(ath.id,null).catch(()=>{});
+    renderPlayerCardHero(); renderAvatarKitBuilder(); renderClubhouse(); return;
   }
 });
 function renderPlayerCardHero(){
@@ -2509,6 +2537,8 @@ let athleteTeamMembership=null, currentTeamXpTotals=null, currentTeamRank=null, 
 // Clubhouse locker room: roster comes from get_clubhouse_roster() (approved members only).
 // status: idle | loading | ready | error. Fallback = migration 0032 not applied yet.
 let currentClubhouseRoster=[], clubhouseStatus='idle', clubhouseError='', clubhouseUsingFallback=false;
+// Teammates' saved Avatar Builder looks (athlete_id -> look), from get_clubhouse_looks() (0034).
+let currentClubhouseLooks=new Map(), clubhouseLooksUnavailable=false;
 // Shared recognitions (0033). status: idle | ready | error | unavailable (migration not applied).
 let currentRecognitions=[], currentSpotlight=null, recognitionsStatus='idle', recognitionsError='';
 // Team Streak & Team Challenge — see 0022_team_streak_and_challenges.sql.
@@ -2610,6 +2640,26 @@ function clubhouseAvatarHTML(m,cls){
   // On load failure, swap the broken image for the monogram.
   return `<img class="clubhouse-avatar ${cls}" src="${escapeHTML(m.avatar_url)}" alt="${escapeHTML(name)}'s avatar" width="256" height="256" loading="lazy" data-fallback="${escapeHTML(name.trim().charAt(0).toUpperCase()||'?')}">`;
 }
+// The Player Card in a locker: the athlete's saved look (or the starter look),
+// drawn by the Avatar Kit with their name on the plate.
+function clubhouseCardHTML(mem){
+  const name=mem.display_name||'Teammate';
+  return `<div class="clubhouse-card" data-card="${escapeHTML(mem.athlete_id)}" role="img" aria-label="${escapeHTML(name)}’s Player Card"><div class="clubhouse-card-inner"><img alt="" width="900" height="1200"><div class="kit-text-layer"></div></div></div>`;
+}
+function clubhouseLookFor(mem){
+  if(activeAthlete&&mem.athlete_id===activeAthlete.id) return kitEffectiveConfig();
+  return AvatarKit.normalize(currentClubhouseLooks.get(mem.athlete_id)||{});
+}
+function hydrateClubhouseCards(root,width){
+  if(!root||!window.AvatarKit) return;
+  root.querySelectorAll('.clubhouse-card').forEach(el=>{
+    const mem=(currentClubhouseRoster||[]).find(x=>x.athlete_id===el.dataset.card); if(!mem) return;
+    const cfg=clubhouseLookFor(mem), img=el.querySelector('img'), layer=el.querySelector('.kit-text-layer');
+    const fit=()=>AvatarKit.layoutText(layer,cfg,mem.display_name||'Teammate',kitTeamText());
+    AvatarKit.cardDataURL(cfg,{width}).then(u=>{ img.src=u; fit() }).catch(()=>{ el.classList.add('is-empty') });
+    kitWatchSize(el,fit);
+  });
+}
 function renderClubhouse(){
   const room=$('#clubhouseRoom'), roster=$('#clubhouseRoster'), note=$('#clubhouseRoomNote');
   if(!room||!roster||!note) return;
@@ -2645,7 +2695,7 @@ function renderClubhouse(){
       <div class="clubhouse-locker-art" aria-hidden="true"></div>
       <span class="clubhouse-nameplate" aria-hidden="true">${escapeHTML(name)}</span>
       <div class="clubhouse-player" aria-hidden="true">
-        ${clubhouseAvatarHTML(mem,'')}
+        ${clubhouseCardHTML(mem)}
         <strong class="clubhouse-xp">${fmtNum(mem.total_xp)}</strong><span class="clubhouse-xp-label">XP</span>
         <span class="clubhouse-workouts">${workoutsLabel(mem.workout_count)}</span>
       </div>
@@ -2653,10 +2703,12 @@ function renderClubhouse(){
       <button type="button" class="clubhouse-locker-action" data-athlete="${escapeHTML(mem.athlete_id)}" aria-label="Open locker. ${escapeHTML(clubhouseMemberLabel(mem,isYou))}"></button>
     </div>`;
   }).join('');
+  hydrateClubhouseCards(roster,300);
   if(viewAll) viewAll.classList.toggle('hidden',members.length<3);
   if(foot){
-    foot.classList.toggle('hidden',!clubhouseUsingFallback);
-    foot.textContent=clubhouseUsingFallback?'Teammate avatars will appear after the clubhouse update finishes setting up.':'';
+    const footMsg=clubhouseUsingFallback?'Teammate avatars will appear after the clubhouse update finishes setting up.':(clubhouseLooksUnavailable?'Teammates’ saved looks will appear on their cards after the next update finishes setting up.':'');
+    foot.classList.toggle('hidden',!footMsg);
+    foot.textContent=footMsg;
   }
 }
 function openClubhouseDialog(html,returnFocusTo){
@@ -2673,7 +2725,7 @@ function closeClubhouseDialog(){
   if(dlg._returnFocus&&document.contains(dlg._returnFocus)) dlg._returnFocus.focus();
 }
 function kudosBoxHTML(mem){
-  if(recognitionsStatus!=='ready') return '<p class="muted">Player cards are private to each athlete’s family.</p>';
+  if(recognitionsStatus!=='ready') return '<p class="muted">Ratings and workout records stay private to each athlete’s family.</p>';
   return `<div class="kudos-box"><p class="kudos-title">Give ${escapeHTML(mem.display_name||'your teammate')} kudos</p>
     <div class="kudos-buttons">${KUDOS_LABELS.map(k=>`<button type="button" class="kudos-btn" data-recipient="${escapeHTML(mem.athlete_id)}" data-kudos="${escapeHTML(k)}">${escapeHTML(k)}</button>`).join('')}</div>
     <p class="muted kudos-note" id="kudosStatus" role="status">Up to 3 a day, one per teammate.</p></div>`;
@@ -2683,13 +2735,14 @@ function showClubhouseMember(athleteId,trigger){
   const isYou=activeAthlete&&mem.athlete_id===activeAthlete.id;
   openClubhouseDialog(`
     <div class="clubhouse-member">
-      <div class="clubhouse-member-photo">${clubhouseAvatarHTML(mem,'large')}</div>
+      <div class="clubhouse-member-photo">${clubhouseCardHTML(mem)}</div>
       <div>
         <h2 id="clubhouseDialogTitle">${escapeHTML(mem.display_name||'Teammate')}${isYou?' <span class="clubhouse-you-tag">YOU</span>':''}</h2>
         <dl class="clubhouse-member-stats"><div><dt>Career XP</dt><dd>${fmtNum(mem.total_xp)}</dd></div><div><dt>Workouts logged</dt><dd>${fmtNum(mem.workout_count)}</dd></div></dl>
         ${isYou?'<button type="button" class="primary" id="clubhouseOpenMyCard">Open my Player Card</button>':kudosBoxHTML(mem)}
       </div>
     </div>`,trigger);
+  hydrateClubhouseCards($('#clubhouseDialogBody'),300);
 }
 function showClubhouseRoster(trigger){
   const rows=(currentClubhouseRoster||[]).map(mem=>{
@@ -2926,7 +2979,7 @@ async function refreshTeamMembershipUI(){
   if(!activeAthlete) return;
   const statusEl=$('#teamStatsStatus');
   if(statusEl) statusEl.textContent='';
-  clubhouseStatus='loading'; clubhouseError=''; renderClubhouse();
+  clubhouseStatus='loading'; clubhouseError=''; currentClubhouseLooks=new Map(); clubhouseLooksUnavailable=false; renderClubhouse();
   try{
     athleteTeamMembership=await withTimeout(getAthleteTeamMembership(activeAthlete.id),10000,'Loading team membership');
     const approved=athleteTeamMembership&&athleteTeamMembership.status==='approved';
@@ -2934,16 +2987,20 @@ async function refreshTeamMembershipUI(){
       const teamId=athleteTeamMembership.teams.id;
       // The locker-room roster is allowed to fail on its own (shown in the
       // room) without taking the rest of the team stats down with it.
-      const [totals,ranked,roster,activeDates,challenge,clubhouse,recs,spot]=await withTimeout(Promise.all([
+      const [totals,ranked,roster,activeDates,challenge,clubhouse,looks,recs,spot]=await withTimeout(Promise.all([
         loadTeamXpTotals(teamId), loadAllTeamXpTotalsRanked(), loadTeamRoster(teamId),
         loadTeamActiveDates(teamId), loadTeamChallenge(teamId),
         loadClubhouseRoster(teamId).then(r=>({rows:r}),e=>({error:e})),
+        loadClubhouseLooks(teamId).then(r=>({rows:r}),e=>({error:e})),
         loadTeamRecognitions(teamId,activeAthlete.id,20).then(r=>({rows:r}),e=>({error:e})),
         loadTeamSpotlight(teamId).then(r=>({row:r}),e=>({error:e}))
       ]),10000,'Loading team stats');
       if(recs.error||spot.error){recognitionsStatus='error'; recognitionsError=(recs.error||spot.error).message||'unknown error'; currentRecognitions=[]; currentSpotlight=null}
       else if(recs.rows===null||spot.row===null){recognitionsStatus='unavailable'; currentRecognitions=[]; currentSpotlight=null}
       else{recognitionsStatus='ready'; recognitionsError=''; currentRecognitions=recs.rows; currentSpotlight=spot.row||null}
+      // A missing or failing looks function only means teammates show the starter card.
+      if(looks.error||looks.rows===null){ currentClubhouseLooks=new Map(); clubhouseLooksUnavailable=looks.rows===null }
+      else{ currentClubhouseLooks=new Map(looks.rows.map(r=>[r.athlete_id,r.avatar_config])); clubhouseLooksUnavailable=false }
       if(clubhouse.error){clubhouseStatus='error'; clubhouseError=clubhouse.error.message||String(clubhouse.error); currentClubhouseRoster=[]; clubhouseUsingFallback=false}
       else if(clubhouse.rows===null){
         // 0032 not applied yet: same approved-only rows the page already had, without avatars.
@@ -3750,6 +3807,8 @@ async function selectAthlete(athleteId){
   if(!a) return;
   if(activeAthlete&&activeAthlete.id!==a.id) saveArcadeStateFor(activeAthlete.id);
   activeAthlete=a;
+  kitDraft=null;
+  syncAthleteLook();
   setStoredActiveAthleteId(a.id);
   state.athleteName=a.display_name;
   const arcadeSnap=loadArcadeStateFor(a.id);
@@ -3956,7 +4015,7 @@ function afterSignedOut(){
   currentTeamRank=null;
   currentTeamRankTotal=null;
   currentTeamRoster=[];
-  currentClubhouseRoster=[]; clubhouseStatus='idle'; clubhouseError=''; clubhouseUsingFallback=false;
+  currentClubhouseRoster=[]; clubhouseStatus='idle'; clubhouseError=''; clubhouseUsingFallback=false; currentClubhouseLooks=new Map(); clubhouseLooksUnavailable=false;
   currentRecognitions=[]; currentSpotlight=null; recognitionsStatus='idle'; recognitionsError='';
   currentTeamProgram=null;
   currentTeamProgramOptedIn=false;
