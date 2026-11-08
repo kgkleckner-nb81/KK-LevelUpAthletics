@@ -1179,7 +1179,6 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .status-item{display:grid;justify-items:center;min-width:54px;padding:4px 8px;border-left:1px solid rgba(255,255,255,.16)}
 .status-item span{font-size:10px;color:#aaa;text-transform:uppercase}
 .status-item strong{font-family:var(--accent);font-size:16px;color:#fff}
-.pack-status strong{color:var(--neon-yellow)}
 .auth-controls{display:flex;align-items:center;gap:8px;border-left:1px solid rgba(255,255,255,.16);padding-left:14px}
 .auth-trigger{padding:7px 14px;font-size:11px}
 .athlete-switcher{padding:7px 12px;font-size:12px;max-width:150px}
@@ -1214,12 +1213,12 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .path-card>p{font-family:var(--accent);font-size:18px;font-weight:600;color:var(--neon-yellow)}
 .path-card ul{padding-left:20px;color:#eee;line-height:1.7}
 .path-card>span{margin-top:auto;border-top:2px solid rgba(255,255,255,.4);padding-top:15px;width:100%;font-family:var(--accent);font-weight:600;letter-spacing:.04em}
-.home-pulse{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;background:var(--ink);color:#fff;padding:16px;border-radius:16px;border:2px solid var(--neon-blue)}
+.home-pulse{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;background:var(--ink);color:#fff;padding:16px;border-radius:16px;border:2px solid var(--neon-blue)}
 .home-pulse div{padding:10px;border-right:1px solid rgba(255,255,255,.15)}
 .home-pulse div:last-child{border-right:0}
 .home-pulse span{display:block;font-size:10px;color:#aaa;letter-spacing:.1em;text-transform:uppercase}
 .home-pulse strong{display:block;margin-top:5px;font-family:var(--accent);font-size:18px;color:var(--neon-yellow)}
-@media(max-width:900px){.status-bar{gap:6px;padding:7px 8px}.status-item{min-width:40px;padding:3px}.status-athlete{display:none}.mode-nav{top:47px;grid-template-columns:repeat(5,1fr)}.mode-nav .parent-mode{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.10)}.subnav{top:96px}.path-grid{grid-template-columns:1fr}.path-card{min-height:350px}.home-pulse{grid-template-columns:1fr 1fr}.path-card h3{font-size:38px}}
+@media(max-width:900px){.status-bar{gap:6px;padding:7px 8px}.status-item{min-width:40px;padding:3px}.status-athlete{display:none}.mode-nav{top:47px;grid-template-columns:repeat(5,1fr)}.mode-nav .parent-mode{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.10)}.subnav{top:96px}.path-grid{grid-template-columns:1fr}.path-card{min-height:350px}.home-pulse{grid-template-columns:1fr 1fr}.home-pulse div:last-child{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15)}.path-card h3{font-size:38px}}
 
 /* Round 14: final vector icon library, referenced as CSS masks (files are
    plain solid-fill silhouettes, no currentColor built in) so every state

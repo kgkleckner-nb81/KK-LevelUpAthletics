@@ -715,14 +715,11 @@ function renderHeroLadderPreview(){
 function renderPlatformStatus(){
   const total=xp(), currentIndex=state.currentTierIndex||0, current=tiers[currentIndex];
   const next=tiers[Math.min(currentIndex+1,tiers.length-1)];
-  const packReady=(total%250)>=200;
   if($('#statusTier')) $('#statusTier').textContent=current.name;
   if($('#statusXP')) $('#statusXP').textContent=total;
   if($('#statusStreak')) $('#statusStreak').textContent=streak();
-  if($('#statusPack')) $('#statusPack').textContent=packReady?'READY':'LOCKED';
   if($('#homeStreak')) $('#homeStreak').textContent=streak()+' Days';
   if($('#homeNextCallup')) $('#homeNextCallup').textContent=next.name;
-  if($('#homePackStatus')) $('#homePackStatus').textContent=packReady?'Ready to Open':'Locked';
   if($('#homeMissionName')) $('#homeMissionName').textContent=typeof missionForToday==='function'?missionForToday().title:'Daily Mission';
 }
 function render(){renderPlatformStatus();const r=ratings(), rec=pr(), x=xp(), t=tier();$('#overall').textContent=r.overall;$('#overallBig').textContent=r.overall;$('#streak').textContent=streak();$('#workouts').textContent=state.daily.length;$('#xp').textContent=x;$('#levelName').textContent=t.name;$('#levelDesc').textContent=t.name==='THE SHOW'?'Major league energy. Keep building.':(t.name==='Triple AAA'?'One step from THE SHOW. Keep stacking wins.':'Keep training to get called up.');[...performanceAxisOrder,'consistency'].forEach(k=>{$('#'+k).textContent=r[k];$('#'+k+'Bar').style.width=Math.min(100,r[k])+'%'});
