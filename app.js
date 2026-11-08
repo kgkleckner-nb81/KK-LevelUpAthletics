@@ -826,6 +826,7 @@ document.addEventListener('click',e=>{
   if(buyBtn) buyGearItem(buyBtn.dataset.item);
   const equipBtn=e.target.closest('.gear-equip-btn');
   if(equipBtn) equipGearItem(equipBtn.dataset.slot,equipBtn.dataset.item);
+  if(e.target.closest('.open-builder-btn')){ switchScreen('player'); setTimeout(goToAvatarBuilder,150) }
 });
 document.addEventListener('change',e=>{
   const colorInput=e.target.closest('.gear-color-input');
@@ -1014,6 +1015,17 @@ function kitAvatarUrl(){
   }
   return null;
 }
+// Card items from the Gear Locker. Free starter items are always allowed; paid
+// ones need the athlete's inventory (guests own none).
+function kitOwns(itemId){ return !!(activeAthlete&&(state.inventory||[]).includes(itemId)) }
+function kitLockedItems(cfg){ return window.AvatarKit?AvatarKit.lockedFor(cfg,kitOwns):[] }
+function kitLockMessage(locked){
+  if(!locked.length) return '';
+  const list=locked.map(x=>`${x.name} (${x.xpCost} XP)`).join(', ');
+  return activeAthlete
+    ?`This look uses ${list}, which you have not unlocked yet. You can try it on, but to save it unlock ${locked.length>1?'them':'it'} in the Gear Locker.`
+    :`This look uses ${list}. Sign in and choose an athlete to unlock items with XP. Free starter items can be saved without signing in.`;
+}
 function kitCurrentDraft(){
   const owner=kitOwnerId();
   if(!kitDraft||kitDraftOwner!==owner){ kitDraft=kitSavedConfig()||AvatarKit.normalize({}); kitDraftOwner=owner }
@@ -1039,10 +1051,32 @@ function renderAvatarKitBuilder(){
   const d=kitCurrentDraft();
   $$('#avatarKitCard [data-kit]').forEach(b=>{
     const k=b.dataset.kit, v=b.dataset.val;
-    const tog=(k==='hair'||k==='cap'||k==='glasses'); const on=tog?!!d[k]:String(d[k])===v;
+    const tog=(k==='hair'||k==='cap'||k==='glasses');
+    const on=tog?!!d[k]:String(d[k])===v;
     b.setAttribute('aria-pressed',String(on));
     if(tog) b.textContent=({hair:'Hair: ',cap:'Cap: ',glasses:'Glasses: '})[k]+(d[k]?'on':'off');
+    // Lock state for Gear Locker items (backgrounds, frames, poses, glasses).
+    const info=(k==='bg'||k==='frame'||k==='pose')?AvatarKit.optionInfo(k,v):(k==='glasses'?AvatarKit.optionInfo('glasses',null):null);
+    const locked=!!(info&&!info.free&&!kitOwns(info.itemId));
+    b.classList.toggle('is-locked',locked);
+    let tag=b.querySelector('.kit-lock');
+    if(locked){
+      if(!tag){ tag=document.createElement('span'); tag.className='kit-lock'; b.appendChild(tag) }
+      tag.textContent=info.xpCost+' XP';
+    }else if(tag) tag.remove();
+    if(info){
+      b.title=info.tier+' · '+(info.free?'included':info.xpCost+' XP')+(locked?' · locked':'');
+      b.setAttribute('aria-label',(tog?(k==='glasses'?info.name:b.textContent):info.name)+(locked?`, locked, ${info.xpCost} XP`:''));
+    }
   });
+  const lockedNow=kitLockedItems(d), note=$('#avatarKitLockNote');
+  if(note){
+    note.classList.toggle('hidden',!lockedNow.length);
+    if(lockedNow.length){
+      note.textContent=kitLockMessage(lockedNow)+' ';
+      if(activeAthlete){ const btn=document.createElement('button'); btn.type='button'; btn.className='link-btn'; btn.id='avatarKitOpenLocker'; btn.textContent='Open the Gear Locker'; note.appendChild(btn) }
+    }
+  }
   const stage=$('#avatarKitStage'), layer=$('#avatarKitPreviewText');
   kitWatchSize(stage,()=>kitLayoutText(layer,kitCurrentDraft()));
   AvatarKit.cardDataURL(d).then(u=>{ const i=$('#avatarKitPreview'); if(i) i.src=u; kitLayoutText(layer,d) })
@@ -1055,8 +1089,11 @@ document.addEventListener('click',e=>{
     if(k==='hair'||k==='cap'||k==='glasses') d[k]=!d[k]; else d[k]=b.dataset.val;
     kitDraft=AvatarKit.normalize(d); renderAvatarKitBuilder(); return;
   }
+  if(e.target.closest('#avatarKitOpenLocker')){ switchScreen('rewards'); return }
   if(e.target.closest('#avatarKitSave')){
     const cfg=AvatarKit.normalize(kitCurrentDraft()); const ath=activeAthlete;
+    const lockedItems=kitLockedItems(cfg);
+    if(lockedItems.length){ const s0=$('#avatarKitStatus'); if(s0) s0.textContent='Not saved yet. '+kitLockMessage(lockedItems); return }
     const ok=AvatarKit.save(kitOwnerId(),cfg);
     const s=$('#avatarKitStatus'); const say=t=>{ if(s) s.textContent=t };
     renderPlayerCardHero(); renderClubhouse();
@@ -1067,7 +1104,7 @@ document.addEventListener('click',e=>{
       if(saved) ath.avatar_config=cfg;
       if(activeAthlete===ath) say(saved?'Saved. It now shows on your Player Card and in your team’s locker room.':'Saved on this device. Saving to your account turns on after the next update.');
       renderClubhouse();
-    }).catch(err=>{ if(activeAthlete===ath) say('Saved on this device, but could not save to your account ('+((err&&err.message)||'try again')+').') });
+    }).catch(err=>{ if(activeAthlete===ath) say(/locked item/i.test((err&&err.message)||'')?'Your account does not have one of these items yet. Unlock it in the Gear Locker, then save again.':'Saved on this device, but could not save to your account ('+((err&&err.message)||'try again')+').') });
     return;
   }
   if(e.target.closest('#avatarKitReset')){
@@ -1833,8 +1870,12 @@ function combineValueFor(entry,key){
 // renderer hides the face/headwear/hair layers entirely instead of
 // stacking with them (a mascot head replaces the face, it doesn't wear a
 // cap over it) — see gearSlotHiddenBySkin below.
-const gearSlotOrder=['base','jersey','headwear','hair','faceExtra','gear','accessory','border','background','skin','badge'];
-const gearSlotLabels={base:'Body',jersey:'Jersey',headwear:'Headwear',hair:'Hair',faceExtra:'Face Extra',gear:'Gear',accessory:'Accessory',border:'Border',background:'Background',skin:'Skin',badge:'Badge'};
+const gearSlotOrder=['kitBackground','kitFrame','kitPose','kitEyewear','base','jersey','headwear','hair','faceExtra','gear','accessory','border','background','skin','badge'];
+// Card items (Avatar Builder) are used in the builder, not equipped from here. The old border
+// and background items are replaced by them: hidden from the shop, kept for anyone who owns them.
+const gearKitSlots=['kitBackground','kitFrame','kitPose','kitEyewear'];
+const gearShopHiddenSlots=['border','background'];
+const gearSlotLabels={kitBackground:'Card Backgrounds',kitFrame:'Card Frames',kitPose:'Poses',kitEyewear:'Eyewear',base:'Body',jersey:'Jersey',headwear:'Headwear',hair:'Hair',faceExtra:'Face Extra',gear:'Gear',accessory:'Accessory',border:'Border',background:'Background',skin:'Skin',badge:'Badge'};
 // Slots a non-default skin hides (replaces) rather than stacks with.
 const gearSlotHiddenBySkin=['headwear','hair','faceExtra'];
 const lockerItems=[
@@ -1906,6 +1947,8 @@ function findGearItem(id){return lockerItems.find(i=>i.id===id)}
 // art gets produced; anything not listed still falls back to the
 // placeholder box.
 const gearItemArt={'face-mustache':'assets/gear/face-mustache.png'};
+// Card items from the Avatar Builder, generated from its catalog so the two never disagree.
+if(window.AvatarKit) AvatarKit.gearItems().forEach(i=>{ lockerItems.push(i); gearItemArt[i.id]='assets/gear/kit/'+i.id+'.webp' });
 const defaultEquipped={base:'default',jersey:'default',headwear:'default',hair:'default',faceExtra:'default',gear:'default',accessory:'default',border:'default',background:'default',skin:'default',badge:'default'};
 // Placeholder-art color palette per tier, used by the CSS-only compositing
 // renderer (renderAvatarComposite) until real illustrated art exists —
@@ -2092,7 +2135,7 @@ function missionForToday(){const m=[{title:'Speed Day',tasks:['6 Sprints','40 Sh
 // the roll simply lands on XP) so a completed mission never wastes a dupe.
 function rollDailyMissionReward(){
   const owned=state.inventory||['default'];
-  const unowned=lockerItems.filter(i=>!owned.includes(i.id));
+  const unowned=lockerItems.filter(i=>!i.kit&&!owned.includes(i.id)); // card items are not in the mystery pool
   if(unowned.length&&Math.random()<0.5){
     const item=unowned[Math.floor(Math.random()*unowned.length)];
     state.inventory=state.inventory||['default'];
@@ -2140,6 +2183,12 @@ async function buyGearItem(itemId){
   // Ask right away, while the athlete is still looking at what they just
   // bought, instead of silently auto-equipping or leaving them to hunt for
   // the separate Equip section below to notice anything changed.
+  if(item.kit){
+    // Card items are used in the Avatar Builder, not equipped from here.
+    await refreshAthleteState();
+    if(confirm(`${item.name} unlocked! -${item.xpCost} XP.\n\nOpen the Avatar Builder to use it now?`)){ switchScreen('player'); setTimeout(goToAvatarBuilder,150) }
+    return;
+  }
   if(confirm(`${item.name} unlocked! -${item.xpCost} XP.\n\nWear it on your Player Card now?`)){
     try{
       await equipGearItemRemote(activeAthlete.id,item.slot,itemId);
@@ -2179,6 +2228,7 @@ function renderGearLocker(){
   renderAvatarComposite($('#gearAvatarPreview'));
   if($('#gearShop')){
     $('#gearShop').innerHTML=gearSlotOrder.map(slot=>{
+      if(gearShopHiddenSlots.includes(slot)) return '';
       const items=lockerItems.filter(i=>i.slot===slot);
       if(!items.length) return '';
       return `<div class="gear-slot-group"><h4>${gearSlotLabels[slot]}</h4><div class="reward-grid">${items.map(item=>{
@@ -2187,17 +2237,17 @@ function renderGearLocker(){
         const art=gearItemArt[item.id];
         return `<div class="reward-tile ${owned?'unlocked':''}">
           <span class="reward-tier-badge tier-${item.tier.toLowerCase()}">${item.tier}</span>
-          ${art?`<img class="gear-tile-art" src="${art}" alt="${item.name}">`:''}
+          ${art?`<img class="gear-tile-art${item.kit?' kit':''}" src="${art}" alt="${item.name}" loading="lazy">`:''}
           <h3>${item.name}${item.tintable?' 🎨':''}</h3>
           <p class="reward-price"><img src="assets/xp/lua-xp-coin.svg" alt="" width="22" height="22"><strong>${item.xpCost} XP</strong></p>
-          ${owned?'<strong>Owned</strong>':`<button type="button" class="primary buy-gear-btn" data-item="${item.id}" ${afford?'':'disabled'}>${afford?'Buy':'Not enough XP'}</button>`}
+          ${owned?(item.kit?'<strong>Owned</strong><button type="button" class="link-btn open-builder-btn">Use it in the Avatar Builder</button>':'<strong>Owned</strong>'):`<button type="button" class="primary buy-gear-btn" data-item="${item.id}" ${afford?'':'disabled'}>${afford?'Buy':'Not enough XP'}</button>`}
         </div>`;
       }).join('')}</div></div>`;
     }).join('');
   }
   if($('#gearEquip')){
     const colors=state.slotColors||{};
-    $('#gearEquip').innerHTML=gearSlotOrder.map(slot=>{
+    $('#gearEquip').innerHTML=gearSlotOrder.filter(s=>!gearKitSlots.includes(s)).map(slot=>{
       const ownedInSlot=lockerItems.filter(i=>i.slot===slot&&inv.includes(i.id));
       const options=[{id:'default',name:'Default'},...ownedInSlot];
       const equippedItem=findGearItem(equipped[slot]);
