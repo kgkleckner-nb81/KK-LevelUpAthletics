@@ -251,6 +251,24 @@ async function saveAthleteAvatarConfig(athleteId,config){
   return true;
 }
 
+// Sport tag (0036). Returns false when the column is not there yet.
+async function updateAthleteSports(athleteId,sports){
+  const {error}=await supabase.from('athletes').update({sports:sports||null}).eq('id',athleteId);
+  if(error){
+    if(error.code==='PGRST204'||error.code==='42703'||/sports/i.test(error.message||'')) return false;
+    throw error;
+  }
+  return true;
+}
+async function updateTeamSports(teamId,sports){
+  const {error}=await supabase.from('teams').update({sports:sports||null}).eq('id',teamId);
+  if(error){
+    if(error.code==='PGRST204'||error.code==='42703'||/sports/i.test(error.message||'')) return false;
+    throw error;
+  }
+  return true;
+}
+
 // Frictionless, same as creation — age isn't a PIN-gated field.
 async function updateAthleteAge(athleteId,age){
   const {error}=await supabase.from('athletes').update({age}).eq('id',athleteId);

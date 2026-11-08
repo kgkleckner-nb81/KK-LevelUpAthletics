@@ -1676,3 +1676,9 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .avatar-kit-lock-note.hidden{display:none}
 .gear-tile-art.kit{width:72px;height:96px;object-fit:cover;border-radius:6px;margin:14px auto 4px}
 .reward-tile .open-builder-btn{display:block;margin:6px auto 0}
+
+/* Sport tag */
+.sport-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.sport-chip{border:2px solid var(--line,#cfd8dc);background:#fff;color:inherit;border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;min-height:40px;cursor:pointer}
+.sport-chip.on{background:#0b3d2e;border-color:#0b3d2e;color:#fff}
+.sport-tag{display:inline-block;margin:6px 6px 0 0;padding:2px 9px;border-radius:999px;background:#e8f1ee;color:#0b3d2e;font-size:12px;font-weight:700;letter-spacing:.02em}

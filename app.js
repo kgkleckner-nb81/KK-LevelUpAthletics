@@ -49,13 +49,13 @@ const combineNames={maxPushups:'Max push-ups',squat60:'Squats in 60 sec',plankMa
 // objective changed (Brewers Call-Up -> Baller Call Up); see migration 0028.
 const quests=[
   {id:'daily-double',type:'Quest',img:'lua-quest-daily-double',title:'Daily Double',desc:'Complete two short workouts in one day.',xp:40},
-  {id:'gold-glove',type:'Quest',img:'lua-quest-gold-glove-drill',title:'Gold Glove Drill',desc:'Complete 50 lateral shuffle touches.',xp:35},
-  {id:'base-stealer',type:'Quest',img:'lua-quest-base-stealer-bonus',title:'Base Stealer Bonus',desc:'Complete 10 total 20-yard sprints.',xp:40},
+  {id:'gold-glove',sports:['baseball','softball'],type:'Quest',img:'lua-quest-gold-glove-drill',title:'Gold Glove Drill',desc:'Complete 50 lateral shuffle touches.',xp:35},
+  {id:'base-stealer',sports:['baseball','softball'],type:'Quest',img:'lua-quest-base-stealer-bonus',title:'Base Stealer Bonus',desc:'Complete 10 total 20-yard sprints.',xp:40},
   {id:'iron-core',type:'Quest',img:'lua-quest-iron-core',title:'Iron Core',desc:'Hold a plank for 60 seconds.',xp:45},
-  {id:'power-hitter',type:'Quest',img:'lua-quest-power-hitter',title:'Power Hitter',desc:'Complete 15 broad jumps with good form.',xp:45},
+  {id:'power-hitter',sports:['baseball','softball'],type:'Quest',img:'lua-quest-power-hitter',title:'Power Hitter',desc:'Complete 15 broad jumps with good form.',xp:45},
   {id:'dad-challenge',type:'Quest',img:'lua-quest-dad-challenge',title:'Dad Challenge',desc:'Beat Dad in one approved challenge.',xp:60},
-  {id:'fastball-monster',type:'Boss Battle',img:'lua-quest-fastball-monster',title:'Fastball Monster',desc:'15 push-ups, 45-sec plank, and 40 squats.',xp:100},
-  {id:'base-dragon',type:'Boss Battle',img:'lua-quest-base-stealing-dragon',title:'Base-Stealing Dragon',desc:'8 sprints and 40 shuffle touches.',xp:100},
+  {id:'fastball-monster',sports:['baseball','softball'],type:'Boss Battle',img:'lua-quest-fastball-monster',title:'Fastball Monster',desc:'15 push-ups, 45-sec plank, and 40 squats.',xp:100},
+  {id:'base-dragon',sports:['baseball','softball'],type:'Boss Battle',img:'lua-quest-base-stealing-dragon',title:'Base-Stealing Dragon',desc:'8 sprints and 40 shuffle touches.',xp:100},
   {id:'spartan-trial',type:'Boss Battle',img:'lua-quest-spartan-trial',title:'Spartan Trial',desc:'Reach 60+ overall and complete a verified combine.',xp:125},
   {id:'brewers-callup',type:'Boss Battle',img:'lua-quest-baller-call-up',title:'Baller Call Up',desc:'Reach Baller tier.',xp:175}
 ];
@@ -731,7 +731,7 @@ $('#dailyLog').innerHTML=workoutHistoryTable(state.daily.slice(-10).reverse());
 $('#combineLog').innerHTML=combineHistoryTable(state.combine.slice().reverse());
 $('#pendingList').innerHTML=table(['Week','Program','Status'],state.combine.filter(a=>!a.verified).map(a=>[a.week,a.programName||'—',a.status]));
 const targetLabels={pushups:'Push-ups',squats:'Squats',plank:'Plank (sec)',shuffleTouches:'Lateral Shuffle Touches',skaterJumps:'Skater Jumps',broadJumpIn:'Broad Jump (in)'};
-$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${targetLabels[k]||k}</strong>: current ${v||0}</p>`).join('');renderQuests();renderRewards();renderGearLocker();renderPlayerCardHero();renderCoachReport();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
+$('#targets').innerHTML=Object.entries({pushups:rec.pushups,squats:rec.squats,plank:rec.plank,shuffleTouches:rec.shuffleTouches,skaterJumps:rec.skaterJumps,broadJumpIn:rec.broadJumpIn}).map(([k,v])=>`<p><strong>${targetLabels[k]||k}</strong>: current ${v||0}</p>`).join('');renderQuests();reorderArcadeBySport();renderSportPickers();renderRewards();renderGearLocker();renderPlayerCardHero();renderCoachReport();renderTeamEdition();renderCombineProgramPicker();renderCharts()}
 
 
 function xpEvents(){
@@ -843,11 +843,102 @@ async function setGearColor(slot,colorHex){
   renderAvatarComposite($('#gearAvatarPreview'));
 }
 
+// ---- Sport tag -----------------------------------------------------------
+// A sport is a tag on content, athletes and teams - not a separate portal.
+// XP, ratings, tiers and leaderboards are identical for every sport. The tag
+// only decides what is featured first; nothing is ever hidden.
+const SPORTS=[{id:'baseball',name:'Baseball'},{id:'softball',name:'Softball'},{id:'basketball',name:'Basketball'}];
+function sportName(id){ const x=SPORTS.find(s=>s.id===id); return x?x.name:id }
+function localSportsKey(){ return 'lua.sports.'+((typeof activeAthlete!=='undefined'&&activeAthlete&&activeAthlete.id)||'guest') }
+// The athlete's own choice wins, then the approved team's, else [] (= all sports).
+function activeSports(){
+  const ok=a=>Array.isArray(a)&&a.length?a.filter(x=>SPORTS.some(s=>s.id===x)):null;
+  const own=ok(activeAthlete&&activeAthlete.sports); if(own&&own.length) return own;
+  try{ const loc=ok(JSON.parse(localStorage.getItem(localSportsKey())||'null')); if(loc&&loc.length) return loc }catch(e){}
+  const m=athleteTeamMembership;
+  const team=ok(m&&m.status==='approved'&&m.teams&&m.teams.sports); if(team&&team.length) return team;
+  return [];
+}
+// Untagged content belongs to every sport.
+function sportMatches(item){
+  const mine=activeSports(), tags=item&&item.sports;
+  if(!mine.length||!tags||!tags.length) return true;
+  return tags.some(t=>mine.includes(t));
+}
+function sortBySport(list){
+  const a=[],b=[]; list.forEach(x=>(sportMatches(x)?a:b).push(x)); return a.concat(b);
+}
+function sportChipHTML(item){
+  const tags=item&&item.sports; if(!tags||!tags.length) return '';
+  return '<span class="sport-tag">'+escapeHTML(tags.map(sportName).join(' · '))+'</span>';
+}
+// Basketball-only players start in the basketball uniform with no cap.
+function kitStarterConfig(){
+  const s=activeSports();
+  const base={};
+  if(s.length&&!s.includes('baseball')&&!s.includes('softball')&&s.includes('basketball')){ base.outfit='basketball'; base.cap=false }
+  return AvatarKit.normalize(base);
+}
+function sportChipsHTML(selected){
+  const none=!selected.length;
+  return '<button type="button" class="sport-chip'+(none?' on':'')+'" data-sport="all" aria-pressed="'+none+'">All sports</button>'
+    +SPORTS.map(s=>{const on=selected.includes(s.id);return '<button type="button" class="sport-chip'+(on?' on':'')+'" data-sport="'+s.id+'" aria-pressed="'+on+'">'+s.name+'</button>'}).join('');
+}
+function toggleSportSelection(current,id){
+  if(id==='all') return [];
+  const set=new Set(current); set.has(id)?set.delete(id):set.add(id);
+  return SPORTS.map(s=>s.id).filter(x=>set.has(x));
+}
+function renderSportPickers(){
+  const ac=$('#athleteSportsCard');
+  if(ac){
+    ac.classList.toggle('hidden',!activeAthlete);
+    if(activeAthlete){
+      const own=(activeAthlete.sports||[]);
+      let sel=own; if(!sel.length){ try{ sel=JSON.parse(localStorage.getItem(localSportsKey())||'[]')||[] }catch(e){ sel=[] } }
+      $('#athleteSportChips').innerHTML=sportChipsHTML(sel);
+    }
+  }
+  if($('#teamSportChips')) $('#teamSportChips').innerHTML=sportChipsHTML((coachTeam&&coachTeam.sports)||[]);
+}
+async function chooseAthleteSport(id){
+  if(!activeAthlete) return;
+  const cur=(activeAthlete.sports&&activeAthlete.sports.length)?activeAthlete.sports:(()=>{try{return JSON.parse(localStorage.getItem(localSportsKey())||'[]')||[]}catch(e){return[]}})();
+  const next=toggleSportSelection(cur,id), status=$('#athleteSportStatus');
+  let saved=false;
+  try{ saved=await updateAthleteSports(activeAthlete.id,next.length?next:null) }catch(e){ if(status) status.textContent='Could not save that. Try again.'; return }
+  if(saved) activeAthlete.sports=next.length?next:null;
+  try{ localStorage.setItem(localSportsKey(),JSON.stringify(next)) }catch(e){}
+  if(!saved) activeAthlete.sports=null;
+  if(status) status.textContent=next.length?'Featuring '+next.map(sportName).join(', ')+' first.':'Showing every sport.';
+  kitDraft=null; render();
+}
+async function chooseTeamSport(id){
+  if(!coachTeam) return;
+  const next=toggleSportSelection(coachTeam.sports||[],id), status=$('#teamSportStatus');
+  let saved=false;
+  try{ saved=await updateTeamSports(coachTeam.id,next.length?next:null) }catch(e){ if(status) status.textContent='Could not save that. Try again.'; return }
+  if(!saved){ if(status) status.textContent='Team sport needs the latest database update before it can be saved.'; return }
+  coachTeam.sports=next.length?next:null;
+  const t=(coachTeams||[]).find(x=>x.id===coachTeam.id); if(t) t.sports=coachTeam.sports;
+  if(status) status.textContent=next.length?'Team focus: '+next.map(sportName).join(', ')+'.':'Team focus: all sports.';
+  renderSportPickers();
+}
+function reorderArcadeBySport(){
+  const grid=document.querySelector('.arcade-grid'); if(!grid) return;
+  const cards=[...grid.querySelectorAll('.game-tile-card')];
+  if(!grid._origOrder) grid._origOrder=cards.slice();
+  const tagged=c=>{const d=(c.dataset.sports||'').split(',').filter(Boolean); return {sports:d}};
+  const ordered=sortBySport(grid._origOrder.map(c=>Object.assign(tagged(c),{el:c}))).map(x=>x.el);
+  ordered.forEach(c=>grid.appendChild(c));
+  cards.forEach(c=>{ const t=tagged(c); c.querySelector('.sport-tag')?.remove(); if(t.sports.length&&activeSports().length){ const holder=c.querySelector('button'); if(holder) holder.insertAdjacentHTML('afterend',sportChipHTML(t)) } });
+}
 function renderQuests(){
   const wk=weekStartISO(todayISO());
   const completedThisWeek=new Set((state.quests||[]).filter(x=>weekStartISO(x.date)===wk).map(x=>x.id));
-  if($('#questSelect')) $('#questSelect').innerHTML=quests.map(q=>`<option value="${q.id}" ${completedThisWeek.has(q.id)?'disabled':''}>${q.type}: ${q.title} (+${q.xp} XP)${completedThisWeek.has(q.id)?' — done this week':''}</option>`).join('');
-  if($('#questList')) $('#questList').innerHTML=quests.map(q=>{
+  const questsSorted=sortBySport(quests);
+  if($('#questSelect')) $('#questSelect').innerHTML=questsSorted.map(q=>`<option value="${q.id}" ${completedThisWeek.has(q.id)?'disabled':''}>${q.type}: ${q.title} (+${q.xp} XP)${completedThisWeek.has(q.id)?' — done this week':''}</option>`).join('');
+  if($('#questList')) $('#questList').innerHTML=questsSorted.map(q=>{
     const doneThisWeek=completedThisWeek.has(q.id);
     const lifetimeCount=(state.quests||[]).filter(x=>x.id===q.id).length;
     return `<div class="quest-card ${q.type==='Boss Battle'?'battle':''} ${doneThisWeek?'complete':''}">
@@ -855,7 +946,7 @@ function renderQuests(){
       <h3>${q.title}</h3>
       <p><strong>${q.type}</strong></p>
       <p>${q.desc}</p>
-      <span class="xp-pill">+${q.xp} XP</span>
+      <span class="xp-pill">+${q.xp} XP</span>${activeSports().length?sportChipHTML(q):''}
       ${doneThisWeek?`<p class="verified">Completed this week</p>`:''}
       ${lifetimeCount?`<p class="muted">Lifetime: ${lifetimeCount}x</p>`:''}
     </div>`;
@@ -1002,7 +1093,7 @@ function kitSavedConfig(){
 }
 function kitEffectiveConfig(){
   if(!window.AvatarKit) return null;
-  return kitSavedConfig()||AvatarKit.normalize({});
+  return kitSavedConfig()||kitStarterConfig();
 }
 function kitAvatarUrl(){
   const cfg=kitEffectiveConfig();
@@ -1028,7 +1119,7 @@ function kitLockMessage(locked){
 }
 function kitCurrentDraft(){
   const owner=kitOwnerId();
-  if(!kitDraft||kitDraftOwner!==owner){ kitDraft=kitSavedConfig()||AvatarKit.normalize({}); kitDraftOwner=owner }
+  if(!kitDraft||kitDraftOwner!==owner){ kitDraft=kitSavedConfig()||kitStarterConfig(); kitDraftOwner=owner }
   return kitDraft;
 }
 // Name and headline text drawn live over a card image; refit when the size changes.
@@ -2129,7 +2220,7 @@ function recordArcadeMetric(gameId,value){
   state.arcadeMetrics[gameId]=Math.max(0,Math.min(100,Math.round(value)));
   save();
 }
-function missionForToday(){const m=[{title:'Speed Day',tasks:['6 Sprints','40 Shuffle Touches','20 Skater Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Power Day',tasks:['35 Squats','12 Push-ups','10 Broad Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Core Day',tasks:['30 Sit Ups','45-Second Plank','20 Dead Bugs'],reward:'+40 XP + Mystery Pack'},{title:'Baseball IQ Day',tasks:['Strike Zone Challenge','Target Throws','Coach Helper'],reward:'+35 XP + Card Unlock'},{title:'Recovery Day',tasks:['Shoulder Mobility','Hip Mobility','Easy Stretching'],reward:'+25 XP + Rain Token Chance'}];return m[new Date().getDay()%m.length]}
+function missionForToday(){const m=[{title:'Speed Day',tasks:['6 Sprints','40 Shuffle Touches','20 Skater Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Power Day',tasks:['35 Squats','12 Push-ups','10 Broad Jumps'],reward:'+40 XP + Mystery Pack'},{title:'Core Day',tasks:['30 Sit Ups','45-Second Plank','20 Dead Bugs'],reward:'+40 XP + Mystery Pack'},{title:'Baseball IQ Day',sports:['baseball','softball'],tasks:['Strike Zone Challenge','Target Throws','Coach Helper'],reward:'+35 XP + Card Unlock'},{title:'Recovery Day',tasks:['Shoulder Mobility','Hip Mobility','Easy Stretching'],reward:'+25 XP + Rain Token Chance'}];const pool=m.filter(x=>sportMatches(x)); const d=new Date().getDay(); return m[d%m.length]&&sportMatches(m[d%m.length])?m[d%m.length]:(pool.length?pool[d%pool.length]:m[d%m.length])}
 // Round 12 item 9 — HARD RULE: one roll per mission, a mystery gear item OR
 // bonus XP, never both. Falls back to XP if every item is already owned (or
 // the roll simply lands on XP) so a completed mission never wastes a dupe.
@@ -3168,6 +3259,7 @@ function renderTeamSetupPanel(){
     }
     // Say which team the roster and shout-out cards are showing.
     ['#teamRosterTeamName','#coachRecognitionsTeamName'].forEach(sel=>{const el=$(sel); if(el) el.textContent='— '+coachTeam.name});
+    if($('#teamSportChips')) $('#teamSportChips').innerHTML=sportChipsHTML(coachTeam.sports||[]);
   }else{
     if(existing) existing.classList.add('hidden');
   }
@@ -3687,6 +3779,15 @@ function todayTriviaIndex(){
   const days=Math.floor((new Date(todayISO()+'T00:00:00Z').getTime()-epoch)/86400000);
   return ((days%triviaQuestions.length)+triviaQuestions.length)%triviaQuestions.length;
 }
+// Existing questions are all baseball. A basketball-only player gets the full
+// pool until basketball questions exist; sport never blocks the daily spin bonus.
+function todayTrivia(){
+  const pool=triviaQuestions.filter(q=>sportMatches({sports:q.sports||['baseball']}));
+  const list=pool.length?pool:triviaQuestions;
+  const epoch=Date.UTC(2024,0,1);
+  const days=Math.floor((new Date(todayISO()+'T00:00:00Z').getTime()-epoch)/86400000);
+  return list[((days%list.length)+list.length)%list.length];
+}
 // Dimensional wheel art (LUA-Prize-Wheel asset pack) — housing/lighting/
 // hub/pointer stay fixed; only #wheel-rotor (the numbered face) turns,
 // via its own SVG transform attribute, so the already-tilted projection
@@ -3745,7 +3846,7 @@ function spinWheel(){
 function answerTrivia(choiceIdx){
   ensureArcadeDay();
   if(state.arcadeDaily.triviaAnswered) return;
-  const q=triviaQuestions[todayTriviaIndex()];
+  const q=todayTrivia();
   const correct=choiceIdx===q.a;
   state.arcadeDaily.triviaAnswered=true;
   state.arcadeDaily.triviaSelected=choiceIdx;
@@ -3762,7 +3863,7 @@ function renderArcadeExtras(){
   $('#spinButton').textContent=remaining>0?'Spin The Wheel':'No Spins Left Today';
   if($('#spinStatus')) $('#spinStatus').textContent=remaining>0?`${remaining} spin${remaining===1?'':'s'} available today.`:"Come back tomorrow — or ace today's trivia for a bonus spin!";
 
-  const q=triviaQuestions[todayTriviaIndex()];
+  const q=todayTrivia();
   const answered=state.arcadeDaily.triviaAnswered;
   const selected=state.arcadeDaily.triviaSelected;
   if($('#triviaCategory')) $('#triviaCategory').textContent=q.cat;
@@ -3812,6 +3913,8 @@ $$('input[name=teamChallengeRewardType]').forEach(r=>r.onchange=toggleTeamChalle
 if($('#saveTeamSetup'))$('#saveTeamSetup').onclick=saveTeamSetup;
 if($('#coachTeamSwitcher'))$('#coachTeamSwitcher').onchange=e=>switchCoachTeam(e.target.value);
 if($('#joinTeamIdentityBtn'))$('#joinTeamIdentityBtn').onclick=joinTeamIdentity;
+if($('#athleteSportChips'))$('#athleteSportChips').addEventListener('click',e=>{const b=e.target.closest('[data-sport]'); if(b) chooseAthleteSport(b.dataset.sport)});
+if($('#teamSportChips'))$('#teamSportChips').addEventListener('click',e=>{const b=e.target.closest('[data-sport]'); if(b) chooseTeamSport(b.dataset.sport)});
 if($('#teamLogoUpload'))$('#teamLogoUpload').onchange=e=>handleTeamLogoUpload(e.target.files[0]);
 if($('#joinTeamProgram'))$('#joinTeamProgram').onclick=joinTeamProgram;
 if($('#completeTeamProgram'))$('#completeTeamProgram').onclick=goToTeamProgramCheckIn;
