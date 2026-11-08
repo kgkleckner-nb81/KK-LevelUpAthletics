@@ -13,12 +13,14 @@
   // Full-body reference extents inside a 900x1200 avatar layer (cap top to sole).
   const REF_TOP=44, REF_FEET=1010;
 
-  // ---- Gear Locker catalog (proposal; nothing reads tier or xpCost yet) ----
-  // tier and xpCost reuse the Locker's current ladder: Common 75, Uncommon 150,
-  // Rare 250, Legendary 400. free marks the starter items every athlete owns.
+  // ---- Gear Locker catalog ----
+  // tier and xpCost use the Locker's ladder: Common 75, Uncommon 150, Rare 250,
+  // Legendary 400. free marks the starter items every athlete owns (cost 0).
+  // Paid items are Gear Locker items with ids like kit-bg-stadium; see
+  // supabase/migrations/0035_gear_locker_card_items.sql, which must match.
   const BACKGROUNDS=[
-    {id:'sandlot',name:'Sandlot',file:'bg_sandlot',tier:'Common',xpCost:75,free:true},
-    {id:'daygame',name:'Day Game',file:'bg_daygame',tier:'Common',xpCost:75},
+    {id:'sandlot',name:'Sandlot',file:'bg_sandlot',tier:'Common',xpCost:0,free:true},
+    {id:'daygame',name:'Day Game',file:'bg_daygame',tier:'Common',xpCost:0,free:true},
     {id:'stadium',name:'Baseball Stadium',file:'bg_stadium',tier:'Uncommon',xpCost:150},
     {id:'football',name:'Football Stadium',file:'bg_football',tier:'Uncommon',xpCost:150},
     {id:'concert',name:'Arena Concert',file:'bg_arena_concert',tier:'Rare',xpCost:250},
@@ -30,7 +32,7 @@
   // frames have the name area built in and carry their own text layout.
   const STD_PLACE={feet:90.5,top:22};
   const FRAMES=[
-    {id:'sandlot',name:'Sandlot',collection:'Classic',type:'standard',file:'frame_sandlot',plate:'plate_sandlot',style:'sandlot',tier:'Common',xpCost:75,free:true,place:STD_PLACE},
+    {id:'sandlot',name:'Sandlot',collection:'Classic',type:'standard',file:'frame_sandlot',plate:'plate_sandlot',style:'sandlot',tier:'Common',xpCost:0,free:true,place:STD_PLACE},
     {id:'retro',name:'Retro All-Star',collection:'Classic',type:'standard',file:'frame_retro',plate:'plate_sandlot',style:'retro',tier:'Common',xpCost:75,place:STD_PLACE},
     {id:'platinum',name:'Platinum',collection:'Classic',type:'standard',file:'frame_platinum',plate:'plate_platinum',style:'platinum',tier:'Uncommon',xpCost:150,place:STD_PLACE},
     {id:'gold',name:'Gold',collection:'Classic',type:'standard',file:'frame_gold',plate:'plate_gold',style:'gold',tier:'Uncommon',xpCost:150,place:STD_PLACE},
@@ -55,7 +57,37 @@
     {id:'hips',name:'Hands on Hips',dir:'pose-hips/',tier:'Common',xpCost:75}
   ];
   const OPTIONS={palette:['A','B'],team:['green','blue'],outfit:['baseball','basketball']};
-  const DEFAULT={pose:'ready',palette:'A',team:'green',outfit:'baseball',cap:true,hair:true,glasses:false,bg:'stadium',frame:'platinum'};
+  const DEFAULT={pose:'ready',palette:'A',team:'green',outfit:'baseball',cap:true,hair:true,glasses:false,bg:'daygame',frame:'sandlot'};
+  // ---- Gear Locker items for the builder's lockable options ----
+  const EYEWEAR=[{id:'neon',name:'Neon Shield Glasses',tier:'Uncommon',xpCost:150}];
+  const ITEM_PART={bg:'bg',frame:'frame',pose:'pose',glasses:'eyewear'};
+  const ITEM_SLOT={bg:'kitBackground',frame:'kitFrame',pose:'kitPose',glasses:'kitEyewear'};
+  const itemId=(kind,id)=>'kit-'+ITEM_PART[kind]+'-'+(kind==='glasses'?'neon':id);
+  // Info for one option: {itemId,name,tier,xpCost,free}. glasses is the on/off toggle.
+  function optionInfo(kind,id){
+    const list=kind==='bg'?BACKGROUNDS:kind==='frame'?FRAMES:kind==='pose'?POSES:kind==='glasses'?EYEWEAR:null;
+    const e=list&&list.find(x=>x.id===(kind==='glasses'?'neon':id)); if(!e) return null;
+    return {itemId:itemId(kind,id),name:e.name,tier:e.tier,xpCost:e.xpCost||0,free:!!e.free};
+  }
+  // Items a look uses that the athlete does not own. owns(itemId) says what they own.
+  function lockedFor(c,owns){
+    c=normalize(c); const out=[];
+    [['bg',c.bg],['frame',c.frame],['pose',c.pose],['glasses',c.glasses?'neon':null]].forEach(([kind,id])=>{
+      if(!id) return; const o=optionInfo(kind,id);
+      if(o&&!o.free&&!owns(o.itemId)) out.push({kind,id,...o});
+    });
+    return out;
+  }
+  // The paid options as Gear Locker shop items (free ones are not for sale).
+  function gearItems(){
+    const out=[];
+    const add=(kind,e,suffix)=>{ if(!e.free) out.push({id:itemId(kind,e.id),name:e.name+(suffix||''),slot:ITEM_SLOT[kind],xpCost:e.xpCost,tier:e.tier,kit:{kind,id:e.id}}) };
+    BACKGROUNDS.forEach(e=>add('bg',e,' Background'));
+    FRAMES.forEach(e=>add('frame',e,' Frame'));
+    POSES.forEach(e=>add('pose',e,''));
+    EYEWEAR.forEach(e=>add('glasses',e,''));
+    return out;
+  }
   const poseOf=id=>POSES.find(p=>p.id===id)||POSES[0];
   const bgOf=id=>BACKGROUNDS.find(b=>b.id===id)||BACKGROUNDS.find(b=>b.id===DEFAULT.bg);
   const frameOf=id=>FRAMES.find(f=>f.id===id)||FRAMES.find(f=>f.id===DEFAULT.frame);
@@ -186,5 +218,5 @@
   function getSaved(id){ try{ const r=localStorage.getItem(key(id)); return r?normalize(JSON.parse(r)):null }catch(e){ return null } }
   function save(id,c){ try{ localStorage.setItem(key(id),JSON.stringify(normalize(c))); return true }catch(e){ return false } }
   function clear(id){ try{ localStorage.removeItem(key(id)) }catch(e){} }
-  window.AvatarKit={OPTIONS,POSES,DEFAULT,BACKGROUNDS,FRAMES,bgOf,frameOf,normalize,layersFor,compose,toDataURL,composeCard,cardDataURL,layoutText,getSaved,save,clear,W,H};
+  window.AvatarKit={OPTIONS,POSES,EYEWEAR,optionInfo,lockedFor,gearItems,itemId,DEFAULT,BACKGROUNDS,FRAMES,bgOf,frameOf,normalize,layersFor,compose,toDataURL,composeCard,cardDataURL,layoutText,getSaved,save,clear,W,H};
 })();

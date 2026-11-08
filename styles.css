@@ -1667,3 +1667,12 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
 .clubhouse-card-inner .kit-text-layer{z-index:2}
 .lua-team-clubhouse .clubhouse-you{left:22.5%}
 .clubhouse-member-photo{width:150px}
+
+/* ---- Locked card items in the Avatar Builder, and card items in the Gear Locker ---- */
+.avatar-kit-opts button.is-locked{border-style:dashed;opacity:.88}
+.avatar-kit-opts .kit-lock{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--ink);color:#fff;font-size:11px;font-weight:800;line-height:1.5;white-space:nowrap}
+.avatar-kit-opts .kit-lock::before{content:"";display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17 9V7a5 5 0 0 0-10 0v2H5v13h14V9h-2zm-8 0V7a3 3 0 0 1 6 0v2H9z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17 9V7a5 5 0 0 0-10 0v2H5v13h14V9h-2zm-8 0V7a3 3 0 0 1 6 0v2H9z'/%3E%3C/svg%3E") center/contain no-repeat}
+.avatar-kit-lock-note{margin:6px 0 0;padding:8px 10px;border:2px dashed var(--ink);border-radius:10px;background:rgba(255,205,60,.25);font-size:14px;line-height:1.4}
+.avatar-kit-lock-note.hidden{display:none}
+.gear-tile-art.kit{width:72px;height:96px;object-fit:cover;border-radius:6px;margin:14px auto 4px}
+.reward-tile .open-builder-btn{display:block;margin:6px auto 0}
